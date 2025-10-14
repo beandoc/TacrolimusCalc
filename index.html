@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Tacrolimus Dosing Tools</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f9;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .calculator-wrapper {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 25px 30px;
+            margin-bottom: 30px;
+            border-top: 5px solid #0056b3;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+        .info-box {
+            background-color: #e7f3fe;
+            border: 1px solid #b3d7f7;
+            border-radius: 4px;
+            padding: 15px;
+            font-size: 0.9em;
+            color: #31708f;
+            margin-bottom: 20px;
+        }
+        .input-row, .single-input-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 12px;
+            align-items: flex-end;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .input-group label {
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none; margin: 0;
+        }
+        input[type=number] { -moz-appearance: textfield; }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .calc-btn { background-color: #28a745; color: white; }
+        .calc-btn:hover { background-color: #218838; }
+        .add-btn { background-color: #007bff; color: white; }
+        .add-btn:hover { background-color: #0069d9; }
+        .output {
+            margin-top: 25px;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 1.1em;
+            font-weight: bold;
+            display: none; /* Hidden by default */
+        }
+        .output span {
+            display: block;
+            margin-top: 8px;
+            font-size: 0.9em;
+            font-weight: normal;
+        }
+        .output-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .output-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .expert-info {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+        details {
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        summary {
+            font-weight: bold;
+            padding: 10px;
+            cursor: pointer;
+            background-color: #f7f7f7;
+        }
+        .details-content { padding: 15px; line-height: 1.6; }
+        .details-content ul { padding-left: 20px; }
+        p { line-height: 1.6; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <h1>Comprehensive Tacrolimus Dosing Tools</h1>
+
+    <div class="calculator-wrapper" style="border-top-color: #dc3545;">
+        <h2>Advanced Tacrolimus Starting Dose Calculator</h2>
+        <div class="info-box">
+            <b>How To Use:</b> This tool calculates an initial tacrolimus dose based on a population pharmacokinetic (popPK) model. It incorporates key patient factors known to influence drug clearance, such as **CYP3A5 genotype, age, and weight**, to better achieve the desired therapeutic target.
+        </div>
+
+        <div class="single-input-group">
+            <div class="input-group">
+                <label for="adv-age">Age (years)</label>
+                <input type="number" id="adv-age" placeholder="e.g., 55">
+            </div>
+            <div class="input-group">
+                <label for="adv-weight">Weight (kg)</label>
+                <input type="number" id="adv-weight" placeholder="e.g., 80">
+            </div>
+            <div class="input-group">
+                <label for="adv-cyp3a5">CYP3A5 Genotype</label>
+                <select id="adv-cyp3a5">
+                    <option value="non-expresser">Non-expresser (*3/*3)</option>
+                    <option value="expresser">Expresser (*1/*1, *1/*3)</option>
+                </select>
+            </div>
+             <div class="input-group">
+                <label for="adv-target">Target Trough (ng/mL)</label>
+                <input type="number" id="adv-target" value="10">
+            </div>
+        </div>
+
+        <div class="controls" style="justify-content: flex-end;">
+            <button id="adv-calculate-btn" class="btn calc-btn" style="background-color: #dc3545;">Calculate Starting Dose</button>
+        </div>
+
+        <div id="adv-output" class="output"></div>
+    </div>
+    
+    <div class="calculator-wrapper" style="border-top-color: #ffc107;">
+        <h2>Hematocrit-Adjusted Tacrolimus Level (Advanced Model)</h2>
+        <div class="info-box">
+             <b>How To Use:</b> This tool uses a detailed pharmacokinetic model to correct tacrolimus levels for hematocrit. It first calculates the active plasma concentration from the whole blood level, then determines what the whole blood level would be at a target hematocrit. (Note: 1 ng/mL = 1 μg/L).
+        </div>
+        <div class="single-input-group">
+            <div class="input-group">
+                <label for="adv-hct-initial-tacro">Initial Tacrolimus (ng/mL)</label>
+                <input type="number" id="adv-hct-initial-tacro" placeholder="e.g., 5">
+            </div>
+            <div class="input-group">
+                <label for="adv-hct-initial-hct">Initial Hematocrit (%)</label>
+                <input type="number" id="adv-hct-initial-hct" placeholder="e.g., 25">
+            </div>
+            <div class="input-group">
+                <label for="adv-hct-target-hct">Target Hematocrit (%)</label>
+                <input type="number" id="adv-hct-target-hct" placeholder="e.g., 35">
+            </div>
+        </div>
+        <div class="controls" style="justify-content: flex-end;">
+            <button id="adv-hct-calculate-btn" class="btn calc-btn" style="background-color: #ffc107; color: #212529;">Calculate Adjusted Level</button>
+        </div>
+        <div id="adv-hct-output" class="output"></div>
+    </div>
+    
+    <div class="calculator-wrapper" style="border-top-color: #6f42c1;">
+        <h2>Intra-Patient Variability (IPV) & Metabolizer Status Calculator</h2>
+         <div class="info-box">
+            <b>How To Use:</b> This tool assesses two key aspects of tacrolimus therapy. It calculates <b>Intra-Patient Variability (IPV)</b> to measure stability and predicts the patient's metabolic phenotype (<b>Fast vs. Slow Metabolizer</b>) using the Concentration/Dose (C/D) ratio. A C/D ratio below 1.05 suggests a fast metabolizer, who may be at higher risk for nephrotoxicity and require closer monitoring.
+        </div>
+        <div class="single-input-group" style="margin-bottom: 20px; grid-template-columns: 1fr 1fr;">
+             <div class="input-group">
+                <label for="transplant-date">Date of Transplant</label>
+                <input type="date" id="transplant-date">
+            </div>
+        </div>
+         <div id="ipv-data-rows"></div>
+        <div class="controls">
+            <button id="ipv-add-level-btn" class="btn add-btn" style="background-color: #6f42c1;">Add Level</button>
+            <button id="ipv-calculate-btn" class="btn calc-btn">Calculate</button>
+        </div>
+        <div id="ipv-output" class="output"></div>
+    </div>
+    
+    <div class="expert-info">
+        <h2>Expert Insights on Tacrolimus Dosing</h2>
+        <details>
+            <summary>Article Highlights</summary>
+            <div class="details-content">
+                <ul>
+                    <li>Most dosing algorithms incorporate **hematocrit** and **CYP3A genotype**.</li>
+                    <li>Prospectively tested algorithms perform better than conventional bodyweight-dosing for reaching the target concentration in a timely manner.</li>
+                    <li>No significant difference in clinical outcomes (rejection, toxicity) has been observed yet between algorithm-based dosing and conventional TDM.</li>
+                    <li>Other metrics, like **unbound plasma** or **intra-lymphocytic tacrolimus concentrations**, might correlate better with toxicity than whole-blood levels.</li>
+                </ul>
+            </div>
+        </details>
+        <details>
+            <summary>Expert Opinion Summary</summary>
+            <div class="details-content">
+                <p>While Therapeutic Drug Monitoring (TDM) is standard, popPK models offer a more personalized initial dose. Studies show a need for lower weight-based doses for obese patients and CYP3A non-expressers, and higher doses for pediatric patients with lower body weight and CYP3A expressers.</p>
+                <p>A key challenge is that patients within the "therapeutic window" still experience adverse events. This may be due to high peak concentrations (Cmax) in fast metabolizers, which are not captured by trough (C0) monitoring. Therefore, focusing on AUC or alternative matrices (unbound plasma) may better predict toxicity.</p>
+                <p>For models to gain physician acceptance, they must be externally validated, tested in clinical trials, and presented in a user-friendly interface. The future of tacrolimus dosing will likely involve a combination of popPK models and machine learning to handle dynamic and diverse patient populations.</p>
+            </div>
+        </details>
+    </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Helper Function ---
+    function displayMessage(divElement, message, type) {
+        divElement.innerHTML = message;
+        divElement.className = `output ${type === 'success' ? 'output-success' : 'output-error'}`;
+        divElement.style.display = 'block';
+    }
+
+    // --- Advanced Dosing Calculator Logic ---
+    document.getElementById('adv-calculate-btn').addEventListener('click', function() {
+        const age = parseFloat(document.getElementById('adv-age').value);
+        const weight = parseFloat(document.getElementById('adv-weight').value);
+        const cyp3a5 = document.getElementById('adv-cyp3a5').value;
+        const targetTrough = parseFloat(document.getElementById('adv-target').value);
+        const outputDiv = document.getElementById('adv-output');
+
+        if (isNaN(age) || isNaN(weight) || isNaN(targetTrough) || age <= 0 || weight <= 0 || targetTrough <= 0) {
+            displayMessage(outputDiv, 'Please enter valid, positive numbers for all fields.', 'error');
+            return;
+        }
+
+        const baseCL = 19.4; 
+        const cyp3a5Factor = (cyp3a5 === 'expresser') ? 1.5 : 1.0;
+        const weightFactor = Math.pow(weight / 70, 0.75);
+        const ageFactor = (age < 65) ? 1.0 : 0.85; 
+
+        const calculatedCL = baseCL * cyp3a5Factor * weightFactor * ageFactor;
+        const targetAUC = targetTrough * 17.5;
+        const recommendedDose = (calculatedCL * targetAUC) / 1000;
+        
+        const outputMessage = `Recommended Daily Dose: <b>${recommendedDose.toFixed(1)} mg/day</b>
+            <span>Calculated Clearance (CL/F): ${calculatedCL.toFixed(1)} L/h. This dose should be divided, e.g., ${ (recommendedDose / 2).toFixed(1)} mg twice daily.</span>`;
+        displayMessage(outputDiv, outputMessage, 'success');
+    });
+
+    // --- Advanced Hematocrit Calculator ---
+    document.getElementById('adv-hct-calculate-btn').addEventListener('click', function() {
+        const Cwb = parseFloat(document.getElementById('adv-hct-initial-tacro').value);
+        const initialHct = parseFloat(document.getElementById('adv-hct-initial-hct').value);
+        const targetHct = parseFloat(document.getElementById('adv-hct-target-hct').value);
+        const outputDiv = document.getElementById('adv-hct-output');
+
+        if (isNaN(Cwb) || isNaN(initialHct) || isNaN(targetHct) || Cwb <= 0 || initialHct <= 0 || targetHct <= 0 || initialHct >= 100 || targetHct >= 100) {
+            displayMessage(outputDiv, 'Enter valid, positive values. HCT must be < 100.', 'error');
+            return;
+        }
+
+        const Bmax = 418; // ug/L
+        const Kd = 3.8;   // ug/L
+
+        const calculatePlasmaConc = (c_wb, fHCT) => {
+            const a = 1 - fHCT;
+            const b = Kd - c_wb - fHCT * Kd + fHCT * Bmax;
+            const c = -c_wb * Kd;
+            const discriminant = Math.sqrt(b * b - 4 * a * c);
+            return (-b + discriminant) / (2 * a);
+        };
+        
+        const calculateWholeBloodConc = (c_p, fHCT) => {
+            return c_p * (1 - fHCT) + fHCT * (Bmax * c_p) / (Kd + c_p);
+        };
+        
+        const initial_fHCT = initialHct / 100;
+        const target_fHCT = targetHct / 100;
+        
+        const currentPlasmaConc = calculatePlasmaConc(Cwb, initial_fHCT);
+        const targetWholeBloodConc = calculateWholeBloodConc(currentPlasmaConc, target_fHCT);
+        
+        const message = `Adjusted Tacrolimus Level: <b>${targetWholeBloodConc.toFixed(1)} ng/mL</b>
+                         <span>Based on a calculated plasma concentration of ${currentPlasmaConc.toFixed(2)} ng/mL.</span>`;
+        displayMessage(outputDiv, message, 'success');
+    });
+
+    // --- IPV & Metabolizer Status Calculator Logic ---
+    const ipvDataRowsContainer = document.getElementById('ipv-data-rows');
+    const addIpvRow = () => {
+        const rowCount = ipvDataRowsContainer.children.length;
+        const newRow = document.createElement('div');
+        newRow.className = 'input-row';
+        newRow.style.gridTemplateColumns = '1fr 1fr 1fr 40px';
+        newRow.innerHTML = `<div class="input-group">
+                ${rowCount === 0 ? '<label>Dose (mg)</label>' : ''}
+                <input type="number" class="dose-input" placeholder="e.g., 5">
+            </div>
+            <div class="input-group">
+                ${rowCount === 0 ? '<label>Concentration (ng/mL)</label>' : ''}
+                <input type="number" class="conc-input" placeholder="e.g., 5.0">
+            </div>
+            <div class="input-group">
+                ${rowCount === 0 ? '<label>Date of Measurement</label>' : ''}
+                <input type="date" class="measure-date-input">
+            </div>
+            <button class="remove-btn" title="Remove level" style="align-self: flex-end; margin-bottom: 8px; visibility: ${rowCount > 2 ? 'visible' : 'hidden'}; background-color: #6c757d;">-</button>`;
+        ipvDataRowsContainer.appendChild(newRow);
+    };
+
+    for(let i=0; i<3; i++) addIpvRow();
+
+    document.getElementById('ipv-add-level-btn').addEventListener('click', addIpvRow);
+    ipvDataRowsContainer.addEventListener('click', e => {
+        if (e.target && e.target.classList.contains('remove-btn')) {
+            if (ipvDataRowsContainer.children.length > 3) e.target.parentElement.remove();
+        }
+    });
+
+    document.getElementById('ipv-calculate-btn').addEventListener('click', function() {
+        const outputDiv = document.getElementById('ipv-output');
+        const transplantDateStr = document.getElementById('transplant-date').value;
+        if (!transplantDateStr) {
+            return displayMessage(outputDiv, 'Please enter the date of transplant.', 'error');
+        }
+        const transplantDate = new Date(transplantDateStr);
+
+        const doseInputs = document.querySelectorAll('.dose-input');
+        const concInputs = document.querySelectorAll('.conc-input');
+        const measureDateInputs = document.querySelectorAll('.measure-date-input');
+        
+        const ratios = [];
+        const daysPostTransplantList = [];
+        
+        for (let i = 0; i < doseInputs.length; i++) {
+            const dose = parseFloat(doseInputs[i].value);
+            const conc = parseFloat(concInputs[i].value);
+            const measureDateStr = measureDateInputs[i].value;
+
+            if (!doseInputs[i].value && !concInputs[i].value && !measureDateStr) continue;
+            
+            if (isNaN(dose) || isNaN(conc) || !measureDateStr || dose <= 0) {
+                return displayMessage(outputDiv, 'Ensure all fields have valid, positive numbers and a date.', 'error');
+            }
+
+            const measureDate = new Date(measureDateStr);
+            if (measureDate < transplantDate) {
+                return displayMessage(outputDiv, 'Measurement date cannot be before the transplant date.', 'error');
+            }
+
+            const daysPostTransplant = Math.round((measureDate - transplantDate) / (1000 * 60 * 60 * 24));
+            daysPostTransplantList.push(daysPostTransplant);
+            ratios.push(conc / dose);
+        }
+
+        if (ratios.length < 3) return displayMessage(outputDiv, 'Please enter at least 3 valid sets of values.', 'error');
+        
+        const sumRatios = ratios.reduce((a, b) => a + b, 0);
+        const avgRatio = sumRatios / ratios.length;
+        if (avgRatio === 0) return displayMessage(outputDiv, 'Calculation error: Average C/D ratio is zero.', 'error');
+        
+        const sumDeviations = ratios.reduce((a, b) => a + Math.abs(b - avgRatio), 0);
+        const mad = sumDeviations / ratios.length;
+        const ipv = (mad / avgRatio) * 100;
+        
+        const totalDays = daysPostTransplantList.reduce((a, b) => a + b, 0);
+        const avgDaysPostTransplant = Math.round(totalDays / daysPostTransplantList.length);
+
+        let metabolizerStatus = '';
+        let clinicalNote = '';
+        if (avgRatio < 1.05) {
+            metabolizerStatus = 'Fast Metabolizer';
+            clinicalNote = 'Fast metabolizers may have a higher risk of nephrotoxicity and often require higher doses. Closer monitoring of renal function is recommended.';
+        } else {
+            metabolizerStatus = 'Slow Metabolizer';
+            clinicalNote = 'Slow metabolizers may require lower doses to avoid toxicity.';
+        }
+
+        const newOutputMessage = `Mean Absolute Deviation is <b>${ipv.toFixed(1)}%</b>.
+            <span>Measurements taken at an average of <b>${avgDaysPostTransplant} days</b> post-transplant.</span>
+            <hr style="margin: 10px 0; border-color: #eee;">
+            <span>Metabolizer Status Prediction: <b>${metabolizerStatus}</b><br>(Average C/D Ratio: ${avgRatio.toFixed(2)})</span>
+            <span style="font-style: italic; margin-top: 10px; font-weight: normal;"><b>Clinical Note:</b> ${clinicalNote}</span>`;
+
+        displayMessage(outputDiv, newOutputMessage, 'success');
+    });
+});
+</script>
+
+</body>
+</html>
+
