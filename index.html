@@ -3,412 +3,831 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comprehensive Tacrolimus Dosing Tools</title>
+    <title>Tacrolimus Clinical Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
+    <script>
+        dayjs.extend(dayjs_plugin_customParseFormat);
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f4f7f9;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        .calculator-wrapper {
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            padding: 25px 30px;
-            margin-bottom: 30px;
-            border-top: 5px solid #0056b3;
-        }
-        h1, h2 {
-            text-align: center;
-            color: #333;
-        }
-        .info-box {
-            background-color: #e7f3fe;
-            border: 1px solid #b3d7f7;
-            border-radius: 4px;
-            padding: 15px;
-            font-size: 0.9em;
-            color: #31708f;
-            margin-bottom: 20px;
-        }
-        .input-row, .single-input-group {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 12px;
-            align-items: flex-end;
-        }
-        .input-group {
-            display: flex;
-            flex-direction: column;
-        }
-        .input-group label {
-            margin-bottom: 5px;
-            font-weight: 500;
-            color: #555;
-        }
-        .input-group input, .input-group select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        input[type=number]::-webkit-inner-spin-button,
-        input[type=number]::-webkit-outer-spin-button {
-            -webkit-appearance: none; margin: 0;
-        }
-        input[type=number] { -moz-appearance: textfield; }
-        .controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 20px;
-        }
-        .btn {
-            padding: 10px 18px;
-            border: none;
-            border-radius: 5px;
-            font-size: 1em;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .calc-btn { background-color: #28a745; color: white; }
-        .calc-btn:hover { background-color: #218838; }
-        .add-btn { background-color: #007bff; color: white; }
-        .add-btn:hover { background-color: #0069d9; }
-        .output {
-            margin-top: 25px;
-            padding: 15px;
-            border-radius: 5px;
-            text-align: center;
-            font-size: 1.1em;
-            font-weight: bold;
-            display: none; /* Hidden by default */
-        }
-        .output span {
-            display: block;
-            margin-top: 8px;
-            font-size: 0.9em;
-            font-weight: normal;
-        }
-        .output-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .output-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .expert-info {
-            font-size: 0.9em;
-            color: #666;
-            margin-top: 20px;
-            border-top: 1px solid #eee;
-            padding-top: 15px;
-        }
-        details {
-            margin-top: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        summary {
-            font-weight: bold;
-            padding: 10px;
-            cursor: pointer;
-            background-color: #f7f7f7;
-        }
-        .details-content { padding: 15px; line-height: 1.6; }
-        .details-content ul { padding-left: 20px; }
-        p { line-height: 1.6; }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .gradient-bg { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05); }
+        .input-focus:focus { box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2); border-color: #6366f1; }
+        .status-indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .level-high { background-color: #ef4444; }
+        .level-target { background-color: #10b981; }
+        .level-low { background-color: #f59e0b; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .output-success { color: #374151; }
+        .output-error { color: #dc2626; font-weight: 500; }
+        .output-info { color: #6b7280; font-style: italic; }
     </style>
 </head>
-<body>
-
-<div class="container">
-
-    <h1>Comprehensive Tacrolimus Dosing Tools</h1>
-
-    <div class="calculator-wrapper" style="border-top-color: #dc3545;">
-        <h2>Advanced Tacrolimus Starting Dose Calculator</h2>
-        <div class="info-box">
-            <b>How To Use:</b> This tool calculates an initial tacrolimus dose based on a population pharmacokinetic (popPK) model. It incorporates key patient factors known to influence drug clearance, such as **CYP3A5 genotype, age, and weight**, to better achieve the desired therapeutic target.
-        </div>
-
-        <div class="single-input-group">
-            <div class="input-group">
-                <label for="adv-age">Age (years)</label>
-                <input type="number" id="adv-age" placeholder="e.g., 55">
-            </div>
-            <div class="input-group">
-                <label for="adv-weight">Weight (kg)</label>
-                <input type="number" id="adv-weight" placeholder="e.g., 80">
-            </div>
-            <div class="input-group">
-                <label for="adv-cyp3a5">CYP3A5 Genotype</label>
-                <select id="adv-cyp3a5">
-                    <option value="non-expresser">Non-expresser (*3/*3)</option>
-                    <option value="expresser">Expresser (*1/*1, *1/*3)</option>
-                </select>
-            </div>
-             <div class="input-group">
-                <label for="adv-target">Target Trough (ng/mL)</label>
-                <input type="number" id="adv-target" value="10">
-            </div>
-        </div>
-
-        <div class="controls" style="justify-content: flex-end;">
-            <button id="adv-calculate-btn" class="btn calc-btn" style="background-color: #dc3545;">Calculate Starting Dose</button>
-        </div>
-
-        <div id="adv-output" class="output"></div>
-    </div>
+<body class="bg-slate-50 min-h-full">
     
-    <div class="calculator-wrapper" style="border-top-color: #ffc107;">
-        <h2>Hematocrit-Adjusted Tacrolimus Level (Advanced Model)</h2>
-        <div class="info-box">
-             <b>How To Use:</b> This tool uses a detailed pharmacokinetic model to correct tacrolimus levels for hematocrit. It first calculates the active plasma concentration from the whole blood level, then determines what the whole blood level would be at a target hematocrit. (Note: 1 ng/mL = 1 μg/L).
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <h1 class="text-3xl font-bold">Tacrolimus Clinical Dashboard</h1>
+            <p class="text-indigo-100 mt-1">Individualized Forecasting for Kidney Transplant</p>
         </div>
-        <div class="single-input-group">
-            <div class="input-group">
-                <label for="adv-hct-initial-tacro">Initial Tacrolimus (ng/mL)</label>
-                <input type="number" id="adv-hct-initial-tacro" placeholder="e.g., 5">
-            </div>
-            <div class="input-group">
-                <label for="adv-hct-initial-hct">Initial Hematocrit (%)</label>
-                <input type="number" id="adv-hct-initial-hct" placeholder="e.g., 25">
-            </div>
-            <div class="input-group">
-                <label for="adv-hct-target-hct">Target Hematocrit (%)</label>
-                <input type="number" id="adv-hct-target-hct" placeholder="e.g., 35">
-            </div>
-        </div>
-        <div class="controls" style="justify-content: flex-end;">
-            <button id="adv-hct-calculate-btn" class="btn calc-btn" style="background-color: #ffc107; color: #212529;">Calculate Adjusted Level</button>
-        </div>
-        <div id="adv-hct-output" class="output"></div>
-    </div>
-    
-    <div class="calculator-wrapper" style="border-top-color: #6f42c1;">
-        <h2>Intra-Patient Variability (IPV) & Metabolizer Status Calculator</h2>
-         <div class="info-box">
-            <b>How To Use:</b> This tool assesses two key aspects of tacrolimus therapy. It calculates <b>Intra-Patient Variability (IPV)</b> to measure stability and predicts the patient's metabolic phenotype (<b>Fast vs. Slow Metabolizer</b>) using the Concentration/Dose (C/D) ratio. A C/D ratio below 1.05 suggests a fast metabolizer, who may be at higher risk for nephrotoxicity and require closer monitoring.
-        </div>
-        <div class="single-input-group" style="margin-bottom: 20px; grid-template-columns: 1fr 1fr;">
-             <div class="input-group">
-                <label for="transplant-date">Date of Transplant</label>
-                <input type="date" id="transplant-date">
-            </div>
-        </div>
-         <div id="ipv-data-rows"></div>
-        <div class="controls">
-            <button id="ipv-add-level-btn" class="btn add-btn" style="background-color: #6f42c1;">Add Level</button>
-            <button id="ipv-calculate-btn" class="btn calc-btn">Calculate</button>
-        </div>
-        <div id="ipv-output" class="output"></div>
-    </div>
-    
-    <div class="expert-info">
-        <h2>Expert Insights on Tacrolimus Dosing</h2>
-        <details>
-            <summary>Article Highlights</summary>
-            <div class="details-content">
-                <ul>
-                    <li>Most dosing algorithms incorporate **hematocrit** and **CYP3A genotype**.</li>
-                    <li>Prospectively tested algorithms perform better than conventional bodyweight-dosing for reaching the target concentration in a timely manner.</li>
-                    <li>No significant difference in clinical outcomes (rejection, toxicity) has been observed yet between algorithm-based dosing and conventional TDM.</li>
-                    <li>Other metrics, like **unbound plasma** or **intra-lymphocytic tacrolimus concentrations**, might correlate better with toxicity than whole-blood levels.</li>
-                </ul>
-            </div>
-        </details>
-        <details>
-            <summary>Expert Opinion Summary</summary>
-            <div class="details-content">
-                <p>While Therapeutic Drug Monitoring (TDM) is standard, popPK models offer a more personalized initial dose. Studies show a need for lower weight-based doses for obese patients and CYP3A non-expressers, and higher doses for pediatric patients with lower body weight and CYP3A expressers.</p>
-                <p>A key challenge is that patients within the "therapeutic window" still experience adverse events. This may be due to high peak concentrations (Cmax) in fast metabolizers, which are not captured by trough (C0) monitoring. Therefore, focusing on AUC or alternative matrices (unbound plasma) may better predict toxicity.</p>
-                <p>For models to gain physician acceptance, they must be externally validated, tested in clinical trials, and presented in a user-friendly interface. The future of tacrolimus dosing will likely involve a combination of popPK models and machine learning to handle dynamic and diverse patient populations.</p>
-            </div>
-        </details>
-    </div>
+    </header>
 
-</div>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        <div class="bg-white rounded-xl card-shadow p-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <span class="bg-indigo-100 text-indigo-600 rounded-full p-2 mr-3">👤</span> Patient & Model Information
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="space-y-4">
+                    <div>
+                        <label for="transplant-date" class="block text-sm font-medium text-gray-700 mb-1">Transplant Date</label>
+                        <input id="transplant-date" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                    </div>
+                     <div>
+                        <label for="weight" class="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
+                        <input type="number" id="weight" value="70" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label for="hematocrit" class="block text-sm font-medium text-gray-700 mb-1">Hematocrit (%)</label>
+                        <input type="number" id="hematocrit" value="35" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                    </div>
+                     <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Mycophenolic Acid</label>
+                         <select id="mpa" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                            <option value="1">Yes</option>
+                            <option value="0" selected>No</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Bioassay Type</label>
+                        <select id="bioassay" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                            <option value="1">LC-MS/MS</option>
+                            <option value="2">CMIA</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-white rounded-xl card-shadow p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <span class="bg-orange-100 text-orange-600 rounded-full p-2 mr-3">⚗️</span> Quick Hematocrit Adjustment
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                    <div>
+                        <label for="quick-hct-level" class="block text-sm font-medium text-gray-700 mb-1">Initial Level (ng/mL)</label>
+                        <input type="number" id="quick-hct-level" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                    </div>
+                    <div>
+                        <label for="quick-hct-initial" class="block text-sm font-medium text-gray-700 mb-1">Initial HCT (%)</label>
+                        <input type="number" id="quick-hct-initial" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                    </div>
+                    <div class="md:col-span-2">
+                        <div id="quick-hct-output" class="text-center text-lg font-semibold p-3 bg-gray-50 rounded-lg">
+                            Adjusted Level: --
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="ipv-card" class="bg-white rounded-xl card-shadow p-6 hidden">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                     <span class="bg-teal-100 text-teal-600 rounded-full p-2 mr-3">📊</span> IPV & Metabolizer Status
+                </h2>
+                <div id="ipv-output" class="text-center text-gray-500 italic">
+                    Requires at least 3 lab results to calculate.
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-white rounded-xl card-shadow p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800 flex items-center m-0">
+                        <span class="bg-purple-100 text-purple-600 rounded-full p-2 mr-3">💊</span> Dose Administration
+                    </h2>
+                    <button onclick="addDefaultDoseDay()" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-colors duration-200 flex items-center shadow-sm text-sm">
+                        + Log Dose Day
+                    </button>
+                </div>
+                <div class="overflow-x-auto -mx-6">
+                    <table class="w-full min-w-full">
+                        <thead><tr class="border-b border-gray-200 text-left text-sm font-semibold text-gray-600">
+                                <th class="py-3 px-4">Date & Time</th><th class="py-3 px-4">Dose (mg)</th><th class="py-3 px-4 text-right">Actions</th>
+                        </tr></thead>
+                        <tbody id="doseLogTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl card-shadow p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800 flex items-center m-0">
+                        <span class="bg-green-100 text-green-600 rounded-full p-2 mr-3">🧪</span> Lab Results
+                    </h2>
+                    <button onclick="showAddRecordModal('level')" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 flex items-center shadow-sm text-sm">
+                        + Log Lab Result
+                    </button>
+                </div>
+                <div class="overflow-x-auto -mx-6">
+                    <table class="w-full min-w-full">
+                        <thead><tr class="border-b border-gray-200 text-left text-sm font-semibold text-gray-600">
+                                <th class="py-3 px-4">Date & Time</th><th class="py-3 px-4">Level (ng/mL)</th><th class="py-3 px-4">Status</th><th class="py-3 px-4 text-right">Actions</th>
+                        </tr></thead>
+                        <tbody id="levelLogTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl card-shadow p-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <span class="bg-cyan-100 text-cyan-600 rounded-full p-2 mr-3">🎯</span> Forecast Parameters
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div>
+                    <label for="prediction-datetime" class="block text-sm font-medium text-gray-700 mb-1">Forecast Date & Time</label>
+                    <input id="prediction-datetime" type="text" placeholder="Select date..." class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                </div>
+                <div>
+                    <button id="run-all-btn" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                        Run Individualized Forecast
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="output-section" class="space-y-8 hidden">
+            <div class="bg-white rounded-xl card-shadow p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center justify-center">
+                    <span class="bg-cyan-100 text-cyan-600 rounded-full p-2 mr-3">📈</span> Concentration Forecast
+                </h2>
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="lg:col-span-1">
+                        <label for="target-low" class="block text-sm font-medium text-gray-700 mb-1">Target Range (ng/mL)</label>
+                        <div class="flex gap-2">
+                            <input id="target-low" type="number" value="8" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                            <input id="target-high" type="number" value="12" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        </div>
+                    </div>
+                    <div class="lg:col-span-3">
+                        <div class="relative h-96">
+                            <canvas id="concentration-chart"></canvas>
+                            <div id="forecast-loader" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden"><div class="loader"></div></div>
+                        </div>
+                        <div id="results-summary" class="mt-4 text-center font-semibold text-lg p-3 bg-gray-50 rounded-md hidden"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="addRecordModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4 card-shadow" id="modal-content">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4" id="modal-title">Add Record</h3>
+            <div class="space-y-4">
+                 <div>
+                    <label for="newDateTime" class="block text-sm font-medium text-gray-700 mb-1">Date & Time</label>
+                    <input type="text" id="newDateTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                </div>
+                <div id="dose-input-container">
+                    <label for="newDose" class="block text-sm font-medium text-gray-700 mb-1">Dose (mg)</label>
+                    <input type="number" step="0.1" id="newDose" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                </div>
+                <div id="level-input-container">
+                    <label for="newLevel" class="block text-sm font-medium text-gray-700 mb-1">Level (ng/mL)</label>
+                    <input type="number" step="0.1" id="newLevel" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                </div>
+            </div>
+            <input type="hidden" id="editIndex">
+            <input type="hidden" id="recordType">
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="hideAddRecordModal()" class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors font-medium rounded-lg">Cancel</button>
+                <button id="save-record-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium">Save Record</button>
+            </div>
+        </div>
+    </div>
 <script>
+// --- Global State & Configuration ---
+let clinicalData = [];
+let myChart = null;
+
+// --- Pharmacokinetic Model Constants (from R code reference) ---
+const PK_CONSTANTS = {
+    // Population typical values for a 70kg person
+    TVCL: 20.3,  // Typical Clearance (L/hr)
+    TVV:  451,   // Typical Volume of Distribution (L)
+    TVKA: 1.81,  // Typical Absorption Rate Constant (1/hr)
+
+    // Hematocrit Adjustment constants
+    HCT_ADJ_BMAX: 418, // Maximum binding capacity (ng/mL)
+    HCT_ADJ_KD: 3.8    // Dissociation constant (ng/mL)
+};
+
+// --- Initialization ---
 document.addEventListener('DOMContentLoaded', function() {
-    // --- Helper Function ---
-    function displayMessage(divElement, message, type) {
-        divElement.innerHTML = message;
-        divElement.className = `output ${type === 'success' ? 'output-success' : 'output-error'}`;
-        divElement.style.display = 'block';
+    initializeUI();
+    setupEventListeners();
+    loadFromLocalStorage(); 
+    renderDoseLog();
+    renderLevelLog();
+});
+
+function initializeUI() {
+    flatpickr("#transplant-date", { altInput: true, altFormat: "d-M-y", dateFormat: "Y-m-d" });
+    flatpickr("#prediction-datetime", { enableTime: true, altInput: true, altFormat: "d-M-y H:i", dateFormat: "Y-m-d H:i" });
+}
+
+function setupEventListeners() {
+    document.getElementById('run-all-btn').addEventListener('click', runAllAnalyses);
+    ['quick-hct-level', 'quick-hct-initial'].forEach(id => {
+        document.getElementById(id).addEventListener('input', runQuickHctAdjustment);
+    });
+}
+
+// --- Local Storage Management ---
+function saveToLocalStorage() {
+    const dataToSave = {
+        patient: {
+            transplantDate: document.getElementById('transplant-date')._flatpickr.input.value,
+            weight: document.getElementById('weight').value,
+            hematocrit: document.getElementById('hematocrit').value,
+            mpa: document.getElementById('mpa').value,
+            bioassay: document.getElementById('bioassay').value
+        },
+        clinicalData: clinicalData
+    };
+    localStorage.setItem('tacrolimusDashboardData', JSON.stringify(dataToSave));
+}
+
+function loadFromLocalStorage() {
+    const savedData = localStorage.getItem('tacrolimusDashboardData');
+    if (savedData) {
+        const data = JSON.parse(savedData);
+        document.getElementById('transplant-date')._flatpickr.setDate(data.patient.transplantDate, true);
+        document.getElementById('weight').value = data.patient.weight || 70;
+        document.getElementById('hematocrit').value = data.patient.hematocrit || 35;
+        document.getElementById('mpa').value = data.patient.mpa || '0';
+        document.getElementById('bioassay').value = data.patient.bioassay || '1';
+        clinicalData = data.clinicalData || [];
+    }
+    if (clinicalData.length === 0) {
+        const transplantDate = dayjs().subtract(5, 'day').hour(8).minute(0).second(0);
+        document.getElementById('transplant-date')._flatpickr.setDate(transplantDate.toDate(), true);
+    }
+    setSmartDefaults();
+}
+
+function setSmartDefaults() {
+    const lastRecord = clinicalData.length > 0 ? clinicalData[clinicalData.length - 1] : null;
+    const defaultForecastDate = lastRecord 
+        ? dayjs(lastRecord.datetime).add(1, 'day').hour(7).minute(0).toDate()
+        : dayjs().add(1, 'day').hour(7).minute(0).toDate();
+    document.getElementById('prediction-datetime')._flatpickr.setDate(defaultForecastDate, true);
+}
+
+// --- UI Modals & Data Entry ---
+/**
+ * NEW: Adds a full day of default doses (07:00 and 19:00) with one click.
+ */
+function addDefaultDoseDay() {
+    const lastRecord = clinicalData.length > 0 ? clinicalData[clinicalData.length - 1] : null;
+    
+    let newDoseDate;
+    if (lastRecord) {
+        newDoseDate = dayjs(lastRecord.datetime).add(1, 'day');
+    } else {
+        const transplantDateStr = document.getElementById('transplant-date')._flatpickr.input.value;
+        newDoseDate = dayjs(transplantDateStr, "YYYY-MM-DD").add(1, 'day');
     }
 
-    // --- Advanced Dosing Calculator Logic ---
-    document.getElementById('adv-calculate-btn').addEventListener('click', function() {
-        const age = parseFloat(document.getElementById('adv-age').value);
-        const weight = parseFloat(document.getElementById('adv-weight').value);
-        const cyp3a5 = document.getElementById('adv-cyp3a5').value;
-        const targetTrough = parseFloat(document.getElementById('adv-target').value);
-        const outputDiv = document.getElementById('adv-output');
+    if (!newDoseDate.isValid()) {
+        alert("Please set a valid transplant date before logging doses.");
+        return;
+    }
 
-        if (isNaN(age) || isNaN(weight) || isNaN(targetTrough) || age <= 0 || weight <= 0 || targetTrough <= 0) {
-            displayMessage(outputDiv, 'Please enter valid, positive numbers for all fields.', 'error');
-            return;
-        }
+    const lastDoseRecord = [...clinicalData].reverse().find(r => r.dose !== null);
+    const defaultDoseValue = lastDoseRecord ? lastDoseRecord.dose : 2.0;
 
-        const baseCL = 19.4; 
-        const cyp3a5Factor = (cyp3a5 === 'expresser') ? 1.5 : 1.0;
-        const weightFactor = Math.pow(weight / 70, 0.75);
-        const ageFactor = (age < 65) ? 1.0 : 0.85; 
-
-        const calculatedCL = baseCL * cyp3a5Factor * weightFactor * ageFactor;
-        const targetAUC = targetTrough * 17.5;
-        const recommendedDose = (calculatedCL * targetAUC) / 1000;
-        
-        const outputMessage = `Recommended Daily Dose: <b>${recommendedDose.toFixed(1)} mg/day</b>
-            <span>Calculated Clearance (CL/F): ${calculatedCL.toFixed(1)} L/h. This dose should be divided, e.g., ${ (recommendedDose / 2).toFixed(1)} mg twice daily.</span>`;
-        displayMessage(outputDiv, outputMessage, 'success');
-    });
-
-    // --- Advanced Hematocrit Calculator ---
-    document.getElementById('adv-hct-calculate-btn').addEventListener('click', function() {
-        const Cwb = parseFloat(document.getElementById('adv-hct-initial-tacro').value);
-        const initialHct = parseFloat(document.getElementById('adv-hct-initial-hct').value);
-        const targetHct = parseFloat(document.getElementById('adv-hct-target-hct').value);
-        const outputDiv = document.getElementById('adv-hct-output');
-
-        if (isNaN(Cwb) || isNaN(initialHct) || isNaN(targetHct) || Cwb <= 0 || initialHct <= 0 || targetHct <= 0 || initialHct >= 100 || targetHct >= 100) {
-            displayMessage(outputDiv, 'Enter valid, positive values. HCT must be < 100.', 'error');
-            return;
-        }
-
-        const Bmax = 418; // ug/L
-        const Kd = 3.8;   // ug/L
-
-        const calculatePlasmaConc = (c_wb, fHCT) => {
-            const a = 1 - fHCT;
-            const b = Kd - c_wb - fHCT * Kd + fHCT * Bmax;
-            const c = -c_wb * Kd;
-            const discriminant = Math.sqrt(b * b - 4 * a * c);
-            return (-b + discriminant) / (2 * a);
-        };
-        
-        const calculateWholeBloodConc = (c_p, fHCT) => {
-            return c_p * (1 - fHCT) + fHCT * (Bmax * c_p) / (Kd + c_p);
-        };
-        
-        const initial_fHCT = initialHct / 100;
-        const target_fHCT = targetHct / 100;
-        
-        const currentPlasmaConc = calculatePlasmaConc(Cwb, initial_fHCT);
-        const targetWholeBloodConc = calculateWholeBloodConc(currentPlasmaConc, target_fHCT);
-        
-        const message = `Adjusted Tacrolimus Level: <b>${targetWholeBloodConc.toFixed(1)} ng/mL</b>
-                         <span>Based on a calculated plasma concentration of ${currentPlasmaConc.toFixed(2)} ng/mL.</span>`;
-        displayMessage(outputDiv, message, 'success');
-    });
-
-    // --- IPV & Metabolizer Status Calculator Logic ---
-    const ipvDataRowsContainer = document.getElementById('ipv-data-rows');
-    const addIpvRow = () => {
-        const rowCount = ipvDataRowsContainer.children.length;
-        const newRow = document.createElement('div');
-        newRow.className = 'input-row';
-        newRow.style.gridTemplateColumns = '1fr 1fr 1fr 40px';
-        newRow.innerHTML = `<div class="input-group">
-                ${rowCount === 0 ? '<label>Dose (mg)</label>' : ''}
-                <input type="number" class="dose-input" placeholder="e.g., 5">
-            </div>
-            <div class="input-group">
-                ${rowCount === 0 ? '<label>Concentration (ng/mL)</label>' : ''}
-                <input type="number" class="conc-input" placeholder="e.g., 5.0">
-            </div>
-            <div class="input-group">
-                ${rowCount === 0 ? '<label>Date of Measurement</label>' : ''}
-                <input type="date" class="measure-date-input">
-            </div>
-            <button class="remove-btn" title="Remove level" style="align-self: flex-end; margin-bottom: 8px; visibility: ${rowCount > 2 ? 'visible' : 'hidden'}; background-color: #6c757d;">-</button>`;
-        ipvDataRowsContainer.appendChild(newRow);
+    const morningDose = {
+        datetime: newDoseDate.hour(7).minute(0).format("YYYY-MM-DD HH:mm"),
+        dose: defaultDoseValue,
+        level: null
+    };
+    const eveningDose = {
+        datetime: newDoseDate.hour(19).minute(0).format("YYYY-MM-DD HH:mm"),
+        dose: defaultDoseValue,
+        level: null
     };
 
-    for(let i=0; i<3; i++) addIpvRow();
-
-    document.getElementById('ipv-add-level-btn').addEventListener('click', addIpvRow);
-    ipvDataRowsContainer.addEventListener('click', e => {
-        if (e.target && e.target.classList.contains('remove-btn')) {
-            if (ipvDataRowsContainer.children.length > 3) e.target.parentElement.remove();
-        }
-    });
-
-    document.getElementById('ipv-calculate-btn').addEventListener('click', function() {
-        const outputDiv = document.getElementById('ipv-output');
-        const transplantDateStr = document.getElementById('transplant-date').value;
-        if (!transplantDateStr) {
-            return displayMessage(outputDiv, 'Please enter the date of transplant.', 'error');
-        }
-        const transplantDate = new Date(transplantDateStr);
-
-        const doseInputs = document.querySelectorAll('.dose-input');
-        const concInputs = document.querySelectorAll('.conc-input');
-        const measureDateInputs = document.querySelectorAll('.measure-date-input');
-        
-        const ratios = [];
-        const daysPostTransplantList = [];
-        
-        for (let i = 0; i < doseInputs.length; i++) {
-            const dose = parseFloat(doseInputs[i].value);
-            const conc = parseFloat(concInputs[i].value);
-            const measureDateStr = measureDateInputs[i].value;
-
-            if (!doseInputs[i].value && !concInputs[i].value && !measureDateStr) continue;
-            
-            if (isNaN(dose) || isNaN(conc) || !measureDateStr || dose <= 0) {
-                return displayMessage(outputDiv, 'Ensure all fields have valid, positive numbers and a date.', 'error');
-            }
-
-            const measureDate = new Date(measureDateStr);
-            if (measureDate < transplantDate) {
-                return displayMessage(outputDiv, 'Measurement date cannot be before the transplant date.', 'error');
-            }
-
-            const daysPostTransplant = Math.round((measureDate - transplantDate) / (1000 * 60 * 60 * 24));
-            daysPostTransplantList.push(daysPostTransplant);
-            ratios.push(conc / dose);
-        }
-
-        if (ratios.length < 3) return displayMessage(outputDiv, 'Please enter at least 3 valid sets of values.', 'error');
-        
-        const sumRatios = ratios.reduce((a, b) => a + b, 0);
-        const avgRatio = sumRatios / ratios.length;
-        if (avgRatio === 0) return displayMessage(outputDiv, 'Calculation error: Average C/D ratio is zero.', 'error');
-        
-        const sumDeviations = ratios.reduce((a, b) => a + Math.abs(b - avgRatio), 0);
-        const mad = sumDeviations / ratios.length;
-        const ipv = (mad / avgRatio) * 100;
-        
-        const totalDays = daysPostTransplantList.reduce((a, b) => a + b, 0);
-        const avgDaysPostTransplant = Math.round(totalDays / daysPostTransplantList.length);
-
-        let metabolizerStatus = '';
-        let clinicalNote = '';
-        if (avgRatio < 1.05) {
-            metabolizerStatus = 'Fast Metabolizer';
-            clinicalNote = 'Fast metabolizers may have a higher risk of nephrotoxicity and often require higher doses. Closer monitoring of renal function is recommended.';
+    // Merge doses into clinicalData
+    [morningDose, eveningDose].forEach(newDose => {
+        const existingRecord = clinicalData.find(r => r.datetime === newDose.datetime);
+        if (existingRecord) {
+            existingRecord.dose = newDose.dose;
         } else {
-            metabolizerStatus = 'Slow Metabolizer';
-            clinicalNote = 'Slow metabolizers may require lower doses to avoid toxicity.';
+            clinicalData.push(newDose);
+        }
+    });
+    
+    clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
+    renderDoseLog();
+}
+
+function showAddRecordModal(type, editIndex = null) {
+    const modal = document.getElementById('addRecordModal');
+    document.getElementById('recordType').value = type;
+    document.getElementById('editIndex').value = editIndex !== null ? editIndex : '';
+    
+    document.getElementById('dose-input-container').style.display = type === 'dose' ? 'block' : 'none';
+    document.getElementById('level-input-container').style.display = type === 'level' ? 'block' : 'none';
+
+    let defaultDate, record;
+    if (editIndex !== null) {
+        document.getElementById('modal-title').textContent = `Edit ${type === 'dose' ? 'Dose' : 'Level'} Record`;
+        record = clinicalData[editIndex];
+        defaultDate = record.datetime;
+        document.getElementById('newDose').value = record.dose || '';
+        document.getElementById('newLevel').value = record.level || '';
+    } else { // This path is now only for adding new lab levels
+        document.getElementById('modal-title').textContent = `Add Lab Result`;
+        const lastRecordTime = clinicalData.length > 0 ? dayjs(clinicalData[clinicalData.length - 1].datetime) : dayjs().subtract(12, 'hour');
+        defaultDate = lastRecordTime.add(11.5, 'hour').toDate();
+        document.getElementById('newDose').value = '';
+        document.getElementById('newLevel').value = '';
+    }
+    
+    flatpickr("#newDateTime", { enableTime: true, altInput: true, altFormat: "d-M-y H:i", dateFormat: "Y-m-d H:i", defaultDate: defaultDate });
+    document.getElementById('save-record-btn').onclick = saveRecord;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function hideAddRecordModal() {
+    document.getElementById('addRecordModal').classList.add('hidden');
+    document.getElementById('addRecordModal').classList.remove('flex');
+}
+
+function saveRecord() {
+    const datetime = dayjs(document.getElementById('newDateTime').value).format("YYYY-MM-DD HH:mm");
+    const doseValue = document.getElementById('newDose').value;
+    const levelValue = document.getElementById('newLevel').value;
+    const editIndexStr = document.getElementById('editIndex').value;
+    const type = document.getElementById('recordType').value;
+
+    if (!datetime || datetime === 'Invalid Date') { alert('Please enter a valid date and time.'); return; }
+
+    let newDose = type === 'dose' ? (doseValue ? parseFloat(doseValue) : null) : null;
+    let newLevel = type === 'level' ? (levelValue ? parseFloat(levelValue) : null) : null;
+
+    if (editIndexStr !== '') {
+        // When editing, we remove the old record first.
+        // We will then re-insert its data as if it's a new entry.
+        const oldRecord = clinicalData.splice(parseInt(editIndexStr), 1)[0];
+        
+        // If the time hasn't changed, we must preserve the other value (e.g., preserve the level when editing a dose).
+        if (oldRecord.datetime === datetime) {
+            if (type === 'dose') {
+                newLevel = oldRecord.level; // Preserve existing level
+            } else { // type === 'level'
+                newDose = oldRecord.dose; // Preserve existing dose
+            }
+        } else {
+             // If time has changed, we need to clean up the other value from the old time slot if it exists
+             if (type === 'dose' && oldRecord.level !== null) {
+                 // The level is being left behind at the old time, so add it back as a level-only record.
+                 clinicalData.push({ datetime: oldRecord.datetime, dose: null, level: oldRecord.level });
+             }
+             if (type === 'level' && oldRecord.dose !== null) {
+                 // The dose is being left behind at the old time, so add it back as a dose-only record.
+                 clinicalData.push({ datetime: oldRecord.datetime, dose: oldRecord.dose, level: null });
+             }
+        }
+    }
+
+    // Now, merge the new/edited data into the array
+    const existingRecord = clinicalData.find(r => r.datetime === datetime);
+    if (existingRecord) {
+        // A record already exists at this time, so merge our data into it
+        if (newDose !== null) existingRecord.dose = newDose;
+        if (newLevel !== null) existingRecord.level = newLevel;
+    } else {
+        // No record at this time, so add a new one
+        clinicalData.push({
+            datetime: datetime,
+            dose: newDose,
+            level: newLevel,
+        });
+    }
+    
+    // Final cleanup and rendering
+    clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
+    renderDoseLog();
+    renderLevelLog();
+    hideAddRecordModal();
+}
+
+
+function deleteRecord(index, type) {
+    if (confirm(`Are you sure you want to delete this ${type}?`)) {
+        const record = clinicalData[index];
+        if (type === 'dose') {
+            record.dose = null;
+        } else if (type === 'level') {
+            record.level = null;
         }
 
-        const newOutputMessage = `Mean Absolute Deviation is <b>${ipv.toFixed(1)}%</b>.
-            <span>Measurements taken at an average of <b>${avgDaysPostTransplant} days</b> post-transplant.</span>
-            <hr style="margin: 10px 0; border-color: #eee;">
-            <span>Metabolizer Status Prediction: <b>${metabolizerStatus}</b><br>(Average C/D Ratio: ${avgRatio.toFixed(2)})</span>
-            <span style="font-style: italic; margin-top: 10px; font-weight: normal;"><b>Clinical Note:</b> ${clinicalNote}</span>`;
+        if (record.dose === null && record.level === null) {
+            clinicalData.splice(index, 1);
+        }
+       
+        renderDoseLog();
+        renderLevelLog();
+    }
+}
 
-        displayMessage(outputDiv, newOutputMessage, 'success');
+// --- UI Rendering ---
+function getLevelStatus(level) {
+    const targetLow = parseFloat(document.getElementById('target-low').value);
+    const targetHigh = parseFloat(document.getElementById('target-high').value);
+    if (isNaN(level) || isNaN(targetLow) || isNaN(targetHigh)) return { text: 'N/A', class: '' };
+    if (level < targetLow) return { text: 'Low', class: 'level-low' };
+    if (level > targetHigh) return { text: 'High', class: 'level-high' };
+    return { text: 'Target', class: 'level-target' };
+}
+
+function renderDoseLog() {
+    const tbody = document.getElementById('doseLogTable');
+    const doseRows = clinicalData.map((record, index) => record.dose !== null ? `
+        <tr class="border-b border-gray-100 text-sm hover:bg-gray-50">
+            <td class="py-3 px-4">${dayjs(record.datetime).format('DD-MMM-YY HH:mm')}</td>
+            <td class="py-3 px-4">${record.dose.toFixed(1)}</td>
+            <td class="py-3 px-4 text-right">
+                <button onclick="showAddRecordModal('dose', ${index})" class="text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
+                <button onclick="deleteRecord(${index}, 'dose')" class="text-red-600 hover:text-red-800 font-medium ml-3">Delete</button>
+            </td>
+        </tr>` : '').join('');
+    
+    tbody.innerHTML = doseRows || `<tr><td colspan="3" class="text-center py-4 text-gray-500">No doses logged.</td></tr>`;
+    if (tbody.innerHTML.trim() === '') {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-500">No doses logged.</td></tr>`;
+    }
+    saveToLocalStorage();
+}
+
+function renderLevelLog() {
+    const tbody = document.getElementById('levelLogTable');
+    const levelRows = clinicalData.map((record, index) => {
+        if (record.level !== null) {
+            const status = getLevelStatus(record.level);
+            return `<tr class="border-b border-gray-100 text-sm hover:bg-gray-50">
+                    <td class="py-3 px-4">${dayjs(record.datetime).format('DD-MMM-YY HH:mm')}</td>
+                    <td class="py-3 px-4 font-medium">${record.level.toFixed(1)}</td>
+                    <td class="py-3 px-4"><span class="status-indicator ${status.class}"></span>${status.text}</td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="showAddRecordModal('level', ${index})" class="text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
+                        <button onclick="deleteRecord(${index}, 'level')" class="text-red-600 hover:text-red-800 font-medium ml-3">Delete</button>
+                    </td>
+                </tr>`;
+        }
+        return '';
+    }).join('');
+
+    tbody.innerHTML = levelRows || `<tr><td colspan="4" class="text-center py-4 text-gray-500">No levels logged.</td></tr>`;
+     if (tbody.innerHTML.trim() === '') {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500">No levels logged.</td></tr>`;
+    }
+    saveToLocalStorage();
+}
+
+// --- Main Analysis Pipeline ---
+async function runAllAnalyses() {
+    const runBtn = document.getElementById('run-all-btn');
+    runBtn.disabled = true; runBtn.textContent = 'Running...';
+    try {
+        const { patientData, historyLog, predictionDate } = gatherDataFromState();
+        document.getElementById('output-section').classList.remove('hidden');
+        document.getElementById('ipv-card').classList.remove('hidden');
+        runIpvAndMetabolizer(historyLog);
+        await runForecast(patientData, historyLog, predictionDate);
+    } catch (error) {
+        alert(`Critical Error: ${error.message}`);
+    } finally {
+        runBtn.disabled = false; runBtn.textContent = 'Run Individualized Forecast';
+    }
+}
+
+function gatherDataFromState() {
+    const transplantDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value, "YYYY-MM-DD");
+    if (!transplantDate.isValid()) throw new Error("Invalid Transplant Date.");
+
+    const predictionDate = dayjs(document.getElementById('prediction-datetime')._flatpickr.input.value, "YYYY-MM-DD HH:mm");
+    if (!predictionDate.isValid()) throw new Error("A valid Forecast Date & Time is required.");
+
+    const patientData = {
+        weight: parseFloat(document.getElementById('weight').value),
+        hct: parseFloat(document.getElementById('hematocrit').value),
+        mpa: parseInt(document.getElementById('mpa').value, 10),
+        bioassay: parseInt(document.getElementById('bioassay').value, 10),
+        transplantDate: transplantDate,
+    };
+
+    const historyLog = clinicalData.map((record, index) => {
+        const recordDate = dayjs(record.datetime);
+        if (recordDate.isBefore(patientData.transplantDate)) {
+            throw new Error(`Log entry for ${recordDate.format('DD-MMM-YY')} cannot be before the transplant date.`);
+        }
+        return {
+            id: index,
+            recordDate: recordDate,
+            dose: record.dose,
+            level: record.level,
+            time: recordDate.diff(patientData.transplantDate, 'hour', true)
+        };
     });
-});
-</script>
+    return { patientData, historyLog, predictionDate };
+}
 
+// --- Clinical Calculation Modules ---
+function runQuickHctAdjustment() {
+    const outputDiv = document.getElementById('quick-hct-output');
+    const Cwb = parseFloat(document.getElementById('quick-hct-level').value);
+    const initialHct = parseFloat(document.getElementById('quick-hct-initial').value);
+    const targetHct = 35; 
+
+    if (isNaN(Cwb) || isNaN(initialHct) || Cwb <= 0 || initialHct <= 0 || initialHct >= 100) {
+        outputDiv.innerHTML = 'Adjusted Level: --';
+        return;
+    }
+
+    const { HCT_ADJ_BMAX: Bmax, HCT_ADJ_KD: Kd } = PK_CONSTANTS;
+    const calculatePlasmaConc = (c_wb, fHCT) => {
+        const a = 1 - fHCT, b = Kd - c_wb - (fHCT * Kd) + (fHCT * Bmax), c = -c_wb * Kd;
+        return (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+    };
+    const calculateWholeBloodConc = (c_p, fHCT) => c_p * (1 - fHCT) + fHCT * (Bmax * c_p) / (Kd + c_p);
+    
+    const currentPlasmaConc = calculatePlasmaConc(Cwb, initialHct / 100);
+    const targetWholeBloodConc = calculateWholeBloodConc(currentPlasmaConc, targetHct / 100);
+    
+    outputDiv.innerHTML = `Adjusted Level: <span class="text-indigo-600">${targetWholeBloodConc.toFixed(1)} ng/mL</span>`;
+}
+
+function runIpvAndMetabolizer(historyLog) {
+    const outputDiv = document.getElementById('ipv-output');
+    const levels = historyLog.filter(e => e.level !== null && e.level > 0).sort((a, b) => a.time - b.time);
+    const allDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
+
+    if (levels.length < 3) return displayMessage(outputDiv, `Need at least 3 measured levels.`, 'info');
+    
+    const cdPairs = levels.map(levelEvent => {
+        const priorDoses = allDoses.filter(d => d.time < levelEvent.time);
+        if (priorDoses.length === 0) return null; 
+
+        const lastDose = priorDoses[priorDoses.length - 1];
+        const secondLastDose = priorDoses[priorDoses.length - 2];
+        
+        let dailyDose = 0;
+        // Logic to establish the daily dose based on the last known regimen
+        if (secondLastDose) {
+            const hoursBetween = lastDose.recordDate.diff(secondLastDose.recordDate, 'hour');
+            if (hoursBetween > 8 && hoursBetween < 16) { // Assumes a standard BD regimen
+                dailyDose = lastDose.dose + secondLastDose.dose;
+            } else { // Fallback for irregular dosing, sum the last two
+                 dailyDose = priorDoses.slice(-2).reduce((sum, d) => sum + d.dose, 0);
+            }
+        } else if (priorDoses.length === 1) { // If only one dose ever given, assume it's half a daily dose
+            dailyDose = lastDose.dose * 2;
+        }
+
+        return dailyDose > 0 ? { ratio: levelEvent.level / dailyDose } : null;
+    }).filter(Boolean);
+
+    if (cdPairs.length < 3) {
+        return displayMessage(outputDiv, `Could only form ${cdPairs.length} C/D pairs. Need at least 3.`, 'error');
+    }
+
+    const ratios = cdPairs.map(p => p.ratio);
+    const avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+    const mad = ratios.reduce((a, b) => a + Math.abs(b - avgRatio), 0) / ratios.length;
+    const ipv = (mad / avgRatio) * 100;
+    
+    const status = avgRatio < 1.05 ? 'Fast Metabolizer' : 'Slow Metabolizer';
+    const note = status === 'Fast Metabolizer' ? 'Higher risk of nephrotoxicity at similar troughs.' : 'May require lower doses for target.';
+
+    let message = `<div class="grid grid-cols-2 gap-4 text-center">
+        <div><div class="text-sm text-gray-500">IPV</div><div class="font-bold text-2xl text-purple-700">${ipv.toFixed(1)}%</div></div>
+        <div><div class="text-sm text-gray-500">Status</div><div class="font-bold text-2xl text-purple-700">${status}</div></div>
+        </div><div class="text-sm text-center mt-3 italic text-gray-600">${note}</div>`;
+    displayMessage(outputDiv, message, 'success');
+}
+
+function runForecast(patientData, historyLog, predictionDate) {
+    return new Promise((resolve) => {
+        document.getElementById('forecast-loader').classList.remove('hidden');
+        setTimeout(() => { 
+            try {
+                const allDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
+                const measuredLevels = historyLog.filter(e => e.level !== null && e.level > 0);
+                
+                const popParams = getPopulationParameters(patientData);
+                const individualParams = getIndividualParameters(popParams, measuredLevels, allDoses, patientData.bioassay);
+                
+                const lastTime = Math.max(predictionDate.diff(patientData.transplantDate, 'hour', true) + 48, ...historyLog.map(l => l.time), 0);
+                const timePoints = Array.from({length: 500}, (_, i) => (lastTime / 499) * i);
+                
+                const popCurve = generateCurve(timePoints, allDoses, popParams, patientData.bioassay);
+                const indCurve = generateCurve(timePoints, allDoses, individualParams, patientData.bioassay);
+
+                const predictedLevel = generateCurve(
+                    [predictionDate.diff(patientData.transplantDate, 'hour', true)],
+                     allDoses, individualParams, patientData.bioassay)[0];
+                
+                updateChart(timePoints, popCurve, indCurve, measuredLevels, patientData.transplantDate);
+                updateSummary(predictedLevel, predictionDate, individualParams.rmse);
+                resolve();
+            } catch (error) {
+                const summaryDiv = document.getElementById('results-summary');
+                displayMessage(summaryDiv, error.message, 'error');
+                summaryDiv.classList.remove('hidden');
+                console.error("Forecast Error:", error);
+            } finally {
+                document.getElementById('forecast-loader').classList.add('hidden');
+            }
+        }, 250);
+    });
+}
+
+// --- Pharmacokinetic Modeling ---
+function getPopulationParameters(patientData) {
+    const { weight, hct, mpa } = patientData;
+    const { TVCL, TVV, TVKA } = PK_CONSTANTS;
+
+    const CL = TVCL * Math.pow(weight / 70, 0.75) * Math.pow(hct / 35, -1.15) * (1 - 0.22 * mpa);
+    const V = TVV * (weight / 70);
+    
+    return { CL: CL, V: V, KA: TVKA };
+}
+
+function getIndividualParameters(popParams, measuredLevels, allDoses, bioassay) {
+    if (measuredLevels.length === 0) {
+        return { ...popParams, rmse: null }; // No data, use population params
+    }
+
+    let bestEtaCL = 0, minError = Infinity;
+    // Search for the best eta_CL that minimizes prediction error
+    for (let eta = -2.0; eta <= 2.0; eta += 0.02) {
+        const testParams = { ...popParams, CL: popParams.CL * Math.exp(eta) };
+        const predictedLevels = generateCurve(measuredLevels.map(l => l.time), allDoses, testParams, bioassay);
+        const currentError = measuredLevels.reduce((sum, level, i) => sum + Math.pow(predictedLevels[i] - level.level, 2), 0);
+
+        if (currentError < minError) {
+            minError = currentError;
+            bestEtaCL = eta;
+        }
+    }
+    
+    return { 
+        CL: popParams.CL * Math.exp(bestEtaCL), 
+        V: popParams.V, 
+        KA: popParams.KA, 
+        rmse: Math.sqrt(minError / measuredLevels.length) 
+    };
+}
+
+/**
+ * Calculates the concentration at a single point in time after a single oral dose.
+ * This is the analytical solution for a one-compartment model (Bateman function).
+ * @param {number} time - Hours since the dose was administered.
+ * @param {number} dose_mg - Dose amount in mg.
+ * @param {object} params - Object with CL (L/hr), V (L), and KA (1/hr).
+ * @returns {number} Concentration in ng/mL.
+ */
+function predictSingleDoseConcentration(time, dose_mg, params) {
+    const { CL, V, KA } = params;
+    if (time <= 0 || V <= 0) return 0;
+    
+    const dose_mcg = dose_mg * 1000; // Convert dose to mcg for ng/mL output
+    const k = CL / V; // Elimination rate constant (1/hr)
+
+    // Handle the special case where absorption and elimination rates are equal
+    if (Math.abs(KA - k) < 1e-6) {
+        return (dose_mcg * KA * time * Math.exp(-k * time)) / V;
+    }
+
+    const coefficient = (dose_mcg * KA) / (V * (KA - k));
+    const concentrations = Math.exp(-k * time) - Math.exp(-KA * time);
+    
+    return coefficient * concentrations;
+}
+
+/**
+ * Generates a concentration curve over time by applying the superposition principle.
+ * It sums the effects of all past doses for each point in time.
+ * @param {number[]} times_to_plot - Array of hours post-transplant to calculate concentration for.
+ * @param {object[]} allDoseEvents - Array of all historical dose events.
+ * @param {object} params - The PK parameters (CL, V, KA) to use for the simulation.
+ * @param {number} bioassay - 1 for LC-MS/MS, 2 for CMIA.
+ * @returns {number[]} Array of concentrations (ng/mL) corresponding to times_to_plot.
+ */
+function generateCurve(times_to_plot, allDoseEvents, params, bioassay) {
+    const concentrations = times_to_plot.map(currentTime => {
+        const totalConcentration = allDoseEvents.reduce((sum, doseEvent) => {
+            if (doseEvent.time < currentTime) {
+                const timeSinceDose = currentTime - doseEvent.time;
+                return sum + predictSingleDoseConcentration(timeSinceDose, doseEvent.dose, params);
+            }
+            return sum;
+        }, 0);
+        return totalConcentration;
+    });
+
+    // Apply bioassay conversion if necessary
+    return bioassay === 2 ? concentrations.map(c => 1.08 * c + 0.55) : concentrations;
+}
+
+
+// --- Charting and Display ---
+function displayMessage(divElement, message, type) {
+    divElement.innerHTML = `<div class="output-${type}">${message}</div>`;
+}
+
+function updateChart(timePoints, popCurve, indCurve, measuredLevels, transplantDate) {
+    const ctx = document.getElementById('concentration-chart').getContext('2d');
+    const targetLow = parseFloat(document.getElementById('target-low').value);
+    const targetHigh = parseFloat(document.getElementById('target-high').value);
+
+    const datasets = [{
+        label: 'Population Prediction', data: popCurve.map((y, i) => ({ x: timePoints[i], y })),
+        borderColor: 'rgba(107, 114, 128, 0.8)', borderWidth: 2, pointRadius: 0, tension: 0.4, borderDash: [5, 5]
+    },{
+        label: 'Individualized Forecast', data: indCurve.map((y, i) => ({ x: timePoints[i], y })),
+        borderColor: 'rgb(37, 99, 235)', borderWidth: 3, pointRadius: 0, tension: 0.4,
+    }];
+
+    if (measuredLevels.length > 0) {
+        datasets.push({
+            label: 'Measured Levels', data: measuredLevels.map(l => ({ x: l.time, y: l.level })),
+            backgroundColor: 'rgb(220, 38, 38)', pointRadius: 5, pointHoverRadius: 7, type: 'scatter', showLine: false
+        });
+    }
+    
+    if (myChart) myChart.destroy();
+
+    myChart = new Chart(ctx, {
+        type: 'line', data: { datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Hours Post-Transplant', font: { size: 14 }}},
+                y: { title: { display: true, text: 'Tacrolimus (ng/mL)', font: { size: 14 }}, min: 0 }
+            },
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: { callbacks: { title: ctx => `Hour ${ctx[0].parsed.x.toFixed(1)} (${transplantDate.add(ctx[0].parsed.x, 'hour').format('DD-MMM-YY HH:mm')})` }}
+            },
+            interaction: { intersect: false, mode: 'index' }
+        },
+        plugins: [{
+            id: 'targetRange',
+            beforeDraw: (chart) => {
+                const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+                ctx.save();
+                ctx.fillStyle = 'rgba(252, 211, 77, 0.2)';
+                ctx.fillRect(left, y.getPixelForValue(targetHigh), right - left, y.getPixelForValue(targetLow) - y.getPixelForValue(targetHigh));
+                ctx.restore();
+            }
+        }]
+    });
+}
+
+function updateSummary(predictedLevel, predictionDate, rmse) {
+    const summaryDiv = document.getElementById('results-summary');
+    const rmseHtml = rmse ? `<div class="text-sm mt-2 text-gray-600">Model Fit (RMSE): <span class="font-semibold text-gray-800">${rmse.toFixed(2)} ng/mL</span></div>` : '';
+    if (predictionDate && !isNaN(predictedLevel)) {
+        summaryDiv.innerHTML = `Predicted Level at <span class="text-indigo-700">${predictionDate.format('DD-MMM-YY HH:mm')}</span> is <span class="text-3xl font-bold text-indigo-600">${predictedLevel.toFixed(1)}</span> ng/mL ${rmseHtml}`;
+    } else {
+         summaryDiv.innerHTML = 'Could not calculate a prediction. Please check inputs.';
+    }
+    summaryDiv.classList.remove('hidden');
+}
+
+</script>
 </body>
 </html>
 
