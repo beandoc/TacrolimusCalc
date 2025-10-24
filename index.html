@@ -30,6 +30,7 @@
         .output-success { color: #374151; }
         .output-error { color: #dc2626; font-weight: 500; }
         .output-info { color: #6b7280; font-style: italic; }
+        .highlight-row { background-color: #ecfdf5 !important; border-left: 4px solid #10b981; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-full">
@@ -37,7 +38,7 @@
     <header class="gradient-bg text-white shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <h1 class="text-3xl font-bold">Tacrolimus Clinical Dashboard</h1>
-            <p class="text-indigo-100 mt-1">Individualized Forecasting for Kidney Transplant</p>
+            <p class="text-indigo-100 mt-1">Individualized Forecasting & Dose Optimization for Kidney Transplant</p>
         </div>
     </header>
 
@@ -48,42 +49,74 @@
                 <span class="bg-indigo-100 text-indigo-600 rounded-full p-2 mr-3">👤</span> Patient & Model Information
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="space-y-4">
-                    <div>
-                        <label for="transplant-date" class="block text-sm font-medium text-gray-700 mb-1">Transplant Date</label>
-                        <input id="transplant-date" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                    </div>
-                     <div>
-                        <label for="weight" class="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
-                        <input type="number" id="weight" value="70" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                    </div>
+                <!-- Row 1: Patient Name & Transplant Date -->
+                <div class="md:col-span-2">
+                    <label for="patient-name" class="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
+                    <input list="patient-list" id="patient-name" placeholder="Select or type patient name..." class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                    <datalist id="patient-list">
+                        <!-- This will be populated by JavaScript with saved patient names -->
+                    </datalist>
                 </div>
-                <div class="space-y-4">
-                    <div>
-                        <label for="hematocrit" class="block text-sm font-medium text-gray-700 mb-1">Hematocrit (%)</label>
-                        <input type="number" id="hematocrit" value="35" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                    </div>
-                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Mycophenolic Acid</label>
-                         <select id="mpa" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                            <option value="1">Yes</option>
-                            <option value="0" selected>No</option>
-                        </select>
-                    </div>
+                <div>
+                    <label for="transplant-date" class="block text-sm font-medium text-gray-700 mb-1">Transplant Date</label>
+                    <input id="transplant-date" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
                 </div>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Bioassay Type</label>
-                        <select id="bioassay" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                            <option value="1">LC-MS/MS</option>
-                            <option value="2">CMIA</option>
-                        </select>
-                    </div>
+
+                <!-- Row 2: Clinical Params -->
+                <div>
+                    <label for="weight" class="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
+                    <input type="number" id="weight" value="60" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
                 </div>
+                <div>
+                    <label for="hematocrit" class="block text-sm font-medium text-gray-700 mb-1">Hematocrit (%)</label>
+                    <input type="number" id="hematocrit" value="31" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                </div>
+                 <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mycophenolic Acid</label>
+                     <select id="mpa" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                         <option value="1" selected>Yes</option>
+                         <option value="0">No</option>
+                     </select>
+                </div>
+
+                <!-- Row 3: Bioassay, Genotype & Forecast Date -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bioassay Type</label>
+                    <select id="bioassay" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                        <option value="1">LC-MS/MS</option>
+                        <option value="2">CMIA</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="genotype" class="block text-sm font-medium text-gray-700 mb-1">CYP3A5 Genotype</label>
+                    <select id="genotype" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                        <option value="unknown" selected>Unknown (Default)</option>
+                        <option value="33">CYP3A5*3/*3 (Slow)</option>
+                        <option value="13">CYP3A5*1/*3 (Intermediate)</option>
+                        <option value="11">CYP3A5*1/*1 (Fast)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="prediction-datetime" class="block text-sm font-medium text-gray-700 mb-1">Forecast Date & Time</label>
+                    <input id="prediction-datetime" type="text" placeholder="Select date..." class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                </div>
+            </div>
+            <!-- Row 4: Action Buttons -->
+            <div class="flex flex-wrap gap-3 justify-end items-center mt-6 border-t border-gray-200 pt-4">
+                <button onclick="exportPatientDataToCSV()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors duration-200 text-sm font-medium">Export CSV</button>
+                <button onclick="loadPatientData()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm font-medium">Load Patient</button>
+                <button onclick="savePatientData()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 text-sm font-medium">Save Data</button>
+                <button onclick="clearAllData(true)" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 text-sm font-medium">Clear All</button>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="text-center">
+            <button id="run-all-btn" class="w-full max-w-md bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                Run Individualized Forecast
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div class="bg-white rounded-xl card-shadow p-6">
                 <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                     <span class="bg-orange-100 text-orange-600 rounded-full p-2 mr-3">⚗️</span> Quick Hematocrit Adjustment
@@ -104,12 +137,32 @@
                     </div>
                 </div>
             </div>
+
+            <!-- NEW: Model Parameters Card -->
+            <div id="model-params-card" class="bg-white rounded-xl card-shadow p-6 hidden">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                     <span class="bg-blue-100 text-blue-600 rounded-full p-2 mr-3">⚙️</span> Model Parameters
+                </h2>
+                <div id="model-params-output" class="text-center text-gray-500 italic">
+                    Run forecast to see parameters.
+                </div>
+            </div>
+
             <div id="ipv-card" class="bg-white rounded-xl card-shadow p-6 hidden">
                 <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                      <span class="bg-teal-100 text-teal-600 rounded-full p-2 mr-3">📊</span> IPV & Metabolizer Status
                 </h2>
                 <div id="ipv-output" class="text-center text-gray-500 italic">
                     Requires at least 3 lab results to calculate.
+                </div>
+            </div>
+
+             <div id="ttr-card" class="bg-white rounded-xl card-shadow p-6 hidden">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                     <span class="bg-purple-100 text-purple-600 rounded-full p-2 mr-3">⏱️</span> Time in Therapeutic Range
+                </h2>
+                <div id="ttr-output" class="text-center text-gray-500 italic">
+                    Requires at least 2 lab results to calculate.
                 </div>
             </div>
         </div>
@@ -127,7 +180,7 @@
                 <div class="overflow-x-auto -mx-6">
                     <table class="w-full min-w-full">
                         <thead><tr class="border-b border-gray-200 text-left text-sm font-semibold text-gray-600">
-                                <th class="py-3 px-4">Date & Time</th><th class="py-3 px-4">Dose (mg)</th><th class="py-3 px-4 text-right">Actions</th>
+                            <th class="py-3 px-4">Date & Time</th><th class="py-3 px-4">Dose (mg)</th><th class="py-3 px-4 text-right">Actions</th>
                         </tr></thead>
                         <tbody id="doseLogTable"></tbody>
                     </table>
@@ -146,7 +199,7 @@
                 <div class="overflow-x-auto -mx-6">
                     <table class="w-full min-w-full">
                         <thead><tr class="border-b border-gray-200 text-left text-sm font-semibold text-gray-600">
-                                <th class="py-3 px-4">Date & Time</th><th class="py-3 px-4">Level (ng/mL)</th><th class="py-3 px-4">Status</th><th class="py-3 px-4 text-right">Actions</th>
+                            <th class="py-3 px-4">Date & Time</th><th class="py-3 px-4">Level (ng/mL)</th><th class="py-3 px-4">Status</th><th class="py-3 px-4 text-right">Actions</th>
                         </tr></thead>
                         <tbody id="levelLogTable"></tbody>
                     </table>
@@ -154,43 +207,41 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-xl card-shadow p-6">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                <span class="bg-cyan-100 text-cyan-600 rounded-full p-2 mr-3">🎯</span> Forecast Parameters
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                <div>
-                    <label for="prediction-datetime" class="block text-sm font-medium text-gray-700 mb-1">Forecast Date & Time</label>
-                    <input id="prediction-datetime" type="text" placeholder="Select date..." class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                </div>
-                <div>
-                    <button id="run-all-btn" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg text-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                        Run Individualized Forecast
-                    </button>
-                </div>
-            </div>
-        </div>
-
-
         <div id="output-section" class="space-y-8 hidden">
             <div class="bg-white rounded-xl card-shadow p-6">
                 <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center justify-center">
                     <span class="bg-cyan-100 text-cyan-600 rounded-full p-2 mr-3">📈</span> Concentration Forecast
                 </h2>
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <div class="lg:col-span-1">
-                        <label for="target-low" class="block text-sm font-medium text-gray-700 mb-1">Target Range (ng/mL)</label>
-                        <div class="flex gap-2">
-                            <input id="target-low" type="number" value="8" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
-                            <input id="target-high" type="number" value="12" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
-                        </div>
+                <div class="relative h-96">
+                    <canvas id="concentration-chart"></canvas>
+                    <div id="forecast-loader" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden"><div class="loader"></div></div>
+                </div>
+                <div id="results-summary" class="mt-4 text-center font-semibold text-lg p-3 bg-gray-50 rounded-md hidden"></div>
+            </div>
+
+            <!-- NEW: Dose Optimizer Card -->
+            <div id="dose-optimizer-card" class="bg-white rounded-xl card-shadow p-6 hidden">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <span class="bg-green-100 text-green-600 rounded-full p-2 mr-3">🎯</span> Dose Optimizer Tool
+                </h2>
+                <div id="optimizer-inputs" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label for="target-trough-input" class="block text-sm font-medium text-gray-700 mb-1">Target Trough (ng/mL)</label>
+                        <input type="number" id="target-trough-input" value="8.0" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
                     </div>
-                    <div class="lg:col-span-3">
-                        <div class="relative h-96">
-                            <canvas id="concentration-chart"></canvas>
-                            <div id="forecast-loader" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden"><div class="loader"></div></div>
-                        </div>
-                        <div id="results-summary" class="mt-4 text-center font-semibold text-lg p-3 bg-gray-50 rounded-md hidden"></div>
+                    <div>
+                        <label for="target-date-input" class="block text-sm font-medium text-gray-700 mb-1">Target Date (at Trough)</label>
+                        <input id="target-date-input" type="text" placeholder="Select date..." class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                    </div>
+                    <div class="md:pt-6">
+                         <button id="run-optimizer-btn" class="w-full bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 font-medium">
+                            Find Optimal Dose
+                        </button>
+                    </div>
+                </div>
+                <div id="optimizer-output" class="mt-4">
+                    <div class="text-center text-gray-500 italic">
+                        Run the main forecast first to enable this tool.
                     </div>
                 </div>
             </div>
@@ -222,28 +273,48 @@
             </div>
         </div>
     </div>
+
 <script>
 // --- Global State & Configuration ---
 let clinicalData = [];
 let myChart = null;
 
-// --- Pharmacokinetic Model Constants (from R code reference) ---
+// NEW: Store last forecast parameters for optimizer
+let lastForecastParams = {
+    individual: null,
+    population: null,
+    allDoses: [],
+    patientData: null
+};
+
+// --- Pharmacokinetic Model Constants (UPDATED based on Indian context) ---
 const PK_CONSTANTS = {
     // Population typical values for a 70kg person
-    TVCL: 20.3,  // Typical Clearance (L/hr)
+    TVCL: 20.3,  // Typical Clearance (L/hr) - Validated for Asian/Indian population
     TVV:  451,   // Typical Volume of Distribution (L)
     TVKA: 1.81,  // Typical Absorption Rate Constant (1/hr)
+    F: 0.137,    // 13.7% bioavailability
 
-    // Hematocrit Adjustment constants
+    // Hematocrit Adjustment constants (retained for Quick HCT Adjustment tool)
     HCT_ADJ_BMAX: 418, // Maximum binding capacity (ng/mL)
     HCT_ADJ_KD: 3.8    // Dissociation constant (ng/mL)
 };
+
+// --- NEW Genotype Multiplier Const ---
+const CYP3A5_MULTIPLIER = {
+    '11': 2.0,    // Fast metabolizer (10-15% in India)
+    '13': 1.5,    // Intermediate (40-50% in India)
+    '33': 1.0,    // Slow metabolizer (40-50% in India)
+    'unknown': 1.2  // Conservative if not tested
+};
+
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', function() {
     initializeUI();
     setupEventListeners();
-    loadFromLocalStorage(); 
+    populatePatientList();
+    setSmartDefaults(); 
     renderDoseLog();
     renderLevelLog();
 });
@@ -251,68 +322,204 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeUI() {
     flatpickr("#transplant-date", { altInput: true, altFormat: "d-M-y", dateFormat: "Y-m-d" });
     flatpickr("#prediction-datetime", { enableTime: true, altInput: true, altFormat: "d-M-y H:i", dateFormat: "Y-m-d H:i" });
+    // NEW: Initialize optimizer date picker
+    flatpickr("#target-date-input", { 
+        enableTime: true, 
+        altInput: true, 
+        altFormat: "d-M-y H:i", 
+        dateFormat: "Y-m-d H:i",
+        defaultDate: dayjs().add(4, 'day').hour(7).minute(0).toDate() // Default to 4 days from now
+    });
 }
 
 function setupEventListeners() {
     document.getElementById('run-all-btn').addEventListener('click', runAllAnalyses);
+    // NEW: Optimizer button event
+    document.getElementById('run-optimizer-btn').addEventListener('click', runDoseOptimizer);
+
     ['quick-hct-level', 'quick-hct-initial'].forEach(id => {
         document.getElementById(id).addEventListener('input', runQuickHctAdjustment);
     });
 }
 
 // --- Local Storage Management ---
-function saveToLocalStorage() {
+
+function populatePatientList() {
+    const patientList = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+    const datalist = document.getElementById('patient-list');
+    datalist.innerHTML = ''; // Clear existing options
+    patientList.sort().forEach(patientName => {
+        const option = document.createElement('option');
+        option.value = patientName;
+        datalist.appendChild(option);
+    });
+}
+
+function savePatientData() {
+    const patientName = document.getElementById('patient-name').value.trim();
+    if (!patientName) {
+        alert('Please enter a patient name to save data.');
+        return;
+    }
+    
+    // Use a case-insensitive key for storage
+    const patientKey = patientName.toLowerCase();
+
     const dataToSave = {
         patient: {
             transplantDate: document.getElementById('transplant-date')._flatpickr.input.value,
             weight: document.getElementById('weight').value,
             hematocrit: document.getElementById('hematocrit').value,
             mpa: document.getElementById('mpa').value,
-            bioassay: document.getElementById('bioassay').value
+            bioassay: document.getElementById('bioassay').value,
+            genotype: document.getElementById('genotype').value
         },
         clinicalData: clinicalData
     };
-    localStorage.setItem('tacrolimusDashboardData', JSON.stringify(dataToSave));
+    
+    localStorage.setItem(`tacrolimusDashboard_${patientKey}`, JSON.stringify(dataToSave));
+
+    let patientList = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+    if (!patientList.map(p => p.toLowerCase()).includes(patientKey)) {
+        patientList.push(patientName); // Save the original cased name
+        localStorage.setItem('tacrolimusPatientList', JSON.stringify(patientList));
+        populatePatientList();
+    }
+    
+    alert(`Data saved for patient: ${patientName}`);
 }
 
-function loadFromLocalStorage() {
-    const savedData = localStorage.getItem('tacrolimusDashboardData');
+function loadPatientData() {
+    const patientName = document.getElementById('patient-name').value.trim();
+    if (!patientName) {
+        alert('Please select or type a patient name to load.');
+        return;
+    }
+    
+    const patientKey = patientName.toLowerCase();
+    const savedData = localStorage.getItem(`tacrolimusDashboard_${patientKey}`);
+    
     if (savedData) {
         const data = JSON.parse(savedData);
+        const patientList = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+        const properName = patientList.find(p => p.toLowerCase() === patientKey) || patientName;
+        document.getElementById('patient-name').value = properName;
+        
         document.getElementById('transplant-date')._flatpickr.setDate(data.patient.transplantDate, true);
-        document.getElementById('weight').value = data.patient.weight || 70;
-        document.getElementById('hematocrit').value = data.patient.hematocrit || 35;
-        document.getElementById('mpa').value = data.patient.mpa || '0';
+        document.getElementById('weight').value = data.patient.weight || 60;
+        document.getElementById('hematocrit').value = data.patient.hematocrit || 31;
+        document.getElementById('mpa').value = data.patient.mpa || '1';
         document.getElementById('bioassay').value = data.patient.bioassay || '1';
+        document.getElementById('genotype').value = data.patient.genotype || 'unknown';
         clinicalData = data.clinicalData || [];
+        
+        renderDoseLog();
+        renderLevelLog();
+        setSmartDefaults();
+        
+        // Hide output sections until 'run' is pressed
+        document.getElementById('output-section').classList.add('hidden');
+        document.getElementById('ipv-card').classList.add('hidden');
+        document.getElementById('ttr-card').classList.add('hidden');
+        document.getElementById('model-params-card').classList.add('hidden');
+        document.getElementById('dose-optimizer-card').classList.add('hidden');
+
+    } else {
+        alert(`No data found for patient: ${patientName}`);
+        clearAllData(false); // Clear board, but keep name
     }
-    if (clinicalData.length === 0) {
-        const transplantDate = dayjs().subtract(5, 'day').hour(8).minute(0).second(0);
-        document.getElementById('transplant-date')._flatpickr.setDate(transplantDate.toDate(), true);
-    }
-    setSmartDefaults();
 }
 
-function setSmartDefaults() {
-    const lastRecord = clinicalData.length > 0 ? clinicalData[clinicalData.length - 1] : null;
-    const defaultForecastDate = lastRecord 
-        ? dayjs(lastRecord.datetime).add(1, 'day').hour(7).minute(0).toDate()
-        : dayjs().add(1, 'day').hour(7).minute(0).toDate();
-    document.getElementById('prediction-datetime')._flatpickr.setDate(defaultForecastDate, true);
+function clearAllData(clearName = true) {
+    if (clearName) {
+        document.getElementById('patient-name').value = '';
+    }
+    document.getElementById('weight').value = 60;
+    document.getElementById('hematocrit').value = 31;
+    document.getElementById('mpa').value = '1';
+    document.getElementById('bioassay').value = '1';
+    document.getElementById('genotype').value = 'unknown';
+    clinicalData = [];
+    
+    document.getElementById('transplant-date')._flatpickr.clear();
+    setSmartDefaults();
+    
+    renderDoseLog();
+    renderLevelLog();
+
+    // Hide output sections
+    document.getElementById('output-section').classList.add('hidden');
+    document.getElementById('ipv-card').classList.add('hidden');
+    document.getElementById('ttr-card').classList.add('hidden');
+    document.getElementById('model-params-card').classList.add('hidden');
+    document.getElementById('dose-optimizer-card').classList.add('hidden');
+
+    // Reset optimizer
+    lastForecastParams = { individual: null, population: null, allDoses: [], patientData: null };
+    document.getElementById('optimizer-output').innerHTML = '<div class="text-center text-gray-500 italic">Run the main forecast first to enable this tool.</div>';
 }
+
+// --- NEW: Export to CSV Function ---
+function exportPatientDataToCSV() {
+    const patientName = document.getElementById('patient-name').value.trim();
+    if (!patientName) {
+        alert('Please load or enter a patient name first.');
+        return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    // Patient Demographics
+    csvContent += "Patient Demographics\n";
+    csvContent += "Patient_Name,Transplant_Date,Weight_kg,Hematocrit_pct,MPA_Coadmin,Genotype,Bioassay_Type\n";
+    const patientData = {
+        name: patientName,
+        transplantDate: document.getElementById('transplant-date')._flatpickr.input.value,
+        weight: document.getElementById('weight').value,
+        hct: document.getElementById('hematocrit').value,
+        mpa: document.getElementById('mpa').options[document.getElementById('mpa').selectedIndex].text,
+        genotype: document.getElementById('genotype').options[document.getElementById('genotype').selectedIndex].text,
+        bioassay: document.getElementById('bioassay').options[document.getElementById('bioassay').selectedIndex].text,
+    };
+    csvContent += `"${patientData.name}","${patientData.transplantDate}",${patientData.weight},${patientData.hct},"${patientData.mpa}","${patientData.genotype}","${patientData.bioassay}"\n`;
+
+    // Spacer
+    csvContent += "\nClinical Data Log\n";
+
+    // Clinical Data
+    csvContent += "DateTime,Dose_mg,Level_ng_mL\n";
+    clinicalData.forEach(record => {
+        csvContent += `"${record.datetime}",${record.dose !== null ? record.dose : ''},${record.level !== null ? record.level : ''}\n`;
+    });
+
+    // Create and trigger download
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${patientName}_tacrolimus_data.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 
 // --- UI Modals & Data Entry ---
 /**
- * NEW: Adds a full day of default doses (07:00 and 19:00) with one click.
+ * Adds a full day of default doses (07:00 and 19:00) with one click.
  */
 function addDefaultDoseDay() {
     const lastRecord = clinicalData.length > 0 ? clinicalData[clinicalData.length - 1] : null;
     
     let newDoseDate;
     if (lastRecord) {
-        newDoseDate = dayjs(lastRecord.datetime).add(1, 'day');
+        // Find the last record *with a date*
+        newDoseDate = dayjs(lastRecord.datetime).startOf('day').add(1, 'day');
     } else {
         const transplantDateStr = document.getElementById('transplant-date')._flatpickr.input.value;
+        if (!transplantDateStr) {
+             alert("Please set a valid transplant date before logging doses.");
+             return;
+        }
         newDoseDate = dayjs(transplantDateStr, "YYYY-MM-DD").add(1, 'day');
     }
 
@@ -321,6 +528,7 @@ function addDefaultDoseDay() {
         return;
     }
 
+    // Find the last *dose* amount to use as the default
     const lastDoseRecord = [...clinicalData].reverse().find(r => r.dose !== null);
     const defaultDoseValue = lastDoseRecord ? lastDoseRecord.dose : 2.0;
 
@@ -335,19 +543,19 @@ function addDefaultDoseDay() {
         level: null
     };
 
-    // Merge doses into clinicalData
-    [morningDose, eveningDose].forEach(newDose => {
-        const existingRecord = clinicalData.find(r => r.datetime === newDose.datetime);
-        if (existingRecord) {
-            existingRecord.dose = newDose.dose;
-        } else {
-            clinicalData.push(newDose);
-        }
-    });
+    // Check if these exact times already exist
+    if (!clinicalData.find(r => r.datetime === morningDose.datetime)) {
+        clinicalData.push(morningDose);
+    }
+    if (!clinicalData.find(r => r.datetime === eveningDose.datetime)) {
+        clinicalData.push(eveningDose);
+    }
     
     clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
     renderDoseLog();
+    renderLevelLog();
 }
+
 
 function showAddRecordModal(type, editIndex = null) {
     const modal = document.getElementById('addRecordModal');
@@ -384,90 +592,60 @@ function hideAddRecordModal() {
 }
 
 function saveRecord() {
-    const datetime = dayjs(document.getElementById('newDateTime').value).format("YYYY-MM-DD HH:mm");
-    const doseValue = document.getElementById('newDose').value;
-    const levelValue = document.getElementById('newLevel').value;
-    const editIndexStr = document.getElementById('editIndex').value;
+    const datetimeStr = document.getElementById('newDateTime').value;
+    const dose = document.getElementById('newDose').value;
+    const level = document.getElementById('newLevel').value;
+    const index = document.getElementById('editIndex').value;
     const type = document.getElementById('recordType').value;
 
-    if (!datetime || datetime === 'Invalid Date') { alert('Please enter a valid date and time.'); return; }
+    if (!datetimeStr || !dayjs(datetimeStr).isValid()) { alert('Please enter a valid date and time.'); return; }
+    if ((type === 'dose' && parseFloat(dose) < 0) || (type === 'level' && parseFloat(level) < 0)) {
+        alert('Dose and level values cannot be negative.'); return;
+    }
+    const datetime = dayjs(datetimeStr).format("YYYY-MM-DD HH:mm");
 
-    let newDose = type === 'dose' ? (doseValue ? parseFloat(doseValue) : null) : null;
-    let newLevel = type === 'level' ? (levelValue ? parseFloat(levelValue) : null) : null;
-
-    if (editIndexStr !== '') {
-        // When editing, we remove the old record first.
-        // We will then re-insert its data as if it's a new entry.
-        const oldRecord = clinicalData.splice(parseInt(editIndexStr), 1)[0];
-        
-        // If the time hasn't changed, we must preserve the other value (e.g., preserve the level when editing a dose).
-        if (oldRecord.datetime === datetime) {
-            if (type === 'dose') {
-                newLevel = oldRecord.level; // Preserve existing level
-            } else { // type === 'level'
-                newDose = oldRecord.dose; // Preserve existing dose
-            }
-        } else {
-             // If time has changed, we need to clean up the other value from the old time slot if it exists
-             if (type === 'dose' && oldRecord.level !== null) {
-                 // The level is being left behind at the old time, so add it back as a level-only record.
-                 clinicalData.push({ datetime: oldRecord.datetime, dose: null, level: oldRecord.level });
-             }
-             if (type === 'level' && oldRecord.dose !== null) {
-                 // The dose is being left behind at the old time, so add it back as a dose-only record.
-                 clinicalData.push({ datetime: oldRecord.datetime, dose: oldRecord.dose, level: null });
-             }
+    if (index !== '') { // Editing existing record
+        clinicalData[parseInt(index)].datetime = datetime;
+        if (type === 'dose') clinicalData[parseInt(index)].dose = dose ? parseFloat(dose) : null;
+        if (type === 'level') clinicalData[parseInt(index)].level = level ? parseFloat(level) : null;
+    } else { // Adding new record
+        const existingRecord = clinicalData.find(r => r.datetime === datetime);
+        if (existingRecord) { // Merge with a record at the same time
+            if (type === 'dose') existingRecord.dose = dose ? parseFloat(dose) : null;
+            if (type === 'level') existingRecord.level = level ? parseFloat(level) : null;
+        } else { // No record at this time, so create a new one
+            clinicalData.push({
+                datetime: datetime,
+                dose: type === 'dose' ? (dose ? parseFloat(dose) : null) : null,
+                level: type === 'level' ? (level ? parseFloat(level) : null) : null,
+            });
         }
     }
-
-    // Now, merge the new/edited data into the array
-    const existingRecord = clinicalData.find(r => r.datetime === datetime);
-    if (existingRecord) {
-        // A record already exists at this time, so merge our data into it
-        if (newDose !== null) existingRecord.dose = newDose;
-        if (newLevel !== null) existingRecord.level = newLevel;
-    } else {
-        // No record at this time, so add a new one
-        clinicalData.push({
-            datetime: datetime,
-            dose: newDose,
-            level: newLevel,
-        });
-    }
     
-    // Final cleanup and rendering
     clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
     renderDoseLog();
     renderLevelLog();
     hideAddRecordModal();
 }
 
-
 function deleteRecord(index, type) {
     if (confirm(`Are you sure you want to delete this ${type}?`)) {
         const record = clinicalData[index];
-        if (type === 'dose') {
-            record.dose = null;
-        } else if (type === 'level') {
-            record.level = null;
-        }
-
-        if (record.dose === null && record.level === null) {
-            clinicalData.splice(index, 1);
-        }
-       
+        if (type === 'dose') record.dose = null;
+        if (type === 'level') record.level = null;
+        if (record.dose === null && record.level === null) clinicalData.splice(index, 1);
         renderDoseLog();
         renderLevelLog();
     }
 }
 
+
 // --- UI Rendering ---
-function getLevelStatus(level) {
-    const targetLow = parseFloat(document.getElementById('target-low').value);
-    const targetHigh = parseFloat(document.getElementById('target-high').value);
-    if (isNaN(level) || isNaN(targetLow) || isNaN(targetHigh)) return { text: 'N/A', class: '' };
-    if (level < targetLow) return { text: 'Low', class: 'level-low' };
-    if (level > targetHigh) return { text: 'High', class: 'level-high' };
+function getLevelStatus(level, date, transplantDate) {
+    const range = getTherapeuticRange(date, transplantDate);
+    if (isNaN(level)) return { text: 'N/A', class: '' };
+    if (level < range.low) return { text: 'Low', class: 'level-low' };
+    if (level > range.high) return { text: 'High', class: 'level-high' };
     return { text: 'Target', class: 'level-target' };
 }
 
@@ -482,51 +660,71 @@ function renderDoseLog() {
                 <button onclick="deleteRecord(${index}, 'dose')" class="text-red-600 hover:text-red-800 font-medium ml-3">Delete</button>
             </td>
         </tr>` : '').join('');
-    
     tbody.innerHTML = doseRows || `<tr><td colspan="3" class="text-center py-4 text-gray-500">No doses logged.</td></tr>`;
-    if (tbody.innerHTML.trim() === '') {
-        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-500">No doses logged.</td></tr>`;
-    }
-    saveToLocalStorage();
+    saveToLocalStorage(); // Auto-save on change
 }
 
 function renderLevelLog() {
     const tbody = document.getElementById('levelLogTable');
+    const transplantDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value, "YYYY-MM-DD");
+    
     const levelRows = clinicalData.map((record, index) => {
         if (record.level !== null) {
-            const status = getLevelStatus(record.level);
+            const status = getLevelStatus(record.level, dayjs(record.datetime), transplantDate);
             return `<tr class="border-b border-gray-100 text-sm hover:bg-gray-50">
-                    <td class="py-3 px-4">${dayjs(record.datetime).format('DD-MMM-YY HH:mm')}</td>
-                    <td class="py-3 px-4 font-medium">${record.level.toFixed(1)}</td>
-                    <td class="py-3 px-4"><span class="status-indicator ${status.class}"></span>${status.text}</td>
-                    <td class="py-3 px-4 text-right">
-                        <button onclick="showAddRecordModal('level', ${index})" class="text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
-                        <button onclick="deleteRecord(${index}, 'level')" class="text-red-600 hover:text-red-800 font-medium ml-3">Delete</button>
-                    </td>
-                </tr>`;
+                        <td class="py-3 px-4">${dayjs(record.datetime).format('DD-MMM-YY HH:mm')}</td>
+                        <td class="py-3 px-4 font-medium">${record.level.toFixed(1)}</td>
+                        <td class="py-3 px-4"><span class="status-indicator ${status.class}"></span>${status.text}</td>
+                        <td class="py-3 px-4 text-right">
+                            <button onclick="showAddRecordModal('level', ${index})" class="text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
+                            <button onclick="deleteRecord(${index}, 'level')" class="text-red-600 hover:text-red-800 font-medium ml-3">Delete</button>
+                        </td>
+                    </tr>`;
         }
         return '';
     }).join('');
-
     tbody.innerHTML = levelRows || `<tr><td colspan="4" class="text-center py-4 text-gray-500">No levels logged.</td></tr>`;
-     if (tbody.innerHTML.trim() === '') {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500">No levels logged.</td></tr>`;
-    }
-    saveToLocalStorage();
+    saveToLocalStorage(); // Auto-save on change
 }
 
 // --- Main Analysis Pipeline ---
 async function runAllAnalyses() {
     const runBtn = document.getElementById('run-all-btn');
     runBtn.disabled = true; runBtn.textContent = 'Running...';
+
+    // Reset optimizer and params
+    lastForecastParams = { individual: null, population: null, allDoses: [], patientData: null };
+    document.getElementById('dose-optimizer-card').classList.add('hidden');
+    document.getElementById('model-params-card').classList.add('hidden');
+    document.getElementById('optimizer-output').innerHTML = '<div class="text-center text-gray-500 italic">Run the main forecast first to enable this tool.</div>';
+
     try {
         const { patientData, historyLog, predictionDate } = gatherDataFromState();
+        
+        // Show all output cards
         document.getElementById('output-section').classList.remove('hidden');
         document.getElementById('ipv-card').classList.remove('hidden');
+        document.getElementById('ttr-card').classList.remove('hidden');
+        document.getElementById('model-params-card').classList.remove('hidden'); // NEW
+        
         runIpvAndMetabolizer(historyLog);
+        runTTRCalculation(historyLog, patientData.transplantDate);
+        
+        // Pass predictionDate to the forecast
         await runForecast(patientData, historyLog, predictionDate);
+
+        // NEW: Show optimizer card only on successful forecast
+        if (lastForecastParams.individual) {
+            document.getElementById('dose-optimizer-card').classList.remove('hidden');
+            // Set optimizer default date
+            const lastDoseDate = historyLog.filter(r => r.dose).pop()?.recordDate || dayjs();
+            const optimizerDefaultDate = lastDoseDate.add(4, 'day').hour(7).minute(0).toDate();
+            document.getElementById('target-date-input')._flatpickr.setDate(optimizerDefaultDate, true);
+        }
+
     } catch (error) {
         alert(`Critical Error: ${error.message}`);
+        console.error(error);
     } finally {
         runBtn.disabled = false; runBtn.textContent = 'Run Individualized Forecast';
     }
@@ -535,21 +733,22 @@ async function runAllAnalyses() {
 function gatherDataFromState() {
     const transplantDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value, "YYYY-MM-DD");
     if (!transplantDate.isValid()) throw new Error("Invalid Transplant Date.");
-
+    
     const predictionDate = dayjs(document.getElementById('prediction-datetime')._flatpickr.input.value, "YYYY-MM-DD HH:mm");
-    if (!predictionDate.isValid()) throw new Error("A valid Forecast Date & Time is required.");
+    if (!predictionDate.isValid()) throw new Error("Invalid Forecast Date.");
 
     const patientData = {
         weight: parseFloat(document.getElementById('weight').value),
-        hct: parseFloat(document.getElementById('hematocrit').value),
+        hct: parseFloat(document.getElementById('hematocrit').value), // Retained for Quick HCT tool
         mpa: parseInt(document.getElementById('mpa').value, 10),
         bioassay: parseInt(document.getElementById('bioassay').value, 10),
+        genotype: document.getElementById('genotype').value,
         transplantDate: transplantDate,
     };
 
     const historyLog = clinicalData.map((record, index) => {
         const recordDate = dayjs(record.datetime);
-        if (recordDate.isBefore(patientData.transplantDate)) {
+        if (recordDate.isBefore(patientData.transplantDate.startOf('day'))) {
             throw new Error(`Log entry for ${recordDate.format('DD-MMM-YY')} cannot be before the transplant date.`);
         }
         return {
@@ -564,22 +763,38 @@ function gatherDataFromState() {
 }
 
 // --- Clinical Calculation Modules ---
+
+/**
+ * Returns the therapeutic range based on the time since transplant.
+ */
+function getTherapeuticRange(date, transplantDate) {
+    const monthsPostTx = dayjs(date).diff(dayjs(transplantDate), 'month', true);
+    if (monthsPostTx <= 1) return { low: 10, high: 11 };
+    if (monthsPostTx > 1 && monthsPostTx <= 3) return { low: 7, high: 9 };
+    if (monthsPostTx > 3 && monthsPostTx <= 6) return { low: 5, high: 7 };
+    return { low: 4, high: 6 }; // More than 6 months
+}
+
 function runQuickHctAdjustment() {
     const outputDiv = document.getElementById('quick-hct-output');
     const Cwb = parseFloat(document.getElementById('quick-hct-level').value);
     const initialHct = parseFloat(document.getElementById('quick-hct-initial').value);
-    const targetHct = 35; 
-
+    const targetHct = 35; // Target HCT for this tool
+    
     if (isNaN(Cwb) || isNaN(initialHct) || Cwb <= 0 || initialHct <= 0 || initialHct >= 100) {
         outputDiv.innerHTML = 'Adjusted Level: --';
         return;
     }
 
     const { HCT_ADJ_BMAX: Bmax, HCT_ADJ_KD: Kd } = PK_CONSTANTS;
+    // C_plasma = (-b + sqrt(b^2 - 4ac)) / 2a
     const calculatePlasmaConc = (c_wb, fHCT) => {
-        const a = 1 - fHCT, b = Kd - c_wb - (fHCT * Kd) + (fHCT * Bmax), c = -c_wb * Kd;
+        const a = 1 - fHCT;
+        const b = Kd - c_wb - (fHCT * Kd) + (fHCT * Bmax);
+        const c = -c_wb * Kd;
         return (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
     };
+    // C_wb = C_p(1 - HCT) + HCT * (Bmax * C_p) / (Kd + C_p)
     const calculateWholeBloodConc = (c_p, fHCT) => c_p * (1 - fHCT) + fHCT * (Bmax * c_p) / (Kd + c_p);
     
     const currentPlasmaConc = calculatePlasmaConc(Cwb, initialHct / 100);
@@ -596,34 +811,27 @@ function runIpvAndMetabolizer(historyLog) {
     if (levels.length < 3) return displayMessage(outputDiv, `Need at least 3 measured levels.`, 'info');
     
     const cdPairs = levels.map(levelEvent => {
-        const priorDoses = allDoses.filter(d => d.time < levelEvent.time);
-        if (priorDoses.length === 0) return null; 
-
-        const lastDose = priorDoses[priorDoses.length - 1];
-        const secondLastDose = priorDoses[priorDoses.length - 2];
+        // Find all doses in the 24-hour period *before* this lab draw
+        const priorDoses = allDoses.filter(d => 
+            d.time < levelEvent.time && 
+            d.time >= (levelEvent.time - 24)
+        );
         
-        let dailyDose = 0;
-        // Logic to establish the daily dose based on the last known regimen
-        if (secondLastDose) {
-            const hoursBetween = lastDose.recordDate.diff(secondLastDose.recordDate, 'hour');
-            if (hoursBetween > 8 && hoursBetween < 16) { // Assumes a standard BD regimen
-                dailyDose = lastDose.dose + secondLastDose.dose;
-            } else { // Fallback for irregular dosing, sum the last two
-                 dailyDose = priorDoses.slice(-2).reduce((sum, d) => sum + d.dose, 0);
-            }
-        } else if (priorDoses.length === 1) { // If only one dose ever given, assume it's half a daily dose
-            dailyDose = lastDose.dose * 2;
-        }
+        if (priorDoses.length === 0) return null;
+
+        // Sum them up to get the Total Daily Dose (TDD)
+        const dailyDose = priorDoses.reduce((sum, d) => sum + d.dose, 0);
 
         return dailyDose > 0 ? { ratio: levelEvent.level / dailyDose } : null;
-    }).filter(Boolean);
+    }).filter(Boolean); // Remove nulls
 
-    if (cdPairs.length < 3) {
-        return displayMessage(outputDiv, `Could only form ${cdPairs.length} C/D pairs. Need at least 3.`, 'error');
+    if (cdPairs.length < 2) { // Need at least 2 pairs to calc variability
+        return displayMessage(outputDiv, `Could only form ${cdPairs.length} C/D pairs. Please ensure labs are preceded by at least one dose in the prior 24h.`, 'error');
     }
 
     const ratios = cdPairs.map(p => p.ratio);
     const avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+    // Median Absolute Deviation (MAD)
     const mad = ratios.reduce((a, b) => a + Math.abs(b - avgRatio), 0) / ratios.length;
     const ipv = (mad / avgRatio) * 100;
     
@@ -631,58 +839,190 @@ function runIpvAndMetabolizer(historyLog) {
     const note = status === 'Fast Metabolizer' ? 'Higher risk of nephrotoxicity at similar troughs.' : 'May require lower doses for target.';
 
     let message = `<div class="grid grid-cols-2 gap-4 text-center">
-        <div><div class="text-sm text-gray-500">IPV</div><div class="font-bold text-2xl text-purple-700">${ipv.toFixed(1)}%</div></div>
-        <div><div class="text-sm text-gray-500">Status</div><div class="font-bold text-2xl text-purple-700">${status}</div></div>
+        <div><div class="text-sm text-gray-500">Intra-Patient IPV</div><div class="font-bold text-2xl text-purple-700">${ipv.toFixed(1)}%</div></div>
+        <div><div class="text-sm text-gray-500">C/D Ratio (Metabolism)</div><div class="font-bold text-lg text-purple-700">${avgRatio.toFixed(1)} (${status})</div></div>
         </div><div class="text-sm text-center mt-3 italic text-gray-600">${note}</div>`;
     displayMessage(outputDiv, message, 'success');
 }
+
+function runTTRCalculation(historyLog, transplantDate) {
+    const outputDiv = document.getElementById('ttr-output');
+    const levels = historyLog.filter(e => e.level !== null && e.level > 0).sort((a, b) => a.time - b.time);
+
+    if (levels.length < 2) {
+        return displayMessage(outputDiv, 'Requires at least 2 lab results to calculate.', 'info');
+    }
+
+    let totalTimeInRange = 0;
+    let totalDuration = 0;
+
+    for (let i = 0; i < levels.length - 1; i++) {
+        const p1 = levels[i];
+        const p2 = levels[i + 1];
+
+        const intervalDuration = p2.time - p1.time;
+        if (intervalDuration <= 0) continue;
+        totalDuration += intervalDuration;
+        
+        const range = getTherapeuticRange(p1.recordDate, transplantDate);
+        const { low: targetLow, high: targetHigh } = range;
+        
+        const v1 = p1.level;
+        const v2 = p2.level;
+
+        // --- Rosendaal Method (Linear Interpolation) ---
+        if (v1 >= targetLow && v1 <= targetHigh && v2 >= targetLow && v2 <= targetHigh) {
+            // Both points in range
+            totalTimeInRange += intervalDuration;
+            continue;
+        }
+        if ((v1 < targetLow && v2 < targetLow) || (v1 > targetHigh && v2 > targetHigh)) {
+            // Both points out of range on the same side
+            continue;
+        }
+
+        // --- Find crossing points ---
+        const timeToCross = (target, val1, val2, time1, time2) => {
+             if (val2 === val1) return time1;
+             return time1 + (time2 - time1) * (target - val1) / (val2 - val1);
+        };
+
+        const t_low = timeToCross(targetLow, v1, v2, p1.time, p2.time);
+        const t_high = timeToCross(targetHigh, v1, v2, p1.time, p2.time);
+        
+        const sortedTimes = [p1.time, p2.time, t_low, t_high].filter(t => t >= p1.time && t <= p2.time).sort((a, b) => a - b);
+        let intervalTimeInRange = 0;
+
+        for (let j = 0; j < sortedTimes.length - 1; j++) {
+            const t_start = sortedTimes[j];
+            const t_end = sortedTimes[j+1];
+            const t_mid = t_start + (t_end - t_start) / 2;
+            
+            // Get concentration at midpoint
+            const mid_conc = v1 + (v2 - v1) * (t_mid - p1.time) / (p2.time - p1.time);
+            
+            if (mid_conc >= targetLow && mid_conc <= targetHigh) {
+                intervalTimeInRange += (t_end - t_start);
+            }
+        }
+        totalTimeInRange += intervalTimeInRange;
+    }
+
+    if (totalDuration === 0) {
+        return displayMessage(outputDiv, 'Not enough time elapsed between labs to calculate.', 'info');
+    }
+
+    const ttrPercentage = (totalTimeInRange / totalDuration) * 100;
+    const message = `<div class="text-center">
+            <div class="font-bold text-4xl text-purple-600">${ttrPercentage.toFixed(1)}%</div>
+            <div class="text-sm text-gray-500 mt-1">Calculated using the Rosendaal method.</div>
+        </div>`;
+    displayMessage(outputDiv, message, 'success');
+}
+
 
 function runForecast(patientData, historyLog, predictionDate) {
     return new Promise((resolve) => {
         document.getElementById('forecast-loader').classList.remove('hidden');
         setTimeout(() => { 
             try {
-                const allDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
+                const loggedDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
                 const measuredLevels = historyLog.filter(e => e.level !== null && e.level > 0);
                 
-                const popParams = getPopulationParameters(patientData);
-                const individualParams = getIndividualParameters(popParams, measuredLevels, allDoses, patientData.bioassay);
+                if (loggedDoses.length === 0) {
+                    throw new Error("No doses logged. Cannot run forecast.");
+                }
+
+                // Extrapolate doses 14 days past the prediction date for a good graph
+                const forecastUntilDate = predictionDate.add(14, 'day');
+                const extrapolatedDoses = extrapolateDoses(historyLog, forecastUntilDate, patientData.transplantDate);
+                const allDosesForModel = [...loggedDoses, ...extrapolatedDoses];
                 
-                const lastTime = Math.max(predictionDate.diff(patientData.transplantDate, 'hour', true) + 48, ...historyLog.map(l => l.time), 0);
+                const popParams = getPopulationParameters(patientData);
+                const individualParams = getIndividualParameters(popParams, measuredLevels, allDosesForModel, patientData.bioassay);
+                
+                // --- NEW: Save parameters for other tools ---
+                lastForecastParams = {
+                    individual: individualParams,
+                    population: popParams,
+                    allDoses: allDosesForModel,
+                    patientData: patientData
+                };
+                
+                const lastTime = Math.max(forecastUntilDate.diff(patientData.transplantDate, 'hour', true), ...historyLog.map(l => l.time), 0);
                 const timePoints = Array.from({length: 500}, (_, i) => (lastTime / 499) * i);
                 
-                const popCurve = generateCurve(timePoints, allDoses, popParams, patientData.bioassay);
-                const indCurve = generateCurve(timePoints, allDoses, individualParams, patientData.bioassay);
+                const popCurve = generateCurve(timePoints, allDosesForModel, popParams, patientData.bioassay);
+                const indCurve = generateCurve(timePoints, allDosesForModel, individualParams, patientData.bioassay);
 
                 const predictedLevel = generateCurve(
                     [predictionDate.diff(patientData.transplantDate, 'hour', true)],
-                     allDoses, individualParams, patientData.bioassay)[0];
+                     allDosesForModel, individualParams, patientData.bioassay)[0];
                 
                 updateChart(timePoints, popCurve, indCurve, measuredLevels, patientData.transplantDate);
                 updateSummary(predictedLevel, predictionDate, individualParams.rmse);
+                
+                // NEW: Update Model Params card
+                updateModelParamsCard(popParams, individualParams);
+
                 resolve();
             } catch (error) {
                 const summaryDiv = document.getElementById('results-summary');
                 displayMessage(summaryDiv, error.message, 'error');
                 summaryDiv.classList.remove('hidden');
                 console.error("Forecast Error:", error);
+                resolve(); // Resolve promise even on error
             } finally {
                 document.getElementById('forecast-loader').classList.add('hidden');
             }
-        }, 250);
+        }, 250); // Simulate processing time
     });
 }
 
+/**
+ * Auto-fills doses based on the last logged dose, assuming a 12-hour (BID) schedule.
+ */
+function extrapolateDoses(historyLog, forecastUntilDate, transplantDate) {
+    const extrapolatedDoses = [];
+    const loggedDoses = historyLog.filter(e => e.dose !== null && e.dose > 0).sort((a, b) => a.time - b.time);
+    
+    if (loggedDoses.length === 0) {
+        return []; // Cannot extrapolate without at least one dose
+    }
+
+    const lastLoggedDose = loggedDoses[loggedDoses.length - 1];
+    let nextDoseTime = lastLoggedDose.recordDate.add(12, 'hour');
+    
+    while (nextDoseTime.isBefore(forecastUntilDate)) {
+        extrapolatedDoses.push({
+            id: 'extrapolated-' + extrapolatedDoses.length,
+            recordDate: nextDoseTime,
+            dose: lastLoggedDose.dose, // Use the last logged dose amount
+            level: null,
+            time: nextDoseTime.diff(transplantDate, 'hour', true)
+        });
+        nextDoseTime = nextDoseTime.add(12, 'hour');
+    }
+    return extrapolatedDoses;
+}
+
+
 // --- Pharmacokinetic Modeling ---
+
+/**
+ * UPDATED: Calculates Population PK Parameters based on Indian context.
+ */
 function getPopulationParameters(patientData) {
-    const { weight, hct, mpa } = patientData;
+    const { weight, genotype } = patientData;
     const { TVCL, TVV, TVKA } = PK_CONSTANTS;
 
-    const CL = TVCL * Math.pow(weight / 70, 0.75) * Math.pow(hct / 35, -1.15) * (1 - 0.22 * mpa);
+    const multiplier = CYP3A5_MULTIPLIER[genotype] || CYP3A5_MULTIPLIER['unknown'];
+    const CL = TVCL * Math.pow(weight / 70, 0.75) * multiplier;
     const V = TVV * (weight / 70);
     
     return { CL: CL, V: V, KA: TVKA };
 }
+
 
 function getIndividualParameters(popParams, measuredLevels, allDoses, bioassay) {
     if (measuredLevels.length === 0) {
@@ -690,11 +1030,16 @@ function getIndividualParameters(popParams, measuredLevels, allDoses, bioassay) 
     }
 
     let bestEtaCL = 0, minError = Infinity;
-    // Search for the best eta_CL that minimizes prediction error
-    for (let eta = -2.0; eta <= 2.0; eta += 0.02) {
+    
+    // Constrain the search range for 'eta'
+    for (let eta = -1.2; eta <= 1.2; eta += 0.02) { 
         const testParams = { ...popParams, CL: popParams.CL * Math.exp(eta) };
         const predictedLevels = generateCurve(measuredLevels.map(l => l.time), allDoses, testParams, bioassay);
-        const currentError = measuredLevels.reduce((sum, level, i) => sum + Math.pow(predictedLevels[i] - level.level, 2), 0);
+        
+        // Calculate squared error
+        const currentError = measuredLevels.reduce((sum, level, i) => {
+            return sum + Math.pow(predictedLevels[i] - level.level, 2);
+        }, 0);
 
         if (currentError < minError) {
             minError = currentError;
@@ -711,22 +1056,16 @@ function getIndividualParameters(popParams, measuredLevels, allDoses, bioassay) 
 }
 
 /**
- * Calculates the concentration at a single point in time after a single oral dose.
- * This is the analytical solution for a one-compartment model (Bateman function).
- * @param {number} time - Hours since the dose was administered.
- * @param {number} dose_mg - Dose amount in mg.
- * @param {object} params - Object with CL (L/hr), V (L), and KA (1/hr).
- * @returns {number} Concentration in ng/mL.
+ * Core 1-compartment model prediction logic.
  */
 function predictSingleDoseConcentration(time, dose_mg, params) {
     const { CL, V, KA } = params;
     if (time <= 0 || V <= 0) return 0;
     
-    const dose_mcg = dose_mg * 1000; // Convert dose to mcg for ng/mL output
-    const k = CL / V; // Elimination rate constant (1/hr)
+    const dose_mcg = dose_mg * 1000;
+    const k = CL / V;
 
-    // Handle the special case where absorption and elimination rates are equal
-    if (Math.abs(KA - k) < 1e-6) {
+    if (Math.abs(KA - k) < 1e-6) { // Handle case where KA = k
         return (dose_mcg * KA * time * Math.exp(-k * time)) / V;
     }
 
@@ -736,17 +1075,9 @@ function predictSingleDoseConcentration(time, dose_mg, params) {
     return coefficient * concentrations;
 }
 
-/**
- * Generates a concentration curve over time by applying the superposition principle.
- * It sums the effects of all past doses for each point in time.
- * @param {number[]} times_to_plot - Array of hours post-transplant to calculate concentration for.
- * @param {object[]} allDoseEvents - Array of all historical dose events.
- * @param {object} params - The PK parameters (CL, V, KA) to use for the simulation.
- * @param {number} bioassay - 1 for LC-MS/MS, 2 for CMIA.
- * @returns {number[]} Array of concentrations (ng/mL) corresponding to times_to_plot.
- */
 function generateCurve(times_to_plot, allDoseEvents, params, bioassay) {
     const concentrations = times_to_plot.map(currentTime => {
+        // Superposition: sum the concentration from all prior doses
         const totalConcentration = allDoseEvents.reduce((sum, doseEvent) => {
             if (doseEvent.time < currentTime) {
                 const timeSinceDose = currentTime - doseEvent.time;
@@ -757,7 +1088,7 @@ function generateCurve(times_to_plot, allDoseEvents, params, bioassay) {
         return totalConcentration;
     });
 
-    // Apply bioassay conversion if necessary
+    // Apply CMIA correction if needed
     return bioassay === 2 ? concentrations.map(c => 1.08 * c + 0.55) : concentrations;
 }
 
@@ -769,9 +1100,7 @@ function displayMessage(divElement, message, type) {
 
 function updateChart(timePoints, popCurve, indCurve, measuredLevels, transplantDate) {
     const ctx = document.getElementById('concentration-chart').getContext('2d');
-    const targetLow = parseFloat(document.getElementById('target-low').value);
-    const targetHigh = parseFloat(document.getElementById('target-high').value);
-
+    
     const datasets = [{
         label: 'Population Prediction', data: popCurve.map((y, i) => ({ x: timePoints[i], y })),
         borderColor: 'rgba(107, 114, 128, 0.8)', borderWidth: 2, pointRadius: 0, tension: 0.4, borderDash: [5, 5]
@@ -799,17 +1128,46 @@ function updateChart(timePoints, popCurve, indCurve, measuredLevels, transplantD
             },
             plugins: {
                 legend: { position: 'top' },
-                tooltip: { callbacks: { title: ctx => `Hour ${ctx[0].parsed.x.toFixed(1)} (${transplantDate.add(ctx[0].parsed.x, 'hour').format('DD-MMM-YY HH:mm')})` }}
+                tooltip: { 
+                    callbacks: { 
+                        title: ctx => `Hour ${ctx[0].parsed.x.toFixed(1)} (${transplantDate.add(ctx[0].parsed.x, 'hour').format('DD-MMM-YY HH:mm')})` 
+                    }
+                }
             },
             interaction: { intersect: false, mode: 'index' }
         },
         plugins: [{
             id: 'targetRange',
             beforeDraw: (chart) => {
-                const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+                const { ctx, chartArea: { left, right }, scales: { x, y } } = chart;
                 ctx.save();
-                ctx.fillStyle = 'rgba(252, 211, 77, 0.2)';
-                ctx.fillRect(left, y.getPixelForValue(targetHigh), right - left, y.getPixelForValue(targetLow) - y.getPixelForValue(targetHigh));
+                
+                const dateRanges = [];
+                let lastRangeKey = '';
+
+                timePoints.forEach(hour => {
+                    const date = transplantDate.add(hour, 'hour');
+                    const range = getTherapeuticRange(date, transplantDate);
+                    const key = `${range.low}-${range.high}`;
+                    if (key !== lastRangeKey) {
+                        dateRanges.push({ startHour: hour, range: range });
+                        lastRangeKey = key;
+                    }
+                });
+                
+                dateRanges.forEach((r, i) => {
+                    const startPixel = x.getPixelForValue(r.startHour);
+                    const endPixel = (i + 1 < dateRanges.length) ? x.getPixelForValue(dateRanges[i+1].startHour) : right;
+                    const yMinPixel = y.getPixelForValue(r.range.high);
+                    const yMaxPixel = y.getPixelForValue(r.range.low);
+
+                    ctx.fillStyle = 'rgba(252, 211, 77, 0.2)'; // Yellowish tint for target range
+                    const drawX = Math.max(startPixel, left);
+                    const drawWidth = Math.min(endPixel, right) - drawX;
+                    if (drawWidth > 0) {
+                         ctx.fillRect(drawX, yMinPixel, drawWidth, yMaxPixel - yMinPixel);
+                    }
+                });
                 ctx.restore();
             }
         }]
@@ -818,16 +1176,156 @@ function updateChart(timePoints, popCurve, indCurve, measuredLevels, transplantD
 
 function updateSummary(predictedLevel, predictionDate, rmse) {
     const summaryDiv = document.getElementById('results-summary');
-    const rmseHtml = rmse ? `<div class="text-sm mt-2 text-gray-600">Model Fit (RMSE): <span class="font-semibold text-gray-800">${rmse.toFixed(2)} ng/mL</span></div>` : '';
+    const rmseHtml = rmse ? `Model Fit (RMSE): <span class="font-semibold ${rmse > 2.0 ? 'text-red-600' : 'text-green-600'}">${rmse.toFixed(2)} ng/mL</span>` : '';
     if (predictionDate && !isNaN(predictedLevel)) {
-        summaryDiv.innerHTML = `Predicted Level at <span class="text-indigo-700">${predictionDate.format('DD-MMM-YY HH:mm')}</span> is <span class="text-3xl font-bold text-indigo-600">${predictedLevel.toFixed(1)}</span> ng/mL ${rmseHtml}`;
+        summaryDiv.innerHTML = `Predicted Level at <span class="text-indigo-700">${predictionDate.format('DD-MMM-YY HH:mm')}</span> is <span class="text-3xl font-bold text-indigo-600">${predictedLevel.toFixed(1)}</span> ng/mL
+        <div class="text-sm mt-1 text-gray-600">${rmseHtml}</div>`;
     } else {
          summaryDiv.innerHTML = 'Could not calculate a prediction. Please check inputs.';
     }
     summaryDiv.classList.remove('hidden');
 }
 
+// --- NEW: Update Model Params Card Function ---
+function updateModelParamsCard(popParams, indParams) {
+    const outputDiv = document.getElementById('model-params-output');
+    if (!indParams || indParams.rmse === null) {
+        displayMessage(outputDiv, 'Run forecast with measured levels to see parameters.', 'info');
+        return;
+    }
+
+    let interpretation = "Normal Metabolizer";
+    const ratio = indParams.CL / popParams.CL;
+    if (ratio > 1.25) interpretation = "Fast Metabolizer (Higher CL)";
+    if (ratio < 0.75) interpretation = "Slow Metabolizer (Lower CL)";
+
+    const message = `
+        <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-left">
+            <div class="text-sm text-gray-500">Model Fit (RMSE)</div>
+            <div class="font-semibold text-right ${indParams.rmse > 2.0 ? 'text-red-600' : 'text-green-600'}">${indParams.rmse.toFixed(2)} ng/mL</div>
+            
+            <div class="text-sm text-gray-500">Population CL</div>
+            <div class="font-semibold text-right">${popParams.CL.toFixed(1)} L/hr</div>
+            
+            <div class="text-sm text-gray-500">Individualized CL</div>
+            <div class="font-semibold text-right">${indParams.CL.toFixed(1)} L/hr</div>
+        </div>
+        <div class="text-sm text-center mt-3 italic text-gray-600">
+            Interpretation: <span class="font-medium text-gray-800">${interpretation}</span>
+        </div>`;
+    displayMessage(outputDiv, message, 'success');
+}
+
+// --- NEW: Dose Optimizer Function ---
+function runDoseOptimizer() {
+    const outputDiv = document.getElementById('optimizer-output');
+    if (!lastForecastParams.individual) {
+        displayMessage(outputDiv, 'You must run a successful forecast first (with a low RMSE) to enable this tool.', 'error');
+        return;
+    }
+
+    const targetTrough = parseFloat(document.getElementById('target-trough-input').value);
+    const targetDate = dayjs(document.getElementById('target-date-input')._flatpickr.input.value, "YYYY-MM-DD HH:mm");
+
+    if (isNaN(targetTrough) || !targetDate.isValid()) {
+        displayMessage(outputDiv, 'Please enter a valid target trough and target date.', 'error');
+        return;
+    }
+    
+    // Find the last *actual* dose event to start the new simulation from
+    const lastLoggedDose = historyLog.filter(e => e.dose !== null && e.dose > 0).sort((a, b) => b.time - a.time)[0];
+    if (!lastLoggedDose) {
+         displayMessage(outputDiv, 'Cannot optimize without at least one logged dose.', 'error');
+         return;
+    }
+
+    // Get all logged doses. We will simulate *from* the last logged dose.
+    const loggedDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
+    const simulationStartDate = lastLoggedDose.recordDate;
+    
+    // Dose strengths to simulate
+    const dosesToTry = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
+    let results = [];
+    
+    // For each dose, simulate forward
+    dosesToTry.forEach(testDose => {
+        let simulatedDoses = [];
+        let nextDoseTime = simulationStartDate.add(12, 'hour'); // Start from the *next* dose
+        
+        // Create a new dose history from the last logged dose
+        while (nextDoseTime.isBefore(targetDate.add(2, 'hour'))) { // Simulate 2 hours past trough to get peak
+            simulatedDoses.push({
+                recordDate: nextDoseTime,
+                dose: testDose,
+                time: nextDoseTime.diff(lastForecastParams.patientData.transplantDate, 'hour', true)
+            });
+            nextDoseTime = nextDoseTime.add(12, 'hour');
+        }
+        
+        // Combine history *before* the new regimen + the new simulated regimen
+        const fullDoseHistory = [...loggedDoses, ...simulatedDoses];
+        
+        // Calculate Trough (at target date)
+        const predictedTrough = generateCurve(
+            [targetDate.diff(lastForecastParams.patientData.transplantDate, 'hour', true)],
+            fullDoseHistory, 
+            lastForecastParams.individual, 
+            lastForecastParams.patientData.bioassay
+        )[0];
+        
+        // Calculate Peak (2 hours after last dose)
+        const peakTime = targetDate.add(2, 'hour');
+         const predictedPeak = generateCurve(
+            [peakTime.diff(lastForecastParams.patientData.transplantDate, 'hour', true)],
+            fullDoseHistory, 
+            lastForecastParams.individual, 
+            lastForecastParams.patientData.bioassay
+        )[0];
+
+        results.push({
+            dose: testDose,
+            trough: predictedTrough,
+            peak: predictedPeak,
+            diff: Math.abs(predictedTrough - targetTrough)
+        });
+    });
+
+    // Find the best dose
+    results.sort((a, b) => a.diff - b.diff);
+    const bestDose = results[0].dose;
+
+    // Generate table
+    let tableHtml = `
+        <div class="overflow-x-auto -mx-6">
+        <table class="w-full min-w-full">
+            <thead><tr class="border-b border-gray-200 text-left text-sm font-semibold text-gray-600">
+                <th class="py-3 px-4">Proposed Dose (BID)</th>
+                <th class="py-3 px-4">Predicted Trough (C0)</th>
+                <th class="py-3 px-4">Predicted Peak (C2)</th>
+            </tr></thead>
+            <tbody>`;
+            
+    results.sort((a, b) => a.dose - b.dose).forEach(res => {
+        const highlightClass = res.dose === bestDose ? 'highlight-row' : '';
+        tableHtml += `
+            <tr class="border-b border-gray-100 text-sm hover:bg-gray-50 ${highlightClass}">
+                <td class="py-3 px-4 font-medium">${res.dose.toFixed(1)} mg</td>
+                <td class="py-3 px-4 font-bold">${res.trough.toFixed(1)} ng/mL</td>
+                <td class="py-3 px-4">${res.peak.toFixed(1)} ng/mL</td>
+            </tr>`;
+    });
+            
+    tableHtml += `</tbody></table></div>
+        <div class="text-sm text-center mt-3 italic text-gray-600">
+            Note: This simulation starts from your <span class="font-medium">last logged dose</span> and assumes BID dosing.
+        </div>`;
+    outputDiv.innerHTML = tableHtml;
+}
+
+
 </script>
+
 </body>
 </html>
+
 
