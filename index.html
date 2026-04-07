@@ -565,6 +565,31 @@
                     </select>
                 </div>
             </div>
+
+            <!-- Advanced Clinical Indicators Section -->
+            <div style="border-top:1px dashed var(--col-border);padding-top:16px;margin-top:16px;">
+                <h4 style="font-family:'Sora',sans-serif;font-size:11px;font-weight:800;color:var(--col-primary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Pharmacokinetic Covariates</h4>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:16px;">
+                    <div>
+                        <label style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Albumin (g/dL)</label>
+                        <input id="albumin" type="number" step="0.1" class="input-field" value="3.5">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Bilirubin (mg/dL)</label>
+                        <input id="bilirubin" type="number" step="0.1" class="input-field" value="1.0">
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <label style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">CYP3A4 Inhibitors (Azoles / Diltiazem)</label>
+                        <select id="inhibitor" class="input-field">
+                            <option value="none" selected>None / Regular metabolizer</option>
+                            <option value="moderate">Moderate (Diltiazem / Fluconazole)</option>
+                            <option value="strong">Strong (Voriconazole / Posaconazole)</option>
+                        </select>
+                    </div>
+                </div>
+                <p style="font-size:11px;color:var(--col-muted);margin-top:10px;font-style:italic;">Note: Inhibitors drastically reduce hepatic clearance (CL) math; Bilirubin >2.0 reduces CL proportionally.</p>
+            </div>
+            
             <div
                 style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid var(--col-border);">
                 <button onclick="loadPatientData()" class="btn btn-secondary">📁 Load Patient</button>
@@ -908,6 +933,15 @@
 
             // v5.1 HCT Covariate Effect
             HCT_CL: -0.9, 
+            
+            // v5.2 Advanced Clinical Weights
+            ALB_REF: 3.5,
+            BIL_REF: 1.0,
+            INHIBITOR: {
+                'none': 1.0,
+                'moderate': 0.65, // ~35% reduction (e.g. Diltiazem)
+                'strong': 0.25    // ~75% reduction (e.g. Voriconazole)
+            },
 
             // HCT RBC binding (for quick correction tool only)
             HCT_BMAX: 418,
@@ -1004,7 +1038,10 @@
                     mpa: document.getElementById('mpa').value,
                     bioassay: document.getElementById('bioassay').value,
                     genotype: document.getElementById('genotype').value,
-                    transplantType: document.getElementById('transplant-type').value
+                    transplantType: document.getElementById('transplant-type').value,
+                    albumin: document.getElementById('albumin').value,
+                    bilirubin: document.getElementById('bilirubin').value,
+                    inhibitor: document.getElementById('inhibitor').value
                 },
                 clinicalData, savedAt: new Date().toISOString()
             };
@@ -1027,6 +1064,9 @@
             document.getElementById('bioassay').value = d.patient.bioassay || '1';
             document.getElementById('genotype').value = d.patient.genotype || 'unknown';
             document.getElementById('transplant-type').value = d.patient.transplantType || 'Live Related';
+            document.getElementById('albumin').value = d.patient.albumin || 3.5;
+            document.getElementById('bilirubin').value = d.patient.bilirubin || 1.0;
+            document.getElementById('inhibitor').value = d.patient.inhibitor || 'none';
             clinicalData = d.clinicalData || [];
             renderDoseLog(); renderLevelLog(); hideOutput();
             showAlert(`Loaded: ${name}`, 'success');
@@ -1041,6 +1081,9 @@
             document.getElementById('bioassay').value = '1';
             document.getElementById('genotype').value = 'unknown';
             document.getElementById('transplant-type').value = 'Live Related';
+            document.getElementById('albumin').value = 3.5;
+            document.getElementById('bilirubin').value = 1.0;
+            document.getElementById('inhibitor').value = 'none';
             clinicalData = [];
             renderDoseLog(); renderLevelLog(); hideOutput();
             showAlert('Cleared', 'success');
@@ -1276,16 +1319,29 @@
         // All parameters are APPARENT (CL/F, V/F)
         // ============================================================
         function getPopulationParameters(patientData) {
-            const { weight, genotype, mpa, hct } = patientData;
+            const { weight, genotype, mpa, hct, albumin, bilirubin, inhibitor } = patientData;
             const m = PK_MODEL;
             const cyp = m.CYP3A5[genotype] || m.CYP3A5['unknown'];
             const wtCL = Math.pow(weight / m.WT_REF, m.WT_CL);
             const wtV  = Math.pow(weight / m.WT_REF, m.WT_V);
             const mpaF = parseInt(mpa) === 1 ? m.MPA_CL : 1.0;
             const hctF = Math.pow((hct || m.HCT_REF) / m.HCT_REF, m.HCT_CL);
+            
+            // Advanced Weights v5.2
+            // Albumin binds tacrolimus; lower albumin increases free fraction, reducing total measured trough.
+            const albVal = parseFloat(albumin) || m.ALB_REF;
+            const albF = Math.pow(albVal / m.ALB_REF, 0.4); // Mild power-model effect on total concentration
+
+            // Bilirubin impairs hepatic clearance
+            const bilVal = parseFloat(bilirubin) || m.BIL_REF;
+            const bilF = bilVal > 2.0 ? (bilVal > 5.0 ? 0.5 : 0.75) : 1.0; 
+
+            // CYP3A4 Inhibitors (The clinical "accelerator")
+            const inhibitorF = m.INHIBITOR[inhibitor || 'none'];
+
             return {
-                CL: m.TVCL * cyp * wtCL * mpaF * hctF,
-                V:  m.TVV  * wtV,
+                CL: m.TVCL * cyp * wtCL * mpaF * hctF * bilF * inhibitorF,
+                V:  m.TVV  * wtV * albF, // Albumin primarily shifts Volume of Distribution
                 KA: m.TVKA
             };
         }
