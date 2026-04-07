@@ -958,7 +958,7 @@
             const td = document.getElementById('transplant-date')._flatpickr;
             const pd = document.getElementById('prediction-datetime')._flatpickr;
             if (!td.input.value) td.setDate(dayjs().subtract(30, 'day').toDate(), true);
-            if (!pd.input.value) pd.setDate(dayjs().toDate(), true);
+            if (!pd.input.value) pd.setDate(dayjs().hour(7).minute(0).toDate(), true);
         }
 
         // ============================================================
