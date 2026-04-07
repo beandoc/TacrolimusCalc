@@ -1,1331 +1,1932 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tacrolimus Clinical Dashboard</title>
+    <title>TacroSmart v5 — Individualized Dosing</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
-    <script>
-        dayjs.extend(dayjs_plugin_customParseFormat);
-    </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>dayjs.extend(dayjs_plugin_customParseFormat);</script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        .gradient-bg { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
-        .card-shadow { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05); }
-        .input-focus:focus { box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2); border-color: #6366f1; }
-        .status-indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-        .level-high { background-color: #ef4444; }
-        .level-target { background-color: #10b981; }
-        .level-low { background-color: #f59e0b; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .output-success { color: #374151; }
-        .output-error { color: #dc2626; font-weight: 500; }
-        .output-info { color: #6b7280; font-style: italic; }
-        .highlight-row { background-color: #ecfdf5 !important; border-left: 4px solid #10b981; }
+        :root {
+            --col-bg: #f0f4f8;
+            --col-surface: #ffffff;
+            --col-border: #dde3eb;
+            --col-text: #1a2332;
+            --col-muted: #6b7c93;
+            --col-primary: #1354d3;
+            --col-primary-light: #e8efff;
+            --col-primary-dark: #0e3fa0;
+            --col-accent: #0ea5a0;
+            --col-success: #0d9e6a;
+            --col-warning: #c9820b;
+            --col-danger: #c82d2d;
+            --col-success-bg: #ecfdf5;
+            --col-warning-bg: #fffbeb;
+            --col-danger-bg: #fff1f1;
+            --radius: 10px;
+            --shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04);
+            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--col-bg);
+            color: var(--col-text);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5 {
+            font-family: 'Sora', sans-serif;
+        }
+
+        code,
+        .mono {
+            font-family: 'DM Mono', monospace;
+        }
+
+        .card {
+            background: var(--col-surface);
+            border: 1px solid var(--col-border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1.5px solid var(--col-border);
+            border-radius: 7px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13.5px;
+            background: #fff;
+            color: var(--col-text);
+            transition: border-color 0.15s, box-shadow 0.15s;
+            outline: none;
+        }
+
+        .input-field:focus {
+            border-color: var(--col-primary);
+            box-shadow: 0 0 0 3px rgba(19, 84, 211, 0.1);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 7px;
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            font-size: 12.5px;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--col-primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--col-primary-dark);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #f1f4f8;
+            color: var(--col-text);
+            border: 1.5px solid var(--col-border);
+        }
+
+        .btn-secondary:hover {
+            background: #e4e9f0;
+        }
+
+        .btn-success {
+            background: var(--col-success);
+            color: #fff;
+        }
+
+        .btn-success:hover {
+            background: #0b8a5c;
+        }
+
+        .btn-danger {
+            background: var(--col-danger);
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #b02626;
+        }
+
+        .btn-accent {
+            background: var(--col-accent);
+            color: #fff;
+        }
+
+        .btn-accent:hover {
+            background: #0b8c88;
+        }
+
+        .btn-xl {
+            padding: 14px 32px;
+            font-size: 15px;
+            border-radius: 10px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 100px;
+            font-size: 11.5px;
+            font-weight: 600;
+            font-family: 'Sora', sans-serif;
+        }
+
+        .badge-success {
+            background: var(--col-success-bg);
+            color: var(--col-success);
+        }
+
+        .badge-warning {
+            background: var(--col-warning-bg);
+            color: var(--col-warning);
+        }
+
+        .badge-danger {
+            background: var(--col-danger-bg);
+            color: var(--col-danger);
+        }
+
+        .badge-info {
+            background: var(--col-primary-light);
+            color: var(--col-primary);
+        }
+
+        .badge-neutral {
+            background: #eef0f3;
+            color: var(--col-muted);
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 4px solid;
+            margin-bottom: 8px;
+            font-size: 13.5px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .alert-error {
+            background: var(--col-danger-bg);
+            border-color: var(--col-danger);
+            color: #7f1d1d;
+        }
+
+        .alert-success {
+            background: var(--col-success-bg);
+            border-color: var(--col-success);
+            color: #064e3b;
+        }
+
+        .alert-info {
+            background: var(--col-primary-light);
+            border-color: var(--col-primary);
+            color: #1e3a8a;
+        }
+
+        .alert-warning {
+            background: var(--col-warning-bg);
+            border-color: var(--col-warning);
+            color: #78350f;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--col-border);
+            gap: 0;
+        }
+
+        .tab {
+            padding: 10px 18px;
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--col-muted);
+            cursor: pointer;
+            border-bottom: 2.5px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.15s;
+        }
+
+        .tab:hover {
+            color: var(--col-primary);
+        }
+
+        .tab.active {
+            color: var(--col-primary);
+            border-bottom-color: var(--col-primary);
+        }
+
+        .tab-content {
+            padding-top: 16px;
+        }
+
+        .tab-content.hidden {
+            display: none;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th {
+            text-align: left;
+            padding: 10px 14px;
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--col-muted);
+            background: #f7f9fc;
+            border-bottom: 1.5px solid var(--col-border);
+        }
+
+        td {
+            padding: 9px 14px;
+            border-bottom: 1px solid #f0f3f7;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: #fafbfd;
+        }
+
+        .metric-card {
+            text-align: center;
+            padding: 16px;
+            border-radius: 8px;
+            background: #f7f9fc;
+            border: 1px solid var(--col-border);
+        }
+
+        .metric-value {
+            font-family: 'DM Mono', monospace;
+            font-size: 26px;
+            font-weight: 500;
+            margin: 4px 0;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            color: var(--col-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .metric-sub {
+            font-size: 11.5px;
+            color: var(--col-muted);
+            margin-top: 2px;
+        }
+
+        /* Intelligence bar */
+        .intel-bar-bg {
+            height: 8px;
+            background: #e5e9ef;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .intel-bar {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Header */
+        .header-gradient {
+            background: linear-gradient(135deg, #0e2d6b 0%, #1354d3 60%, #0ea5a0 100%);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 16px;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: #fff;
+            border-radius: 12px;
+            padding: 28px;
+            width: 100%;
+            max-width: 520px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* PE table coloring */
+        .pe-good {
+            color: var(--col-success);
+            font-weight: 600;
+        }
+
+        .pe-ok {
+            color: var(--col-warning);
+            font-weight: 600;
+        }
+
+        .pe-bad {
+            color: var(--col-danger);
+            font-weight: 600;
+        }
+
+        /* Spinner */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinner {
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+
+        /* Section label */
+        .section-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--col-muted);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--col-border);
+        }
+
+        .flaw-tag {
+            font-size: 11px;
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+            padding: 1px 7px;
+            border-radius: 4px;
+            font-family: 'DM Mono', monospace;
+        }
+
+        .fix-tag {
+            font-size: 11px;
+            background: #f0fdf4;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+            padding: 1px 7px;
+            border-radius: 4px;
+            font-family: 'DM Mono', monospace;
+        }
+
+        @media (max-width: 640px) {
+            .btn-xl {
+                width: 100%;
+                justify-content: center;
+            }
+        }
     </style>
 </head>
-<body class="bg-slate-50 min-h-full">
-    
-    <header class="gradient-bg text-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 class="text-3xl font-bold">Tacrolimus Clinical Dashboard</h1>
-            <p class="text-indigo-100 mt-1">Individualized Forecasting & Dose Optimization for Kidney Transplant</p>
+
+<body>
+
+    <!-- Header -->
+    <header class="header-gradient text-white" style="padding: 24px 0;">
+        <div
+            style="max-width:1200px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+            <div>
+                <h1 style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">TacroSmart v5</h1>
+                <p style="color:rgba(255,255,255,0.75);font-size:13px;margin-top:4px;">MAP Bayesian Forecasting · Indian
+                    Kidney Transplant Population · Validated PK Model</p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <button onclick="openSettingsModal()" class="btn btn-secondary"
+                    style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">⚙
+                    Settings</button>
+            </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        
-        <div class="bg-white rounded-xl card-shadow p-6">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                <span class="bg-indigo-100 text-indigo-600 rounded-full p-2 mr-3">👤</span> Patient & Model Information
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Row 1: Patient Name & Transplant Date -->
-                <div class="md:col-span-2">
-                    <label for="patient-name" class="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
-                    <input list="patient-list" id="patient-name" placeholder="Select or type patient name..." class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                    <datalist id="patient-list">
-                        <!-- This will be populated by JavaScript with saved patient names -->
-                    </datalist>
-                </div>
-                <div>
-                    <label for="transplant-date" class="block text-sm font-medium text-gray-700 mb-1">Transplant Date</label>
-                    <input id="transplant-date" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                </div>
+    <main style="max-width:1200px;margin:0 auto;padding:24px;">
 
-                <!-- Row 2: Clinical Params -->
-                <div>
-                    <label for="weight" class="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
-                    <input type="number" id="weight" value="60" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                </div>
-                <div>
-                    <label for="hematocrit" class="block text-sm font-medium text-gray-700 mb-1">Hematocrit (%)</label>
-                    <input type="number" id="hematocrit" value="31" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                </div>
-                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Mycophenolic Acid</label>
-                     <select id="mpa" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                         <option value="1" selected>Yes</option>
-                         <option value="0">No</option>
-                     </select>
-                </div>
+        <!-- Alert Container -->
+        <div id="alert-container" style="margin-bottom:16px;"></div>
 
-                <!-- Row 3: Bioassay, Genotype & Forecast Date -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Bioassay Type</label>
-                    <select id="bioassay" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                        <option value="1">LC-MS/MS</option>
-                        <option value="2">CMIA</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="genotype" class="block text-sm font-medium text-gray-700 mb-1">CYP3A5 Genotype</label>
-                    <select id="genotype" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                        <option value="unknown" selected>Unknown (Default)</option>
-                        <option value="33">CYP3A5*3/*3 (Slow)</option>
-                        <option value="13">CYP3A5*1/*3 (Intermediate)</option>
-                        <option value="11">CYP3A5*1/*1 (Fast)</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="prediction-datetime" class="block text-sm font-medium text-gray-700 mb-1">Forecast Date & Time</label>
-                    <input id="prediction-datetime" type="text" placeholder="Select date..." class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                </div>
+        <!-- Model Info Banner -->
+        <div class="card"
+            style="padding:14px 20px;margin-bottom:20px;background:var(--col-primary-light);border-color:#c3d5f9;display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+            <div style="flex:1;min-width:200px">
+                <p style="font-family:'Sora',sans-serif;font-weight:700;font-size:13px;color:var(--col-primary);">📐
+                    Størset 2014 / South Asian-Adapted Population Model</p>
+                <p style="font-size:12px;color:#3b5bdb;margin-top:3px;">1-Compartment · MAP Bayesian with η<sub>CL</sub>
+                    + η<sub>V</sub> · IIV-penalized optimization · Proportional residual error · 90% MC confidence
+                    intervals</p>
             </div>
-            <!-- Row 4: Action Buttons -->
-            <div class="flex flex-wrap gap-3 justify-end items-center mt-6 border-t border-gray-200 pt-4">
-                <button onclick="exportPatientDataToCSV()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors duration-200 text-sm font-medium">Export CSV</button>
-                <button onclick="loadPatientData()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm font-medium">Load Patient</button>
-                <button onclick="savePatientData()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 text-sm font-medium">Save Data</button>
-                <button onclick="clearAllData(true)" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 text-sm font-medium">Clear All</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <span class="fix-tag">CYP3A5 Indian freq</span>
+                <span class="fix-tag">HCT + MPA covariates</span>
+                <span class="fix-tag">2D MAP Bayesian</span>
+                <span class="fix-tag">CI bands</span>
             </div>
         </div>
 
-        <div class="text-center">
-            <button id="run-all-btn" class="w-full max-w-md bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg text-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                Run Individualized Forecast
+        <!-- Patient Information Card -->
+        <div class="card" style="padding:24px;margin-bottom:20px;">
+            <div class="section-title">Patient Information</div>
+            <div
+                style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:16px;">
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Patient
+                        Name</label>
+                    <input list="patient-list" id="patient-name" placeholder="Enter name..." class="input-field">
+                    <datalist id="patient-list"></datalist>
+                </div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Transplant
+                        Date</label>
+                    <input id="transplant-date" type="text" class="input-field" placeholder="dd-mmm-yy">
+                </div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Weight
+                        (kg)</label>
+                    <input type="number" id="weight" value="60" min="30" max="180" class="input-field">
+                </div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Hematocrit
+                        (%)</label>
+                    <input type="number" id="hematocrit" value="35" min="15" max="60" class="input-field">
+                </div>
+            </div>
+            <div
+                style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px;">
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">CYP3A5
+                        Genotype</label>
+                    <select id="genotype" class="input-field">
+                        <option value="unknown">Unknown · Indian default (↑*1 freq)</option>
+                        <option value="33">*3/*3 · Slow Metabolizer</option>
+                        <option value="13">*1/*3 · Intermediate</option>
+                        <option value="11">*1/*1 · Fast Metabolizer</option>
+                    </select>
+                </div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Mycophenolate
+                        (MPA) <span style="color:#c9820b">↓CL 13%</span></label>
+                    <select id="mpa" class="input-field">
+                        <option value="1" selected>Yes · Coadministered</option>
+                        <option value="0">No</option>
+                    </select>
+                </div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Assay
+                        Type</label>
+                    <select id="bioassay" class="input-field">
+                        <option value="1">LC-MS/MS (reference)</option>
+                        <option value="2">CMIA (+8% offset)</option>
+                    </select>
+                </div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Forecast
+                        Date & Time</label>
+                    <input id="prediction-datetime" type="text" class="input-field" placeholder="dd-mmm-yy HH:mm">
+                </div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Type of Transplant</label>
+                    <select id="transplant-type" class="input-field">
+                        <option value="Live Related" selected>Live Related</option>
+                        <option value="Deceased Donor">Deceased Donor</option>
+                    </select>
+                </div>
+            </div>
+            <div
+                style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid var(--col-border);">
+                <button onclick="loadPatientData()" class="btn btn-secondary">📁 Load Patient</button>
+                <button onclick="savePatientData()" class="btn btn-success">💾 Save</button>
+                <button onclick="exportPatientDataToCSV()" class="btn btn-secondary">📊 Export CSV</button>
+                <button onclick="clearAllData(true)" class="btn btn-danger">🗑 Clear All</button>
+            </div>
+        </div>
+
+        <!-- Clinical Data -->
+        <div class="card" style="padding:24px;margin-bottom:20px;">
+            <div class="tabs" id="main-tabs">
+                <button class="tab active" onclick="switchTab('doses',this)">💊 Dose Administration</button>
+                <button class="tab" onclick="switchTab('levels',this)">🧪 Lab Results</button>
+            </div>
+
+            <!-- Doses Tab -->
+            <div id="doses-tab" class="tab-content">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:15px;">Dose Administration Log
+                    </h3>
+                    <button onclick="addDefaultDoseDay()" class="btn btn-primary">+ Log Dose Day</button>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date & Time</th>
+                                <th>Dose (mg)</th>
+                                <th style="text-align:right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="doseLogTable">
+                            <tr>
+                                <td colspan="3" style="text-align:center;padding:32px;color:var(--col-muted);">No doses
+                                    logged</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Levels Tab -->
+            <div id="levels-tab" class="tab-content hidden">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:15px;">Lab Results</h3>
+                    <button onclick="showAddRecordModal('level')" class="btn btn-primary">+ Log Lab Result</button>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date & Time</th>
+                                <th>Level (ng/mL)</th>
+                                <th>C/D Ratio</th>
+                                <th>Status</th>
+                                <th style="text-align:right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="levelLogTable">
+                            <tr>
+                                <td colspan="5" style="text-align:center;padding:32px;color:var(--col-muted);">No levels
+                                    logged</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Run Analysis -->
+        <div style="text-align:center;margin-bottom:24px;">
+            <button id="run-all-btn" class="btn btn-primary btn-xl">
+                ▶ Run MAP Bayesian Forecast
             </button>
+            <p style="font-size:12px;color:var(--col-muted);margin-top:8px;">Model learns from each measured trough —
+                accuracy improves with more data</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div class="bg-white rounded-xl card-shadow p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                    <span class="bg-orange-100 text-orange-600 rounded-full p-2 mr-3">⚗️</span> Quick Hematocrit Adjustment
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+        <!-- ===== RESULTS SECTION ===== -->
+        <div id="output-section" style="display:none;">
+
+            <!-- Model Intelligence Panel -->
+            <div class="card" style="padding:24px;margin-bottom:20px;" id="intelligence-card">
+                <div class="section-title">Model Intelligence & Accuracy</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;"
+                    id="accuracy-metrics-grid">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Intelligence bar -->
+                <div style="margin-bottom:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <span
+                            style="font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);">MODEL
+                            CERTAINTY</span>
+                        <span id="intel-label"
+                            style="font-size:12px;font-family:'Sora',sans-serif;font-weight:700;color:var(--col-primary);">Population
+                            Estimate</span>
+                    </div>
+                    <div class="intel-bar-bg">
+                        <div class="intel-bar" id="intel-bar" style="width:15%;background:var(--col-warning);"></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:4px;">
+                        <span style="font-size:10.5px;color:var(--col-muted);">Population (0 obs)</span>
+                        <span style="font-size:10.5px;color:var(--col-muted);">Individualized (≥5 obs)</span>
+                    </div>
+                </div>
+
+                <!-- Per-observation PE table -->
+                <div id="pe-table-section" style="display:none;">
+                    <div class="section-title" style="margin-top:4px;">Per-Observation Prediction Errors</div>
+                    <div style="overflow-x:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Observation</th>
+                                    <th>Time (hr)</th>
+                                    <th>Observed (ng/mL)</th>
+                                    <th>Predicted</th>
+                                    <th>Error (ng/mL)</th>
+                                    <th>PE%</th>
+                                    <th>Quality</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pe-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forecast Chart -->
+            <div class="card" style="padding:24px;margin-bottom:20px;">
+                <div
+                    style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+                    <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:17px;">Concentration Forecast
+                    </h3>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;align-items:center;">
+                        <span style="display:flex;align-items:center;gap:4px;"><span
+                                style="width:20px;height:3px;background:#1354d3;display:inline-block;border-radius:2px;"></span>Individualized</span>
+                        <span style="display:flex;align-items:center;gap:4px;"><span
+                                style="width:20px;height:3px;background:rgba(19,84,211,0.3);display:inline-block;border-radius:2px;"></span>90%
+                            CI</span>
+                        <span style="display:flex;align-items:center;gap:4px;"><span
+                                style="width:20px;height:3px;background:#9ca3af;border-top:2px dashed #9ca3af;display:inline-block;"></span>Population</span>
+                        <span style="display:flex;align-items:center;gap:4px;"><span
+                                style="width:10px;height:10px;background:#dc2626;border-radius:50%;display:inline-block;"></span>Observed</span>
+                    </div>
+                </div>
+                <div
+                    style="position:relative;height:380px;background:#fafbfc;border-radius:8px;border:1px solid var(--col-border);">
+                    <canvas id="concentration-chart"></canvas>
+                </div>
+                <div id="results-summary"
+                    style="display:none;margin-top:16px;padding:16px;background:var(--col-primary-light);border:1px solid #c3d5f9;border-radius:8px;text-align:center;">
+                </div>
+            </div>
+
+            <!-- 3-column: PK params | IPV | TTR -->
+            <div
+                style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:20px;">
+
+                <!-- PK Parameters -->
+                <div class="card" style="padding:20px;">
+                    <div class="section-title">Individualized PK Parameters</div>
+                    <div id="model-params-output" style="color:var(--col-muted);font-size:13px;">Run forecast to see
+                        parameters.</div>
+                </div>
+
+                <!-- IPV -->
+                <div class="card" style="padding:20px;">
+                    <div class="section-title">IPV & Metabolizer Status</div>
+                    <div id="ipv-output" style="color:var(--col-muted);font-size:13px;">Need ≥3 lab results.</div>
+                </div>
+
+                <!-- TTR -->
+                <div class="card" style="padding:20px;">
+                    <div class="section-title">Time in Therapeutic Range</div>
+                    <div id="ttr-output" style="color:var(--col-muted);font-size:13px;">Need ≥2 lab results.</div>
+                </div>
+            </div>
+
+            <!-- Dose Optimizer -->
+            <div class="card" style="padding:24px;margin-bottom:20px;" id="dose-optimizer-card">
+                <div class="section-title">🎯 Dose Optimizer</div>
+                <div
+                    style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:16px;">
                     <div>
-                        <label for="quick-hct-level" class="block text-sm font-medium text-gray-700 mb-1">Initial Level (ng/mL)</label>
-                        <input type="number" id="quick-hct-level" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                        <label
+                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Target
+                            Trough (ng/mL)</label>
+                        <input type="number" id="target-trough-input" value="8.0" step="0.5" class="input-field">
                     </div>
                     <div>
-                        <label for="quick-hct-initial" class="block text-sm font-medium text-gray-700 mb-1">Initial HCT (%)</label>
-                        <input type="number" id="quick-hct-initial" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                        <label
+                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Target
+                            Date</label>
+                        <input id="target-date-input" type="text" class="input-field" placeholder="dd-mmm-yy HH:mm">
                     </div>
-                    <div class="md:col-span-2">
-                        <div id="quick-hct-output" class="text-center text-lg font-semibold p-3 bg-gray-50 rounded-lg">
-                            Adjusted Level: --
+                    <div style="display:flex;align-items:flex-end;">
+                        <button id="run-optimizer-btn" class="btn btn-accent" style="width:100%;">Find Optimal
+                            Dose</button>
+                    </div>
+                </div>
+                <div id="optimizer-output"
+                    style="color:var(--col-muted);font-size:13px;text-align:center;padding:24px;">Run the main forecast
+                    first.</div>
+            </div>
+
+            <!-- Quick HCT Tool -->
+            <div class="card" style="padding:24px;margin-bottom:20px;">
+                <div class="section-title">⚗️ Hematocrit Correction Tool</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;">
+                    <div>
+                        <label
+                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Measured
+                            Level (ng/mL)</label>
+                        <input type="number" id="quick-hct-level" class="input-field" placeholder="e.g. 7.5">
+                    </div>
+                    <div>
+                        <label
+                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Patient
+                            HCT (%)</label>
+                        <input type="number" id="quick-hct-initial" class="input-field" placeholder="e.g. 28">
+                    </div>
+                    <div style="display:flex;align-items:flex-end;">
+                        <div
+                            style="width:100%;padding:12px;background:var(--col-primary-light);border:1.5px solid #c3d5f9;border-radius:8px;text-align:center;">
+                            <div
+                                style="font-size:11px;color:var(--col-muted);margin-bottom:4px;font-family:'Sora',sans-serif;font-weight:600;">
+                                Corrected to HCT 35%</div>
+                            <div id="quick-hct-output"
+                                style="font-family:'DM Mono',monospace;font-size:26px;font-weight:500;color:var(--col-primary);">
+                                --</div>
+                            <div style="font-size:11px;color:var(--col-muted);">ng/mL</div>
                         </div>
                     </div>
                 </div>
+                <p style="font-size:11.5px;color:var(--col-muted);margin-top:10px;">Uses saturable Bmax/Kd RBC binding
+                    model. Corrects for HCT-driven dilution of WB tacrolimus.</p>
             </div>
 
-            <!-- NEW: Model Parameters Card -->
-            <div id="model-params-card" class="bg-white rounded-xl card-shadow p-6 hidden">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                     <span class="bg-blue-100 text-blue-600 rounded-full p-2 mr-3">⚙️</span> Model Parameters
-                </h2>
-                <div id="model-params-output" class="text-center text-gray-500 italic">
-                    Run forecast to see parameters.
-                </div>
-            </div>
-
-            <div id="ipv-card" class="bg-white rounded-xl card-shadow p-6 hidden">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                     <span class="bg-teal-100 text-teal-600 rounded-full p-2 mr-3">📊</span> IPV & Metabolizer Status
-                </h2>
-                <div id="ipv-output" class="text-center text-gray-500 italic">
-                    Requires at least 3 lab results to calculate.
-                </div>
-            </div>
-
-             <div id="ttr-card" class="bg-white rounded-xl card-shadow p-6 hidden">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                     <span class="bg-purple-100 text-purple-600 rounded-full p-2 mr-3">⏱️</span> Time in Therapeutic Range
-                </h2>
-                <div id="ttr-output" class="text-center text-gray-500 italic">
-                    Requires at least 2 lab results to calculate.
-                </div>
-            </div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="bg-white rounded-xl card-shadow p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold text-gray-800 flex items-center m-0">
-                        <span class="bg-purple-100 text-purple-600 rounded-full p-2 mr-3">💊</span> Dose Administration
-                    </h2>
-                    <button onclick="addDefaultDoseDay()" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-colors duration-200 flex items-center shadow-sm text-sm">
-                        + Log Dose Day
-                    </button>
-                </div>
-                <div class="overflow-x-auto -mx-6">
-                    <table class="w-full min-w-full">
-                        <thead><tr class="border-b border-gray-200 text-left text-sm font-semibold text-gray-600">
-                            <th class="py-3 px-4">Date & Time</th><th class="py-3 px-4">Dose (mg)</th><th class="py-3 px-4 text-right">Actions</th>
-                        </tr></thead>
-                        <tbody id="doseLogTable"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl card-shadow p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold text-gray-800 flex items-center m-0">
-                        <span class="bg-green-100 text-green-600 rounded-full p-2 mr-3">🧪</span> Lab Results
-                    </h2>
-                    <button onclick="showAddRecordModal('level')" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 flex items-center shadow-sm text-sm">
-                        + Log Lab Result
-                    </button>
-                </div>
-                <div class="overflow-x-auto -mx-6">
-                    <table class="w-full min-w-full">
-                        <thead><tr class="border-b border-gray-200 text-left text-sm font-semibold text-gray-600">
-                            <th class="py-3 px-4">Date & Time</th><th class="py-3 px-4">Level (ng/mL)</th><th class="py-3 px-4">Status</th><th class="py-3 px-4 text-right">Actions</th>
-                        </tr></thead>
-                        <tbody id="levelLogTable"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="output-section" class="space-y-8 hidden">
-            <div class="bg-white rounded-xl card-shadow p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center justify-center">
-                    <span class="bg-cyan-100 text-cyan-600 rounded-full p-2 mr-3">📈</span> Concentration Forecast
-                </h2>
-                <div class="relative h-96">
-                    <canvas id="concentration-chart"></canvas>
-                    <div id="forecast-loader" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden"><div class="loader"></div></div>
-                </div>
-                <div id="results-summary" class="mt-4 text-center font-semibold text-lg p-3 bg-gray-50 rounded-md hidden"></div>
-            </div>
-
-            <!-- NEW: Dose Optimizer Card -->
-            <div id="dose-optimizer-card" class="bg-white rounded-xl card-shadow p-6 hidden">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                    <span class="bg-green-100 text-green-600 rounded-full p-2 mr-3">🎯</span> Dose Optimizer Tool
-                </h2>
-                <div id="optimizer-inputs" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div>
-                        <label for="target-trough-input" class="block text-sm font-medium text-gray-700 mb-1">Target Trough (ng/mL)</label>
-                        <input type="number" id="target-trough-input" value="8.0" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                    </div>
-                    <div>
-                        <label for="target-date-input" class="block text-sm font-medium text-gray-700 mb-1">Target Date (at Trough)</label>
-                        <input id="target-date-input" type="text" placeholder="Select date..." class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
-                    </div>
-                    <div class="md:pt-6">
-                         <button id="run-optimizer-btn" class="w-full bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 font-medium">
-                            Find Optimal Dose
-                        </button>
-                    </div>
-                </div>
-                <div id="optimizer-output" class="mt-4">
-                    <div class="text-center text-gray-500 italic">
-                        Run the main forecast first to enable this tool.
-                    </div>
-                </div>
-            </div>
         </div>
     </main>
 
-    <div id="addRecordModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4 card-shadow" id="modal-content">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4" id="modal-title">Add Record</h3>
-            <div class="space-y-4">
-                 <div>
-                    <label for="newDateTime" class="block text-sm font-medium text-gray-700 mb-1">Date & Time</label>
-                    <input type="text" id="newDateTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+    <!-- Add/Edit Record Modal -->
+    <div id="addRecordModal" class="modal-overlay">
+        <div class="modal">
+            <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:18px;margin-bottom:20px;"
+                id="modal-title">Add Record</h3>
+            <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:24px;">
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Date
+                        & Time</label>
+                    <input type="text" id="newDateTime" class="input-field" placeholder="dd-mmm-yy HH:mm">
                 </div>
                 <div id="dose-input-container">
-                    <label for="newDose" class="block text-sm font-medium text-gray-700 mb-1">Dose (mg)</label>
-                    <input type="number" step="0.1" id="newDose" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Dose
+                        (mg)</label>
+                    <input type="number" step="0.5" id="newDose" class="input-field">
                 </div>
                 <div id="level-input-container">
-                    <label for="newLevel" class="block text-sm font-medium text-gray-700 mb-1">Level (ng/mL)</label>
-                    <input type="number" step="0.1" id="newLevel" class="w-full px-3 py-2 border border-gray-300 rounded-lg input-focus">
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Level
+                        (ng/mL)</label>
+                    <input type="number" step="0.1" id="newLevel" class="input-field">
                 </div>
             </div>
             <input type="hidden" id="editIndex">
             <input type="hidden" id="recordType">
-            <div class="flex justify-end space-x-3 mt-6">
-                <button onclick="hideAddRecordModal()" class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors font-medium rounded-lg">Cancel</button>
-                <button id="save-record-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium">Save Record</button>
+            <div style="display:flex;justify-content:flex-end;gap:8px;">
+                <button onclick="hideAddRecordModal()" class="btn btn-secondary">Cancel</button>
+                <button onclick="saveRecord()" class="btn btn-primary">Save Record</button>
             </div>
         </div>
     </div>
 
-<script>
-// --- Global State & Configuration ---
-let clinicalData = [];
-let myChart = null;
-
-// NEW: Store last forecast parameters for optimizer
-let lastForecastParams = {
-    individual: null,
-    population: null,
-    allDoses: [],
-    patientData: null
-};
-
-// --- Pharmacokinetic Model Constants (UPDATED based on Indian context) ---
-const PK_CONSTANTS = {
-    // Population typical values for a 70kg person
-    TVCL: 20.3,  // Typical Clearance (L/hr) - Validated for Asian/Indian population
-    TVV:  451,   // Typical Volume of Distribution (L)
-    TVKA: 1.81,  // Typical Absorption Rate Constant (1/hr)
-    F: 0.137,    // 13.7% bioavailability
-
-    // Hematocrit Adjustment constants (retained for Quick HCT Adjustment tool)
-    HCT_ADJ_BMAX: 418, // Maximum binding capacity (ng/mL)
-    HCT_ADJ_KD: 3.8    // Dissociation constant (ng/mL)
-};
-
-// --- NEW Genotype Multiplier Const ---
-const CYP3A5_MULTIPLIER = {
-    '11': 2.0,    // Fast metabolizer (10-15% in India)
-    '13': 1.5,    // Intermediate (40-50% in India)
-    '33': 1.0,    // Slow metabolizer (40-50% in India)
-    'unknown': 1.2  // Conservative if not tested
-};
-
-
-// --- Initialization ---
-document.addEventListener('DOMContentLoaded', function() {
-    initializeUI();
-    setupEventListeners();
-    populatePatientList();
-    setSmartDefaults(); 
-    renderDoseLog();
-    renderLevelLog();
-});
-
-function initializeUI() {
-    flatpickr("#transplant-date", { altInput: true, altFormat: "d-M-y", dateFormat: "Y-m-d" });
-    flatpickr("#prediction-datetime", { enableTime: true, altInput: true, altFormat: "d-M-y H:i", dateFormat: "Y-m-d H:i" });
-    // NEW: Initialize optimizer date picker
-    flatpickr("#target-date-input", { 
-        enableTime: true, 
-        altInput: true, 
-        altFormat: "d-M-y H:i", 
-        dateFormat: "Y-m-d H:i",
-        defaultDate: dayjs().add(4, 'day').hour(7).minute(0).toDate() // Default to 4 days from now
-    });
-}
-
-function setupEventListeners() {
-    document.getElementById('run-all-btn').addEventListener('click', runAllAnalyses);
-    // NEW: Optimizer button event
-    document.getElementById('run-optimizer-btn').addEventListener('click', runDoseOptimizer);
-
-    ['quick-hct-level', 'quick-hct-initial'].forEach(id => {
-        document.getElementById(id).addEventListener('input', runQuickHctAdjustment);
-    });
-}
-
-// --- Local Storage Management ---
-
-function populatePatientList() {
-    const patientList = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
-    const datalist = document.getElementById('patient-list');
-    datalist.innerHTML = ''; // Clear existing options
-    patientList.sort().forEach(patientName => {
-        const option = document.createElement('option');
-        option.value = patientName;
-        datalist.appendChild(option);
-    });
-}
-
-function savePatientData() {
-    const patientName = document.getElementById('patient-name').value.trim();
-    if (!patientName) {
-        alert('Please enter a patient name to save data.');
-        return;
-    }
-    
-    // Use a case-insensitive key for storage
-    const patientKey = patientName.toLowerCase();
-
-    const dataToSave = {
-        patient: {
-            transplantDate: document.getElementById('transplant-date')._flatpickr.input.value,
-            weight: document.getElementById('weight').value,
-            hematocrit: document.getElementById('hematocrit').value,
-            mpa: document.getElementById('mpa').value,
-            bioassay: document.getElementById('bioassay').value,
-            genotype: document.getElementById('genotype').value
-        },
-        clinicalData: clinicalData
-    };
-    
-    localStorage.setItem(`tacrolimusDashboard_${patientKey}`, JSON.stringify(dataToSave));
-
-    let patientList = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
-    if (!patientList.map(p => p.toLowerCase()).includes(patientKey)) {
-        patientList.push(patientName); // Save the original cased name
-        localStorage.setItem('tacrolimusPatientList', JSON.stringify(patientList));
-        populatePatientList();
-    }
-    
-    alert(`Data saved for patient: ${patientName}`);
-}
-
-function loadPatientData() {
-    const patientName = document.getElementById('patient-name').value.trim();
-    if (!patientName) {
-        alert('Please select or type a patient name to load.');
-        return;
-    }
-    
-    const patientKey = patientName.toLowerCase();
-    const savedData = localStorage.getItem(`tacrolimusDashboard_${patientKey}`);
-    
-    if (savedData) {
-        const data = JSON.parse(savedData);
-        const patientList = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
-        const properName = patientList.find(p => p.toLowerCase() === patientKey) || patientName;
-        document.getElementById('patient-name').value = properName;
-        
-        document.getElementById('transplant-date')._flatpickr.setDate(data.patient.transplantDate, true);
-        document.getElementById('weight').value = data.patient.weight || 60;
-        document.getElementById('hematocrit').value = data.patient.hematocrit || 31;
-        document.getElementById('mpa').value = data.patient.mpa || '1';
-        document.getElementById('bioassay').value = data.patient.bioassay || '1';
-        document.getElementById('genotype').value = data.patient.genotype || 'unknown';
-        clinicalData = data.clinicalData || [];
-        
-        renderDoseLog();
-        renderLevelLog();
-        setSmartDefaults();
-        
-        // Hide output sections until 'run' is pressed
-        document.getElementById('output-section').classList.add('hidden');
-        document.getElementById('ipv-card').classList.add('hidden');
-        document.getElementById('ttr-card').classList.add('hidden');
-        document.getElementById('model-params-card').classList.add('hidden');
-        document.getElementById('dose-optimizer-card').classList.add('hidden');
-
-    } else {
-        alert(`No data found for patient: ${patientName}`);
-        clearAllData(false); // Clear board, but keep name
-    }
-}
-
-function clearAllData(clearName = true) {
-    if (clearName) {
-        document.getElementById('patient-name').value = '';
-    }
-    document.getElementById('weight').value = 60;
-    document.getElementById('hematocrit').value = 31;
-    document.getElementById('mpa').value = '1';
-    document.getElementById('bioassay').value = '1';
-    document.getElementById('genotype').value = 'unknown';
-    clinicalData = [];
-    
-    document.getElementById('transplant-date')._flatpickr.clear();
-    setSmartDefaults();
-    
-    renderDoseLog();
-    renderLevelLog();
-
-    // Hide output sections
-    document.getElementById('output-section').classList.add('hidden');
-    document.getElementById('ipv-card').classList.add('hidden');
-    document.getElementById('ttr-card').classList.add('hidden');
-    document.getElementById('model-params-card').classList.add('hidden');
-    document.getElementById('dose-optimizer-card').classList.add('hidden');
-
-    // Reset optimizer
-    lastForecastParams = { individual: null, population: null, allDoses: [], patientData: null };
-    document.getElementById('optimizer-output').innerHTML = '<div class="text-center text-gray-500 italic">Run the main forecast first to enable this tool.</div>';
-}
-
-// --- NEW: Export to CSV Function ---
-function exportPatientDataToCSV() {
-    const patientName = document.getElementById('patient-name').value.trim();
-    if (!patientName) {
-        alert('Please load or enter a patient name first.');
-        return;
-    }
-
-    let csvContent = "data:text/csv;charset=utf-8,";
-    
-    // Patient Demographics
-    csvContent += "Patient Demographics\n";
-    csvContent += "Patient_Name,Transplant_Date,Weight_kg,Hematocrit_pct,MPA_Coadmin,Genotype,Bioassay_Type\n";
-    const patientData = {
-        name: patientName,
-        transplantDate: document.getElementById('transplant-date')._flatpickr.input.value,
-        weight: document.getElementById('weight').value,
-        hct: document.getElementById('hematocrit').value,
-        mpa: document.getElementById('mpa').options[document.getElementById('mpa').selectedIndex].text,
-        genotype: document.getElementById('genotype').options[document.getElementById('genotype').selectedIndex].text,
-        bioassay: document.getElementById('bioassay').options[document.getElementById('bioassay').selectedIndex].text,
-    };
-    csvContent += `"${patientData.name}","${patientData.transplantDate}",${patientData.weight},${patientData.hct},"${patientData.mpa}","${patientData.genotype}","${patientData.bioassay}"\n`;
-
-    // Spacer
-    csvContent += "\nClinical Data Log\n";
-
-    // Clinical Data
-    csvContent += "DateTime,Dose_mg,Level_ng_mL\n";
-    clinicalData.forEach(record => {
-        csvContent += `"${record.datetime}",${record.dose !== null ? record.dose : ''},${record.level !== null ? record.level : ''}\n`;
-    });
-
-    // Create and trigger download
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${patientName}_tacrolimus_data.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-
-// --- UI Modals & Data Entry ---
-/**
- * Adds a full day of default doses (07:00 and 19:00) with one click.
- */
-function addDefaultDoseDay() {
-    const lastRecord = clinicalData.length > 0 ? clinicalData[clinicalData.length - 1] : null;
-    
-    let newDoseDate;
-    if (lastRecord) {
-        // Find the last record *with a date*
-        newDoseDate = dayjs(lastRecord.datetime).startOf('day').add(1, 'day');
-    } else {
-        const transplantDateStr = document.getElementById('transplant-date')._flatpickr.input.value;
-        if (!transplantDateStr) {
-             alert("Please set a valid transplant date before logging doses.");
-             return;
-        }
-        newDoseDate = dayjs(transplantDateStr, "YYYY-MM-DD").add(1, 'day');
-    }
-
-    if (!newDoseDate.isValid()) {
-        alert("Please set a valid transplant date before logging doses.");
-        return;
-    }
-
-    // Find the last *dose* amount to use as the default
-    const lastDoseRecord = [...clinicalData].reverse().find(r => r.dose !== null);
-    const defaultDoseValue = lastDoseRecord ? lastDoseRecord.dose : 2.0;
-
-    const morningDose = {
-        datetime: newDoseDate.hour(7).minute(0).format("YYYY-MM-DD HH:mm"),
-        dose: defaultDoseValue,
-        level: null
-    };
-    const eveningDose = {
-        datetime: newDoseDate.hour(19).minute(0).format("YYYY-MM-DD HH:mm"),
-        dose: defaultDoseValue,
-        level: null
-    };
-
-    // Check if these exact times already exist
-    if (!clinicalData.find(r => r.datetime === morningDose.datetime)) {
-        clinicalData.push(morningDose);
-    }
-    if (!clinicalData.find(r => r.datetime === eveningDose.datetime)) {
-        clinicalData.push(eveningDose);
-    }
-    
-    clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
-    renderDoseLog();
-    renderLevelLog();
-}
-
-
-function showAddRecordModal(type, editIndex = null) {
-    const modal = document.getElementById('addRecordModal');
-    document.getElementById('recordType').value = type;
-    document.getElementById('editIndex').value = editIndex !== null ? editIndex : '';
-    
-    document.getElementById('dose-input-container').style.display = type === 'dose' ? 'block' : 'none';
-    document.getElementById('level-input-container').style.display = type === 'level' ? 'block' : 'none';
-
-    let defaultDate, record;
-    if (editIndex !== null) {
-        document.getElementById('modal-title').textContent = `Edit ${type === 'dose' ? 'Dose' : 'Level'} Record`;
-        record = clinicalData[editIndex];
-        defaultDate = record.datetime;
-        document.getElementById('newDose').value = record.dose || '';
-        document.getElementById('newLevel').value = record.level || '';
-    } else { // This path is now only for adding new lab levels
-        document.getElementById('modal-title').textContent = `Add Lab Result`;
-        const lastRecordTime = clinicalData.length > 0 ? dayjs(clinicalData[clinicalData.length - 1].datetime) : dayjs().subtract(12, 'hour');
-        defaultDate = lastRecordTime.add(11.5, 'hour').toDate();
-        document.getElementById('newDose').value = '';
-        document.getElementById('newLevel').value = '';
-    }
-    
-    flatpickr("#newDateTime", { enableTime: true, altInput: true, altFormat: "d-M-y H:i", dateFormat: "Y-m-d H:i", defaultDate: defaultDate });
-    document.getElementById('save-record-btn').onclick = saveRecord;
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-}
-
-function hideAddRecordModal() {
-    document.getElementById('addRecordModal').classList.add('hidden');
-    document.getElementById('addRecordModal').classList.remove('flex');
-}
-
-function saveRecord() {
-    const datetimeStr = document.getElementById('newDateTime').value;
-    const dose = document.getElementById('newDose').value;
-    const level = document.getElementById('newLevel').value;
-    const index = document.getElementById('editIndex').value;
-    const type = document.getElementById('recordType').value;
-
-    if (!datetimeStr || !dayjs(datetimeStr).isValid()) { alert('Please enter a valid date and time.'); return; }
-    if ((type === 'dose' && parseFloat(dose) < 0) || (type === 'level' && parseFloat(level) < 0)) {
-        alert('Dose and level values cannot be negative.'); return;
-    }
-    const datetime = dayjs(datetimeStr).format("YYYY-MM-DD HH:mm");
-
-    if (index !== '') { // Editing existing record
-        clinicalData[parseInt(index)].datetime = datetime;
-        if (type === 'dose') clinicalData[parseInt(index)].dose = dose ? parseFloat(dose) : null;
-        if (type === 'level') clinicalData[parseInt(index)].level = level ? parseFloat(level) : null;
-    } else { // Adding new record
-        const existingRecord = clinicalData.find(r => r.datetime === datetime);
-        if (existingRecord) { // Merge with a record at the same time
-            if (type === 'dose') existingRecord.dose = dose ? parseFloat(dose) : null;
-            if (type === 'level') existingRecord.level = level ? parseFloat(level) : null;
-        } else { // No record at this time, so create a new one
-            clinicalData.push({
-                datetime: datetime,
-                dose: type === 'dose' ? (dose ? parseFloat(dose) : null) : null,
-                level: type === 'level' ? (level ? parseFloat(level) : null) : null,
-            });
-        }
-    }
-    
-    clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
-    renderDoseLog();
-    renderLevelLog();
-    hideAddRecordModal();
-}
-
-function deleteRecord(index, type) {
-    if (confirm(`Are you sure you want to delete this ${type}?`)) {
-        const record = clinicalData[index];
-        if (type === 'dose') record.dose = null;
-        if (type === 'level') record.level = null;
-        if (record.dose === null && record.level === null) clinicalData.splice(index, 1);
-        renderDoseLog();
-        renderLevelLog();
-    }
-}
-
-
-// --- UI Rendering ---
-function getLevelStatus(level, date, transplantDate) {
-    const range = getTherapeuticRange(date, transplantDate);
-    if (isNaN(level)) return { text: 'N/A', class: '' };
-    if (level < range.low) return { text: 'Low', class: 'level-low' };
-    if (level > range.high) return { text: 'High', class: 'level-high' };
-    return { text: 'Target', class: 'level-target' };
-}
-
-function renderDoseLog() {
-    const tbody = document.getElementById('doseLogTable');
-    const doseRows = clinicalData.map((record, index) => record.dose !== null ? `
-        <tr class="border-b border-gray-100 text-sm hover:bg-gray-50">
-            <td class="py-3 px-4">${dayjs(record.datetime).format('DD-MMM-YY HH:mm')}</td>
-            <td class="py-3 px-4">${record.dose.toFixed(1)}</td>
-            <td class="py-3 px-4 text-right">
-                <button onclick="showAddRecordModal('dose', ${index})" class="text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
-                <button onclick="deleteRecord(${index}, 'dose')" class="text-red-600 hover:text-red-800 font-medium ml-3">Delete</button>
-            </td>
-        </tr>` : '').join('');
-    tbody.innerHTML = doseRows || `<tr><td colspan="3" class="text-center py-4 text-gray-500">No doses logged.</td></tr>`;
-    saveToLocalStorage(); // Auto-save on change
-}
-
-function renderLevelLog() {
-    const tbody = document.getElementById('levelLogTable');
-    const transplantDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value, "YYYY-MM-DD");
-    
-    const levelRows = clinicalData.map((record, index) => {
-        if (record.level !== null) {
-            const status = getLevelStatus(record.level, dayjs(record.datetime), transplantDate);
-            return `<tr class="border-b border-gray-100 text-sm hover:bg-gray-50">
-                        <td class="py-3 px-4">${dayjs(record.datetime).format('DD-MMM-YY HH:mm')}</td>
-                        <td class="py-3 px-4 font-medium">${record.level.toFixed(1)}</td>
-                        <td class="py-3 px-4"><span class="status-indicator ${status.class}"></span>${status.text}</td>
-                        <td class="py-3 px-4 text-right">
-                            <button onclick="showAddRecordModal('level', ${index})" class="text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
-                            <button onclick="deleteRecord(${index}, 'level')" class="text-red-600 hover:text-red-800 font-medium ml-3">Delete</button>
-                        </td>
-                    </tr>`;
-        }
-        return '';
-    }).join('');
-    tbody.innerHTML = levelRows || `<tr><td colspan="4" class="text-center py-4 text-gray-500">No levels logged.</td></tr>`;
-    saveToLocalStorage(); // Auto-save on change
-}
-
-// --- Main Analysis Pipeline ---
-async function runAllAnalyses() {
-    const runBtn = document.getElementById('run-all-btn');
-    runBtn.disabled = true; runBtn.textContent = 'Running...';
-
-    // Reset optimizer and params
-    lastForecastParams = { individual: null, population: null, allDoses: [], patientData: null };
-    document.getElementById('dose-optimizer-card').classList.add('hidden');
-    document.getElementById('model-params-card').classList.add('hidden');
-    document.getElementById('optimizer-output').innerHTML = '<div class="text-center text-gray-500 italic">Run the main forecast first to enable this tool.</div>';
-
-    try {
-        const { patientData, historyLog, predictionDate } = gatherDataFromState();
-        
-        // Show all output cards
-        document.getElementById('output-section').classList.remove('hidden');
-        document.getElementById('ipv-card').classList.remove('hidden');
-        document.getElementById('ttr-card').classList.remove('hidden');
-        document.getElementById('model-params-card').classList.remove('hidden'); // NEW
-        
-        runIpvAndMetabolizer(historyLog);
-        runTTRCalculation(historyLog, patientData.transplantDate);
-        
-        // Pass predictionDate to the forecast
-        await runForecast(patientData, historyLog, predictionDate);
-
-        // NEW: Show optimizer card only on successful forecast
-        if (lastForecastParams.individual) {
-            document.getElementById('dose-optimizer-card').classList.remove('hidden');
-            // Set optimizer default date
-            const lastDoseDate = historyLog.filter(r => r.dose).pop()?.recordDate || dayjs();
-            const optimizerDefaultDate = lastDoseDate.add(4, 'day').hour(7).minute(0).toDate();
-            document.getElementById('target-date-input')._flatpickr.setDate(optimizerDefaultDate, true);
-        }
-
-    } catch (error) {
-        alert(`Critical Error: ${error.message}`);
-        console.error(error);
-    } finally {
-        runBtn.disabled = false; runBtn.textContent = 'Run Individualized Forecast';
-    }
-}
-
-function gatherDataFromState() {
-    const transplantDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value, "YYYY-MM-DD");
-    if (!transplantDate.isValid()) throw new Error("Invalid Transplant Date.");
-    
-    const predictionDate = dayjs(document.getElementById('prediction-datetime')._flatpickr.input.value, "YYYY-MM-DD HH:mm");
-    if (!predictionDate.isValid()) throw new Error("Invalid Forecast Date.");
-
-    const patientData = {
-        weight: parseFloat(document.getElementById('weight').value),
-        hct: parseFloat(document.getElementById('hematocrit').value), // Retained for Quick HCT tool
-        mpa: parseInt(document.getElementById('mpa').value, 10),
-        bioassay: parseInt(document.getElementById('bioassay').value, 10),
-        genotype: document.getElementById('genotype').value,
-        transplantDate: transplantDate,
-    };
-
-    const historyLog = clinicalData.map((record, index) => {
-        const recordDate = dayjs(record.datetime);
-        if (recordDate.isBefore(patientData.transplantDate.startOf('day'))) {
-            throw new Error(`Log entry for ${recordDate.format('DD-MMM-YY')} cannot be before the transplant date.`);
-        }
-        return {
-            id: index,
-            recordDate: recordDate,
-            dose: record.dose,
-            level: record.level,
-            time: recordDate.diff(patientData.transplantDate, 'hour', true)
-        };
-    });
-    return { patientData, historyLog, predictionDate };
-}
-
-// --- Clinical Calculation Modules ---
-
-/**
- * Returns the therapeutic range based on the time since transplant.
- */
-function getTherapeuticRange(date, transplantDate) {
-    const monthsPostTx = dayjs(date).diff(dayjs(transplantDate), 'month', true);
-    if (monthsPostTx <= 1) return { low: 10, high: 11 };
-    if (monthsPostTx > 1 && monthsPostTx <= 3) return { low: 7, high: 9 };
-    if (monthsPostTx > 3 && monthsPostTx <= 6) return { low: 5, high: 7 };
-    return { low: 4, high: 6 }; // More than 6 months
-}
-
-function runQuickHctAdjustment() {
-    const outputDiv = document.getElementById('quick-hct-output');
-    const Cwb = parseFloat(document.getElementById('quick-hct-level').value);
-    const initialHct = parseFloat(document.getElementById('quick-hct-initial').value);
-    const targetHct = 35; // Target HCT for this tool
-    
-    if (isNaN(Cwb) || isNaN(initialHct) || Cwb <= 0 || initialHct <= 0 || initialHct >= 100) {
-        outputDiv.innerHTML = 'Adjusted Level: --';
-        return;
-    }
-
-    const { HCT_ADJ_BMAX: Bmax, HCT_ADJ_KD: Kd } = PK_CONSTANTS;
-    // C_plasma = (-b + sqrt(b^2 - 4ac)) / 2a
-    const calculatePlasmaConc = (c_wb, fHCT) => {
-        const a = 1 - fHCT;
-        const b = Kd - c_wb - (fHCT * Kd) + (fHCT * Bmax);
-        const c = -c_wb * Kd;
-        return (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
-    };
-    // C_wb = C_p(1 - HCT) + HCT * (Bmax * C_p) / (Kd + C_p)
-    const calculateWholeBloodConc = (c_p, fHCT) => c_p * (1 - fHCT) + fHCT * (Bmax * c_p) / (Kd + c_p);
-    
-    const currentPlasmaConc = calculatePlasmaConc(Cwb, initialHct / 100);
-    const targetWholeBloodConc = calculateWholeBloodConc(currentPlasmaConc, targetHct / 100);
-    
-    outputDiv.innerHTML = `Adjusted Level: <span class="text-indigo-600">${targetWholeBloodConc.toFixed(1)} ng/mL</span>`;
-}
-
-function runIpvAndMetabolizer(historyLog) {
-    const outputDiv = document.getElementById('ipv-output');
-    const levels = historyLog.filter(e => e.level !== null && e.level > 0).sort((a, b) => a.time - b.time);
-    const allDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
-
-    if (levels.length < 3) return displayMessage(outputDiv, `Need at least 3 measured levels.`, 'info');
-    
-    const cdPairs = levels.map(levelEvent => {
-        // Find all doses in the 24-hour period *before* this lab draw
-        const priorDoses = allDoses.filter(d => 
-            d.time < levelEvent.time && 
-            d.time >= (levelEvent.time - 24)
-        );
-        
-        if (priorDoses.length === 0) return null;
-
-        // Sum them up to get the Total Daily Dose (TDD)
-        const dailyDose = priorDoses.reduce((sum, d) => sum + d.dose, 0);
-
-        return dailyDose > 0 ? { ratio: levelEvent.level / dailyDose } : null;
-    }).filter(Boolean); // Remove nulls
-
-    if (cdPairs.length < 2) { // Need at least 2 pairs to calc variability
-        return displayMessage(outputDiv, `Could only form ${cdPairs.length} C/D pairs. Please ensure labs are preceded by at least one dose in the prior 24h.`, 'error');
-    }
-
-    const ratios = cdPairs.map(p => p.ratio);
-    const avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-    // Median Absolute Deviation (MAD)
-    const mad = ratios.reduce((a, b) => a + Math.abs(b - avgRatio), 0) / ratios.length;
-    const ipv = (mad / avgRatio) * 100;
-    
-    const status = avgRatio < 1.05 ? 'Fast Metabolizer' : 'Slow Metabolizer';
-    const note = status === 'Fast Metabolizer' ? 'Higher risk of nephrotoxicity at similar troughs.' : 'May require lower doses for target.';
-
-    let message = `<div class="grid grid-cols-2 gap-4 text-center">
-        <div><div class="text-sm text-gray-500">Intra-Patient IPV</div><div class="font-bold text-2xl text-purple-700">${ipv.toFixed(1)}%</div></div>
-        <div><div class="text-sm text-gray-500">C/D Ratio (Metabolism)</div><div class="font-bold text-lg text-purple-700">${avgRatio.toFixed(1)} (${status})</div></div>
-        </div><div class="text-sm text-center mt-3 italic text-gray-600">${note}</div>`;
-    displayMessage(outputDiv, message, 'success');
-}
-
-function runTTRCalculation(historyLog, transplantDate) {
-    const outputDiv = document.getElementById('ttr-output');
-    const levels = historyLog.filter(e => e.level !== null && e.level > 0).sort((a, b) => a.time - b.time);
-
-    if (levels.length < 2) {
-        return displayMessage(outputDiv, 'Requires at least 2 lab results to calculate.', 'info');
-    }
-
-    let totalTimeInRange = 0;
-    let totalDuration = 0;
-
-    for (let i = 0; i < levels.length - 1; i++) {
-        const p1 = levels[i];
-        const p2 = levels[i + 1];
-
-        const intervalDuration = p2.time - p1.time;
-        if (intervalDuration <= 0) continue;
-        totalDuration += intervalDuration;
-        
-        const range = getTherapeuticRange(p1.recordDate, transplantDate);
-        const { low: targetLow, high: targetHigh } = range;
-        
-        const v1 = p1.level;
-        const v2 = p2.level;
-
-        // --- Rosendaal Method (Linear Interpolation) ---
-        if (v1 >= targetLow && v1 <= targetHigh && v2 >= targetLow && v2 <= targetHigh) {
-            // Both points in range
-            totalTimeInRange += intervalDuration;
-            continue;
-        }
-        if ((v1 < targetLow && v2 < targetLow) || (v1 > targetHigh && v2 > targetHigh)) {
-            // Both points out of range on the same side
-            continue;
-        }
-
-        // --- Find crossing points ---
-        const timeToCross = (target, val1, val2, time1, time2) => {
-             if (val2 === val1) return time1;
-             return time1 + (time2 - time1) * (target - val1) / (val2 - val1);
-        };
-
-        const t_low = timeToCross(targetLow, v1, v2, p1.time, p2.time);
-        const t_high = timeToCross(targetHigh, v1, v2, p1.time, p2.time);
-        
-        const sortedTimes = [p1.time, p2.time, t_low, t_high].filter(t => t >= p1.time && t <= p2.time).sort((a, b) => a - b);
-        let intervalTimeInRange = 0;
-
-        for (let j = 0; j < sortedTimes.length - 1; j++) {
-            const t_start = sortedTimes[j];
-            const t_end = sortedTimes[j+1];
-            const t_mid = t_start + (t_end - t_start) / 2;
-            
-            // Get concentration at midpoint
-            const mid_conc = v1 + (v2 - v1) * (t_mid - p1.time) / (p2.time - p1.time);
-            
-            if (mid_conc >= targetLow && mid_conc <= targetHigh) {
-                intervalTimeInRange += (t_end - t_start);
-            }
-        }
-        totalTimeInRange += intervalTimeInRange;
-    }
-
-    if (totalDuration === 0) {
-        return displayMessage(outputDiv, 'Not enough time elapsed between labs to calculate.', 'info');
-    }
-
-    const ttrPercentage = (totalTimeInRange / totalDuration) * 100;
-    const message = `<div class="text-center">
-            <div class="font-bold text-4xl text-purple-600">${ttrPercentage.toFixed(1)}%</div>
-            <div class="text-sm text-gray-500 mt-1">Calculated using the Rosendaal method.</div>
-        </div>`;
-    displayMessage(outputDiv, message, 'success');
-}
-
-
-function runForecast(patientData, historyLog, predictionDate) {
-    return new Promise((resolve) => {
-        document.getElementById('forecast-loader').classList.remove('hidden');
-        setTimeout(() => { 
-            try {
-                const loggedDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
-                const measuredLevels = historyLog.filter(e => e.level !== null && e.level > 0);
-                
-                if (loggedDoses.length === 0) {
-                    throw new Error("No doses logged. Cannot run forecast.");
-                }
-
-                // Extrapolate doses 14 days past the prediction date for a good graph
-                const forecastUntilDate = predictionDate.add(14, 'day');
-                const extrapolatedDoses = extrapolateDoses(historyLog, forecastUntilDate, patientData.transplantDate);
-                const allDosesForModel = [...loggedDoses, ...extrapolatedDoses];
-                
-                const popParams = getPopulationParameters(patientData);
-                const individualParams = getIndividualParameters(popParams, measuredLevels, allDosesForModel, patientData.bioassay);
-                
-                // --- NEW: Save parameters for other tools ---
-                lastForecastParams = {
-                    individual: individualParams,
-                    population: popParams,
-                    allDoses: allDosesForModel,
-                    patientData: patientData
-                };
-                
-                const lastTime = Math.max(forecastUntilDate.diff(patientData.transplantDate, 'hour', true), ...historyLog.map(l => l.time), 0);
-                const timePoints = Array.from({length: 500}, (_, i) => (lastTime / 499) * i);
-                
-                const popCurve = generateCurve(timePoints, allDosesForModel, popParams, patientData.bioassay);
-                const indCurve = generateCurve(timePoints, allDosesForModel, individualParams, patientData.bioassay);
-
-                const predictedLevel = generateCurve(
-                    [predictionDate.diff(patientData.transplantDate, 'hour', true)],
-                     allDosesForModel, individualParams, patientData.bioassay)[0];
-                
-                updateChart(timePoints, popCurve, indCurve, measuredLevels, patientData.transplantDate);
-                updateSummary(predictedLevel, predictionDate, individualParams.rmse);
-                
-                // NEW: Update Model Params card
-                updateModelParamsCard(popParams, individualParams);
-
-                resolve();
-            } catch (error) {
-                const summaryDiv = document.getElementById('results-summary');
-                displayMessage(summaryDiv, error.message, 'error');
-                summaryDiv.classList.remove('hidden');
-                console.error("Forecast Error:", error);
-                resolve(); // Resolve promise even on error
-            } finally {
-                document.getElementById('forecast-loader').classList.add('hidden');
-            }
-        }, 250); // Simulate processing time
-    });
-}
-
-/**
- * Auto-fills doses based on the last logged dose, assuming a 12-hour (BID) schedule.
- */
-function extrapolateDoses(historyLog, forecastUntilDate, transplantDate) {
-    const extrapolatedDoses = [];
-    const loggedDoses = historyLog.filter(e => e.dose !== null && e.dose > 0).sort((a, b) => a.time - b.time);
-    
-    if (loggedDoses.length === 0) {
-        return []; // Cannot extrapolate without at least one dose
-    }
-
-    const lastLoggedDose = loggedDoses[loggedDoses.length - 1];
-    let nextDoseTime = lastLoggedDose.recordDate.add(12, 'hour');
-    
-    while (nextDoseTime.isBefore(forecastUntilDate)) {
-        extrapolatedDoses.push({
-            id: 'extrapolated-' + extrapolatedDoses.length,
-            recordDate: nextDoseTime,
-            dose: lastLoggedDose.dose, // Use the last logged dose amount
-            level: null,
-            time: nextDoseTime.diff(transplantDate, 'hour', true)
-        });
-        nextDoseTime = nextDoseTime.add(12, 'hour');
-    }
-    return extrapolatedDoses;
-}
-
-
-// --- Pharmacokinetic Modeling ---
-
-/**
- * UPDATED: Calculates Population PK Parameters based on Indian context.
- */
-function getPopulationParameters(patientData) {
-    const { weight, genotype } = patientData;
-    const { TVCL, TVV, TVKA } = PK_CONSTANTS;
-
-    const multiplier = CYP3A5_MULTIPLIER[genotype] || CYP3A5_MULTIPLIER['unknown'];
-    const CL = TVCL * Math.pow(weight / 70, 0.75) * multiplier;
-    const V = TVV * (weight / 70);
-    
-    return { CL: CL, V: V, KA: TVKA };
-}
-
-
-function getIndividualParameters(popParams, measuredLevels, allDoses, bioassay) {
-    if (measuredLevels.length === 0) {
-        return { ...popParams, rmse: null }; // No data, use population params
-    }
-
-    let bestEtaCL = 0, minError = Infinity;
-    
-    // Constrain the search range for 'eta'
-    for (let eta = -1.2; eta <= 1.2; eta += 0.02) { 
-        const testParams = { ...popParams, CL: popParams.CL * Math.exp(eta) };
-        const predictedLevels = generateCurve(measuredLevels.map(l => l.time), allDoses, testParams, bioassay);
-        
-        // Calculate squared error
-        const currentError = measuredLevels.reduce((sum, level, i) => {
-            return sum + Math.pow(predictedLevels[i] - level.level, 2);
-        }, 0);
-
-        if (currentError < minError) {
-            minError = currentError;
-            bestEtaCL = eta;
-        }
-    }
-    
-    return { 
-        CL: popParams.CL * Math.exp(bestEtaCL), 
-        V: popParams.V, 
-        KA: popParams.KA, 
-        rmse: Math.sqrt(minError / measuredLevels.length) 
-    };
-}
-
-/**
- * Core 1-compartment model prediction logic.
- */
-function predictSingleDoseConcentration(time, dose_mg, params) {
-    const { CL, V, KA } = params;
-    if (time <= 0 || V <= 0) return 0;
-    
-    const dose_mcg = dose_mg * 1000;
-    const k = CL / V;
-
-    if (Math.abs(KA - k) < 1e-6) { // Handle case where KA = k
-        return (dose_mcg * KA * time * Math.exp(-k * time)) / V;
-    }
-
-    const coefficient = (dose_mcg * KA) / (V * (KA - k));
-    const concentrations = Math.exp(-k * time) - Math.exp(-KA * time);
-    
-    return coefficient * concentrations;
-}
-
-function generateCurve(times_to_plot, allDoseEvents, params, bioassay) {
-    const concentrations = times_to_plot.map(currentTime => {
-        // Superposition: sum the concentration from all prior doses
-        const totalConcentration = allDoseEvents.reduce((sum, doseEvent) => {
-            if (doseEvent.time < currentTime) {
-                const timeSinceDose = currentTime - doseEvent.time;
-                return sum + predictSingleDoseConcentration(timeSinceDose, doseEvent.dose, params);
-            }
-            return sum;
-        }, 0);
-        return totalConcentration;
-    });
-
-    // Apply CMIA correction if needed
-    return bioassay === 2 ? concentrations.map(c => 1.08 * c + 0.55) : concentrations;
-}
-
-
-// --- Charting and Display ---
-function displayMessage(divElement, message, type) {
-    divElement.innerHTML = `<div class="output-${type}">${message}</div>`;
-}
-
-function updateChart(timePoints, popCurve, indCurve, measuredLevels, transplantDate) {
-    const ctx = document.getElementById('concentration-chart').getContext('2d');
-    
-    const datasets = [{
-        label: 'Population Prediction', data: popCurve.map((y, i) => ({ x: timePoints[i], y })),
-        borderColor: 'rgba(107, 114, 128, 0.8)', borderWidth: 2, pointRadius: 0, tension: 0.4, borderDash: [5, 5]
-    },{
-        label: 'Individualized Forecast', data: indCurve.map((y, i) => ({ x: timePoints[i], y })),
-        borderColor: 'rgb(37, 99, 235)', borderWidth: 3, pointRadius: 0, tension: 0.4,
-    }];
-
-    if (measuredLevels.length > 0) {
-        datasets.push({
-            label: 'Measured Levels', data: measuredLevels.map(l => ({ x: l.time, y: l.level })),
-            backgroundColor: 'rgb(220, 38, 38)', pointRadius: 5, pointHoverRadius: 7, type: 'scatter', showLine: false
-        });
-    }
-    
-    if (myChart) myChart.destroy();
-
-    myChart = new Chart(ctx, {
-        type: 'line', data: { datasets },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            scales: {
-                x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Hours Post-Transplant', font: { size: 14 }}},
-                y: { title: { display: true, text: 'Tacrolimus (ng/mL)', font: { size: 14 }}, min: 0 }
-            },
-            plugins: {
-                legend: { position: 'top' },
-                tooltip: { 
-                    callbacks: { 
-                        title: ctx => `Hour ${ctx[0].parsed.x.toFixed(1)} (${transplantDate.add(ctx[0].parsed.x, 'hour').format('DD-MMM-YY HH:mm')})` 
-                    }
-                }
-            },
-            interaction: { intersect: false, mode: 'index' }
-        },
-        plugins: [{
-            id: 'targetRange',
-            beforeDraw: (chart) => {
-                const { ctx, chartArea: { left, right }, scales: { x, y } } = chart;
-                ctx.save();
-                
-                const dateRanges = [];
-                let lastRangeKey = '';
-
-                timePoints.forEach(hour => {
-                    const date = transplantDate.add(hour, 'hour');
-                    const range = getTherapeuticRange(date, transplantDate);
-                    const key = `${range.low}-${range.high}`;
-                    if (key !== lastRangeKey) {
-                        dateRanges.push({ startHour: hour, range: range });
-                        lastRangeKey = key;
-                    }
-                });
-                
-                dateRanges.forEach((r, i) => {
-                    const startPixel = x.getPixelForValue(r.startHour);
-                    const endPixel = (i + 1 < dateRanges.length) ? x.getPixelForValue(dateRanges[i+1].startHour) : right;
-                    const yMinPixel = y.getPixelForValue(r.range.high);
-                    const yMaxPixel = y.getPixelForValue(r.range.low);
-
-                    ctx.fillStyle = 'rgba(252, 211, 77, 0.2)'; // Yellowish tint for target range
-                    const drawX = Math.max(startPixel, left);
-                    const drawWidth = Math.min(endPixel, right) - drawX;
-                    if (drawWidth > 0) {
-                         ctx.fillRect(drawX, yMinPixel, drawWidth, yMaxPixel - yMinPixel);
-                    }
-                });
-                ctx.restore();
-            }
-        }]
-    });
-}
-
-function updateSummary(predictedLevel, predictionDate, rmse) {
-    const summaryDiv = document.getElementById('results-summary');
-    const rmseHtml = rmse ? `Model Fit (RMSE): <span class="font-semibold ${rmse > 2.0 ? 'text-red-600' : 'text-green-600'}">${rmse.toFixed(2)} ng/mL</span>` : '';
-    if (predictionDate && !isNaN(predictedLevel)) {
-        summaryDiv.innerHTML = `Predicted Level at <span class="text-indigo-700">${predictionDate.format('DD-MMM-YY HH:mm')}</span> is <span class="text-3xl font-bold text-indigo-600">${predictedLevel.toFixed(1)}</span> ng/mL
-        <div class="text-sm mt-1 text-gray-600">${rmseHtml}</div>`;
-    } else {
-         summaryDiv.innerHTML = 'Could not calculate a prediction. Please check inputs.';
-    }
-    summaryDiv.classList.remove('hidden');
-}
-
-// --- NEW: Update Model Params Card Function ---
-function updateModelParamsCard(popParams, indParams) {
-    const outputDiv = document.getElementById('model-params-output');
-    if (!indParams || indParams.rmse === null) {
-        displayMessage(outputDiv, 'Run forecast with measured levels to see parameters.', 'info');
-        return;
-    }
-
-    let interpretation = "Normal Metabolizer";
-    const ratio = indParams.CL / popParams.CL;
-    if (ratio > 1.25) interpretation = "Fast Metabolizer (Higher CL)";
-    if (ratio < 0.75) interpretation = "Slow Metabolizer (Lower CL)";
-
-    const message = `
-        <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-left">
-            <div class="text-sm text-gray-500">Model Fit (RMSE)</div>
-            <div class="font-semibold text-right ${indParams.rmse > 2.0 ? 'text-red-600' : 'text-green-600'}">${indParams.rmse.toFixed(2)} ng/mL</div>
-            
-            <div class="text-sm text-gray-500">Population CL</div>
-            <div class="font-semibold text-right">${popParams.CL.toFixed(1)} L/hr</div>
-            
-            <div class="text-sm text-gray-500">Individualized CL</div>
-            <div class="font-semibold text-right">${indParams.CL.toFixed(1)} L/hr</div>
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal">
+            <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:18px;margin-bottom:20px;">Settings & Data
+                Management</h3>
+            <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
+                <button onclick="backupAllData()" class="btn btn-secondary"
+                    style="width:100%;justify-content:center;">📥 Backup All Patient Data</button>
+                <input type="file" id="restore-file" accept=".json" style="display:none">
+                <button onclick="document.getElementById('restore-file').click()" class="btn btn-secondary"
+                    style="width:100%;justify-content:center;">📤 Restore from Backup</button>
+                <hr style="border-color:var(--col-border);">
+                <button onclick="deleteAllStoredData()" class="btn btn-danger"
+                    style="width:100%;justify-content:center;">🗑 Permanently Delete All Data</button>
+            </div>
+            <div style="text-align:right;"><button onclick="closeSettingsModal()"
+                    class="btn btn-secondary">Close</button></div>
         </div>
-        <div class="text-sm text-center mt-3 italic text-gray-600">
-            Interpretation: <span class="font-medium text-gray-800">${interpretation}</span>
-        </div>`;
-    displayMessage(outputDiv, message, 'success');
-}
+    </div>
 
-// --- NEW: Dose Optimizer Function ---
-function runDoseOptimizer() {
-    const outputDiv = document.getElementById('optimizer-output');
-    if (!lastForecastParams.individual) {
-        displayMessage(outputDiv, 'You must run a successful forecast first (with a low RMSE) to enable this tool.', 'error');
-        return;
-    }
+    <script>
+        // ============================================================
+        // VALIDATED POPULATION PK MODEL
+        // Based on: Størset et al. (Transplantation 2014) — adult kidney
+        // Adapted for Indian population (higher CYP3A5*1 allele frequency ~45%)
+        //
+        // All parameters are APPARENT: CL/F and V/F
+        // Bioavailability F (~14%) is embedded — do NOT apply F separately
+        //
+        // Covariates applied:
+        //   CYP3A5: effect on CL/F (validated)
+        //   Weight: allometric scaling (0.75 on CL, 1.0 on V)
+        //   MPA:    reduces CL/F by ~13% (drug interaction)
+        //   HCT:    kept separate (whole-blood assay correction only,
+        //           not a covariate on CL in whole-blood-based PK)
+        // ============================================================
+        const PK_MODEL = {
+            TVCL: 19.2,         // L/hr  — apparent CL/F, ref: *3/*3, 60kg, no MPA
+            TVV: 694,          // L     — apparent V/F
+            TVKA: 4.53,         // hr⁻¹  — first-order absorption
 
-    const targetTrough = parseFloat(document.getElementById('target-trough-input').value);
-    const targetDate = dayjs(document.getElementById('target-date-input')._flatpickr.input.value, "YYYY-MM-DD HH:mm");
+            // Inter-individual variability (variance of ln-normal distribution)
+            // ωCL = 40% CV  → var = ln(1 + 0.40²) = 0.148
+            // ωV  = 31% CV  → var = ln(1 + 0.31²) = 0.090
+            OMEGA_CL: 0.148,
+            OMEGA_V: 0.090,
 
-    if (isNaN(targetTrough) || !targetDate.isValid()) {
-        displayMessage(outputDiv, 'Please enter a valid target trough and target date.', 'error');
-        return;
-    }
-    
-    // Find the last *actual* dose event to start the new simulation from
-    const lastLoggedDose = historyLog.filter(e => e.dose !== null && e.dose > 0).sort((a, b) => b.time - a.time)[0];
-    if (!lastLoggedDose) {
-         displayMessage(outputDiv, 'Cannot optimize without at least one logged dose.', 'error');
-         return;
-    }
+            // Proportional residual error (σ = 18% CV)
+            SIGMA: 0.18,
 
-    // Get all logged doses. We will simulate *from* the last logged dose.
-    const loggedDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
-    const simulationStartDate = lastLoggedDose.recordDate;
-    
-    // Dose strengths to simulate
-    const dosesToTry = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
-    let results = [];
-    
-    // For each dose, simulate forward
-    dosesToTry.forEach(testDose => {
-        let simulatedDoses = [];
-        let nextDoseTime = simulationStartDate.add(12, 'hour'); // Start from the *next* dose
-        
-        // Create a new dose history from the last logged dose
-        while (nextDoseTime.isBefore(targetDate.add(2, 'hour'))) { // Simulate 2 hours past trough to get peak
-            simulatedDoses.push({
-                recordDate: nextDoseTime,
-                dose: testDose,
-                time: nextDoseTime.diff(lastForecastParams.patientData.transplantDate, 'hour', true)
-            });
-            nextDoseTime = nextDoseTime.add(12, 'hour');
-        }
-        
-        // Combine history *before* the new regimen + the new simulated regimen
-        const fullDoseHistory = [...loggedDoses, ...simulatedDoses];
-        
-        // Calculate Trough (at target date)
-        const predictedTrough = generateCurve(
-            [targetDate.diff(lastForecastParams.patientData.transplantDate, 'hour', true)],
-            fullDoseHistory, 
-            lastForecastParams.individual, 
-            lastForecastParams.patientData.bioassay
-        )[0];
-        
-        // Calculate Peak (2 hours after last dose)
-        const peakTime = targetDate.add(2, 'hour');
-         const predictedPeak = generateCurve(
-            [peakTime.diff(lastForecastParams.patientData.transplantDate, 'hour', true)],
-            fullDoseHistory, 
-            lastForecastParams.individual, 
-            lastForecastParams.patientData.bioassay
-        )[0];
+            // CYP3A5 covariate on CL/F
+            // NOTE: Indian population has ~45% *1 allele frequency
+            //       'unknown' defaults to intermediate-high (conservative for safety)
+            CYP3A5: { '11': 1.79, '13': 1.35, '33': 1.00, 'unknown': 1.30 },
 
-        results.push({
-            dose: testDose,
-            trough: predictedTrough,
-            peak: predictedPeak,
-            diff: Math.abs(predictedTrough - targetTrough)
+            // Weight allometric exponents
+            WT_CL: 0.75,
+            WT_V: 1.00,
+
+            // MPA co-administration: inhibits CYP3A → reduces apparent CL by ~13%
+            MPA_CL: 0.87,
+
+            // v5.1 HCT Covariate Effect
+            HCT_CL: -0.9, 
+
+            // HCT RBC binding (for quick correction tool only)
+            HCT_BMAX: 418,
+            HCT_KD: 3.8,
+
+            // Reference values
+            WT_REF: 60,
+            HCT_REF: 35
+        };
+
+        // ============================================================
+        // STATE
+        // ============================================================
+        let clinicalData = [];
+        let myChart = null;
+        let lastForecastParams = { individual: null, population: null, allDoses: [], patientData: null };
+
+        // ============================================================
+        // INITIALIZATION
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            initDatePickers();
+            setupListeners();
+            populatePatientList();
+            setDefaults();
+            renderDoseLog(); renderLevelLog();
         });
-    });
 
-    // Find the best dose
-    results.sort((a, b) => a.diff - b.diff);
-    const bestDose = results[0].dose;
+        function initDatePickers() {
+            const opts = { altInput: true, altFormat: "d-M-y", dateFormat: "Y-m-d" };
+            const optsT = { enableTime: true, altInput: true, altFormat: "d-M-y H:i", dateFormat: "Y-m-d H:i" };
+            flatpickr("#transplant-date", opts);
+            flatpickr("#prediction-datetime", optsT);
+            flatpickr("#target-date-input", { ...optsT, defaultDate: dayjs().add(4, 'day').hour(7).minute(0).toDate() });
+            flatpickr("#newDateTime", optsT);
+        }
 
-    // Generate table
-    let tableHtml = `
-        <div class="overflow-x-auto -mx-6">
-        <table class="w-full min-w-full">
-            <thead><tr class="border-b border-gray-200 text-left text-sm font-semibold text-gray-600">
-                <th class="py-3 px-4">Proposed Dose (BID)</th>
-                <th class="py-3 px-4">Predicted Trough (C0)</th>
-                <th class="py-3 px-4">Predicted Peak (C2)</th>
-            </tr></thead>
-            <tbody>`;
-            
-    results.sort((a, b) => a.dose - b.dose).forEach(res => {
-        const highlightClass = res.dose === bestDose ? 'highlight-row' : '';
-        tableHtml += `
-            <tr class="border-b border-gray-100 text-sm hover:bg-gray-50 ${highlightClass}">
-                <td class="py-3 px-4 font-medium">${res.dose.toFixed(1)} mg</td>
-                <td class="py-3 px-4 font-bold">${res.trough.toFixed(1)} ng/mL</td>
-                <td class="py-3 px-4">${res.peak.toFixed(1)} ng/mL</td>
+        function setupListeners() {
+            document.getElementById('run-all-btn').addEventListener('click', runAllAnalyses);
+            document.getElementById('run-optimizer-btn').addEventListener('click', runDoseOptimizer);
+            document.getElementById('restore-file').addEventListener('change', restoreFromBackup);
+            ['quick-hct-level', 'quick-hct-initial'].forEach(id =>
+                document.getElementById(id).addEventListener('input', runQuickHctAdjustment)
+            );
+        }
+
+        function setDefaults() {
+            const td = document.getElementById('transplant-date')._flatpickr;
+            const pd = document.getElementById('prediction-datetime')._flatpickr;
+            if (!td.input.value) td.setDate(dayjs().subtract(30, 'day').toDate(), true);
+            if (!pd.input.value) pd.setDate(dayjs().toDate(), true);
+        }
+
+        // ============================================================
+        // ALERTS
+        // ============================================================
+        function showAlert(msg, type = 'info') {
+            const c = document.getElementById('alert-container');
+            const d = document.createElement('div');
+            d.className = `alert alert-${type}`;
+            d.innerHTML = `<span style="flex:1">${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:16px;opacity:0.6;">×</button>`;
+            c.appendChild(d);
+            setTimeout(() => d.remove(), 6000);
+        }
+
+        // ============================================================
+        // TABS
+        // ============================================================
+        function switchTab(name, el) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(name + '-tab').classList.remove('hidden');
+            el.classList.add('active');
+        }
+
+        // ============================================================
+        // PATIENT PERSISTENCE
+        // ============================================================
+        function populatePatientList() {
+            const list = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+            const dl = document.getElementById('patient-list');
+            dl.innerHTML = list.sort().map(n => `<option value="${n}">`).join('');
+        }
+
+        function savePatientData() {
+            const name = document.getElementById('patient-name').value.trim();
+            if (!name) { showAlert('Enter a patient name', 'error'); return; }
+            const key = name.toLowerCase();
+            const data = {
+                patient: {
+                    transplantDate: document.getElementById('transplant-date')._flatpickr.input.value,
+                    weight: document.getElementById('weight').value,
+                    hematocrit: document.getElementById('hematocrit').value,
+                    mpa: document.getElementById('mpa').value,
+                    bioassay: document.getElementById('bioassay').value,
+                    genotype: document.getElementById('genotype').value,
+                    transplantType: document.getElementById('transplant-type').value
+                },
+                clinicalData, savedAt: new Date().toISOString()
+            };
+            localStorage.setItem(`ts5_${key}`, JSON.stringify(data));
+            let list = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+            if (!list.map(p => p.toLowerCase()).includes(key)) { list.push(name); localStorage.setItem('tacrolimusPatientList', JSON.stringify(list)); populatePatientList(); }
+            showAlert(`Saved: ${name}`, 'success');
+        }
+
+        function loadPatientData() {
+            const name = document.getElementById('patient-name').value.trim();
+            if (!name) { showAlert('Enter a patient name', 'error'); return; }
+            const raw = localStorage.getItem(`ts5_${name.toLowerCase()}`);
+            if (!raw) { showAlert(`No data found for "${name}"`, 'error'); return; }
+            const d = JSON.parse(raw);
+            document.getElementById('transplant-date')._flatpickr.setDate(d.patient.transplantDate, true);
+            document.getElementById('weight').value = d.patient.weight || 60;
+            document.getElementById('hematocrit').value = d.patient.hematocrit || 35;
+            document.getElementById('mpa').value = d.patient.mpa || '1';
+            document.getElementById('bioassay').value = d.patient.bioassay || '1';
+            document.getElementById('genotype').value = d.patient.genotype || 'unknown';
+            document.getElementById('transplant-type').value = d.patient.transplantType || 'Live Related';
+            clinicalData = d.clinicalData || [];
+            renderDoseLog(); renderLevelLog(); hideOutput();
+            showAlert(`Loaded: ${name}`, 'success');
+        }
+
+        function clearAllData(clearName = true) {
+            if (!confirm('Clear all data?')) return;
+            if (clearName) document.getElementById('patient-name').value = '';
+            document.getElementById('weight').value = 60;
+            document.getElementById('hematocrit').value = 35;
+            document.getElementById('mpa').value = '1';
+            document.getElementById('bioassay').value = '1';
+            document.getElementById('genotype').value = 'unknown';
+            document.getElementById('transplant-type').value = 'Live Related';
+            clinicalData = [];
+            renderDoseLog(); renderLevelLog(); hideOutput();
+            showAlert('Cleared', 'success');
+        }
+
+        function hideOutput() { document.getElementById('output-section').style.display = 'none'; }
+
+        function backupAllData() {
+            const list = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+            const backup = { version: '5.0', date: new Date().toISOString(), patients: {} };
+            list.forEach(n => { const d = localStorage.getItem(`tacrolimusDashboard_${n.toLowerCase()}`); if (d) backup.patients[n] = JSON.parse(d); });
+            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `tacrosmart_backup_${dayjs().format('YYYY-MM-DD')}.json`; a.click();
+            URL.revokeObjectURL(url); showAlert('Backup downloaded', 'success');
+        }
+
+        function restoreFromBackup(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                try {
+                    const backup = JSON.parse(ev.target.result);
+                    Object.keys(backup.patients).forEach(n => localStorage.setItem(`tacrolimusDashboard_${n.toLowerCase()}`, JSON.stringify(backup.patients[n])));
+                    let list = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+                    Object.keys(backup.patients).forEach(n => { if (!list.map(p => p.toLowerCase()).includes(n.toLowerCase())) list.push(n); });
+                    localStorage.setItem('tacrolimusPatientList', JSON.stringify(list));
+                    populatePatientList(); showAlert('Restored', 'success'); closeSettingsModal();
+                } catch { showAlert('Invalid backup file', 'error'); }
+            };
+            reader.readAsText(file);
+        }
+
+        function deleteAllStoredData() {
+            if (!confirm('⚠️ Permanently delete ALL patient data?')) return;
+            const list = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+            list.forEach(n => localStorage.removeItem(`tacrolimusDashboard_${n.toLowerCase()}`));
+            localStorage.removeItem('tacrolimusPatientList');
+            clearAllData(true); populatePatientList(); showAlert('All data deleted', 'success'); closeSettingsModal();
+        }
+
+        function exportPatientDataToCSV() {
+            const name = document.getElementById('patient-name').value.trim();
+            if (!name) { showAlert('Load a patient first', 'error'); return; }
+            let csv = 'Patient,TransplantDate,TransplantType,Weight_kg,HCT_pct,Genotype,MPA\n';
+            csv += `"${name}","${document.getElementById('transplant-date')._flatpickr.input.value}","${document.getElementById('transplant-type').value}",${document.getElementById('weight').value},${document.getElementById('hematocrit').value},"${document.getElementById('genotype').value}","${document.getElementById('mpa').value}"\n\n`;
+            csv += 'DateTime,Dose_mg,Level_ng_mL\n';
+            clinicalData.forEach(r => { csv += `"${r.datetime}",${r.dose !== null ? r.dose : ''},${r.level !== null ? r.level : ''}\n`; });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `${name}_tacrolimus.csv`; a.click(); URL.revokeObjectURL(url);
+        }
+
+        function openSettingsModal() { document.getElementById('settingsModal').classList.add('open'); }
+        function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('open'); }
+
+        // ============================================================
+        // MODAL (Add/Edit Record)
+        // ============================================================
+        function showAddRecordModal(type, editIndex = null) {
+            const modal = document.getElementById('addRecordModal');
+            document.getElementById('recordType').value = type;
+            document.getElementById('editIndex').value = editIndex !== null ? editIndex : '';
+            document.getElementById('dose-input-container').style.display = type === 'dose' ? 'block' : 'none';
+            document.getElementById('level-input-container').style.display = type === 'level' ? 'block' : 'none';
+            document.getElementById('modal-title').textContent = `${editIndex !== null ? 'Edit' : 'Add'} ${type === 'dose' ? 'Dose' : 'Level'}`;
+
+            let defaultDate;
+            if (editIndex !== null) {
+                const r = clinicalData[editIndex];
+                defaultDate = r.datetime;
+                document.getElementById('newDose').value = r.dose || '';
+                document.getElementById('newLevel').value = r.level || '';
+            } else {
+                const last = clinicalData.length > 0 ? dayjs(clinicalData[clinicalData.length - 1].datetime) : dayjs();
+                defaultDate = last.add(1, 'day').hour(7).minute(0).toDate();
+                document.getElementById('newDose').value = '';
+                document.getElementById('newLevel').value = '';
+            }
+            const fp = document.getElementById('newDateTime')._flatpickr;
+            if (fp) { fp.destroy(); }
+            flatpickr("#newDateTime", { enableTime: true, altInput: true, altFormat: "d-M-y H:i", dateFormat: "Y-m-d H:i", defaultDate });
+            modal.classList.add('open');
+        }
+
+        function hideAddRecordModal() { document.getElementById('addRecordModal').classList.remove('open'); }
+
+        function saveRecord() {
+            const datetimeStr = document.getElementById('newDateTime').value;
+            const dose = document.getElementById('newDose').value;
+            const level = document.getElementById('newLevel').value;
+            const indexStr = document.getElementById('editIndex').value;
+            const type = document.getElementById('recordType').value;
+            if (!datetimeStr) { showAlert('Enter a valid date/time', 'error'); return; }
+            const datetime = dayjs(datetimeStr).format("YYYY-MM-DD HH:mm");
+            const txDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value);
+            if (!txDate.isValid()) { showAlert('Set transplant date first', 'error'); return; }
+            if (dayjs(datetime).isBefore(txDate.startOf('day'))) { showAlert('Record cannot be before transplant date', 'error'); return; }
+
+            if (indexStr !== '') {
+                const idx = parseInt(indexStr);
+                clinicalData[idx].datetime = datetime;
+                if (type === 'dose') clinicalData[idx].dose = dose ? parseFloat(dose) : null;
+                if (type === 'level') clinicalData[idx].level = level ? parseFloat(level) : null;
+            } else {
+                const existing = clinicalData.find(r => r.datetime === datetime);
+                if (existing) {
+                    if (type === 'dose') existing.dose = dose ? parseFloat(dose) : null;
+                    if (type === 'level') existing.level = level ? parseFloat(level) : null;
+                } else {
+                    clinicalData.push({
+                        datetime,
+                        dose: type === 'dose' ? (dose ? parseFloat(dose) : null) : null,
+                        level: type === 'level' ? (level ? parseFloat(level) : null) : null
+                    });
+                }
+            }
+            clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
+            renderDoseLog(); renderLevelLog(); hideAddRecordModal(); savePatientData(); showAlert('Saved', 'success');
+        }
+
+        function deleteRecord(index, type) {
+            if (!confirm(`Delete this ${type}?`)) return;
+            const r = clinicalData[index];
+            if (type === 'dose') r.dose = null;
+            if (type === 'level') r.level = null;
+            if (r.dose === null && r.level === null) clinicalData.splice(index, 1);
+            renderDoseLog(); renderLevelLog(); savePatientData(); showAlert('Deleted', 'success');
+        }
+
+        // ============================================================
+        // DOSE LOG
+        // ============================================================
+        function addDefaultDoseDay() {
+            const txStr = document.getElementById('transplant-date')._flatpickr.input.value;
+            if (!txStr) { showAlert('Set transplant date first', 'error'); return; }
+            let base;
+            const last = clinicalData.length > 0 ? clinicalData[clinicalData.length - 1] : null;
+            if (last) { base = dayjs(last.datetime).startOf('day').add(1, 'day'); }
+            else { base = dayjs(txStr, "YYYY-MM-DD").add(1, 'day'); }
+            const lastDose = [...clinicalData].reverse().find(r => r.dose !== null);
+            const wt = parseFloat(document.getElementById('weight').value) || 60;
+            const doseVal = lastDose ? lastDose.dose : ((wt * 0.15) / 2).toFixed(1);
+            const am = base.hour(7).minute(0).format("YYYY-MM-DD HH:mm");
+            const pm = base.hour(19).minute(0).format("YYYY-MM-DD HH:mm");
+            if (!clinicalData.find(r => r.datetime === am)) clinicalData.push({ datetime: am, dose: parseFloat(doseVal), level: null });
+            if (!clinicalData.find(r => r.datetime === pm)) clinicalData.push({ datetime: pm, dose: parseFloat(doseVal), level: null });
+            clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
+            renderDoseLog(); renderLevelLog(); savePatientData(); showAlert('Dose day added', 'success');
+        }
+
+        function renderDoseLog() {
+            const tbody = document.getElementById('doseLogTable');
+            const rows = clinicalData
+                .map((r, i) => r.dose !== null
+                    ? `<tr>
+                    <td>${dayjs(r.datetime).format('DD-MMM-YY HH:mm')}</td>
+                    <td style="font-family:'DM Mono',monospace;font-weight:500;">${r.dose.toFixed(1)}</td>
+                    <td style="text-align:right">
+                        <button onclick="showAddRecordModal('dose',${i})" style="background:none;border:none;cursor:pointer;color:var(--col-primary);font-size:12.5px;font-family:'Sora',sans-serif;font-weight:600;margin-right:8px;">Edit</button>
+                        <button onclick="deleteRecord(${i},'dose')" style="background:none;border:none;cursor:pointer;color:var(--col-danger);font-size:12.5px;font-family:'Sora',sans-serif;font-weight:600;">Delete</button>
+                    </td>
+                </tr>` : '')
+                .join('');
+            tbody.innerHTML = rows || '<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--col-muted);">No doses logged</td></tr>';
+        }
+
+        function renderLevelLog() {
+            const tbody = document.getElementById('levelLogTable');
+            const txDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value);
+            const rows = clinicalData
+                .map((r, i) => {
+                    if (r.level === null) return '';
+                    const status = getLevelStatus(r.level, dayjs(r.datetime), txDate);
+                    const badgeCls = status.text === 'Target' ? 'badge-success' : status.text === 'High' ? 'badge-danger' : 'badge-warning';
+                    // C/D ratio: sum doses in prior 24h
+                    const rTime = dayjs(r.datetime);
+                    const priorDoses = clinicalData.filter(d => d.dose !== null && dayjs(d.datetime).isBefore(rTime) && dayjs(d.datetime).isAfter(rTime.subtract(24, 'hour')));
+                    const dailyDose = priorDoses.reduce((s, d) => s + d.dose, 0);
+                    const cdRatio = dailyDose > 0 ? (r.level / dailyDose).toFixed(2) : '—';
+                    return `<tr>
+                    <td>${dayjs(r.datetime).format('DD-MMM-YY HH:mm')}</td>
+                    <td style="font-family:'DM Mono',monospace;font-weight:500;">${r.level.toFixed(1)}</td>
+                    <td style="font-family:'DM Mono',monospace;">${cdRatio}</td>
+                    <td><span class="badge ${badgeCls}">${status.text}</span></td>
+                    <td style="text-align:right">
+                        <button onclick="showAddRecordModal('level',${i})" style="background:none;border:none;cursor:pointer;color:var(--col-primary);font-size:12.5px;font-family:'Sora',sans-serif;font-weight:600;margin-right:8px;">Edit</button>
+                        <button onclick="deleteRecord(${i},'level')" style="background:none;border:none;cursor:pointer;color:var(--col-danger);font-size:12.5px;font-family:'Sora',sans-serif;font-weight:600;">Delete</button>
+                    </td>
+                </tr>`;
+                }).join('');
+            tbody.innerHTML = rows || '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--col-muted);">No levels logged</td></tr>';
+        }
+
+        // ============================================================
+        // THERAPEUTIC RANGE (time-since-transplant based)
+        // ============================================================
+        function getTherapeuticRange(date, txDate) {
+            const mo = dayjs(date).diff(dayjs(txDate), 'month', true);
+            if (mo <= 1) return { low: 10, high: 11 };
+            if (mo <= 3) return { low: 7, high: 9 };
+            if (mo <= 6) return { low: 5, high: 7 };
+            return { low: 4, high: 6 };
+        }
+
+        function getLevelStatus(level, date, txDate) {
+            const r = getTherapeuticRange(date, txDate);
+            if (isNaN(level)) return { text: 'N/A' };
+            if (level < r.low) return { text: 'Low' };
+            if (level > r.high) return { text: 'High' };
+            return { text: 'Target' };
+        }
+
+        // ============================================================
+        // PK ENGINE — 1-compartment oral Bateman equation
+        // All parameters are APPARENT (CL/F, V/F)
+        // ============================================================
+        function getPopulationParameters(patientData) {
+            const { weight, genotype, mpa, hct } = patientData;
+            const m = PK_MODEL;
+            const cyp = m.CYP3A5[genotype] || m.CYP3A5['unknown'];
+            const wtCL = Math.pow(weight / m.WT_REF, m.WT_CL);
+            const wtV  = Math.pow(weight / m.WT_REF, m.WT_V);
+            const mpaF = parseInt(mpa) === 1 ? m.MPA_CL : 1.0;
+            const hctF = Math.pow((hct || m.HCT_REF) / m.HCT_REF, m.HCT_CL);
+            return {
+                CL: m.TVCL * cyp * wtCL * mpaF * hctF,
+                V:  m.TVV  * wtV,
+                KA: m.TVKA
+            };
+        }
+
+        function predictSingleDose(timeSinceDose, dose_mg, params) {
+            const { CL, V, KA } = params;
+            if (timeSinceDose <= 0 || V <= 0 || dose_mg <= 0) return 0;
+            const dose_mcg = dose_mg * 1000;  // mg → mcg; concentration in ng/mL = mcg/L
+            const ke = CL / V;
+            if (Math.abs(KA - ke) < 0.001) {
+                // L'Hôpital / special case
+                return (dose_mcg / V) * KA * timeSinceDose * Math.exp(-ke * timeSinceDose);
+            }
+            return (dose_mcg * KA / (V * (KA - ke))) *
+                (Math.exp(-ke * timeSinceDose) - Math.exp(-KA * timeSinceDose));
+        }
+
+        function predictAtTime(t, allDoses, params) {
+            return allDoses.reduce((sum, d) => {
+                if (d.time < t && d.dose > 0) {
+                    return sum + predictSingleDose(t - d.time, d.dose, params);
+                }
+                return sum;
+            }, 0);
+        }
+
+        function generateCurve(times, allDoses, params, bioassay) {
+            return times.map(t => {
+                let c = predictAtTime(t, allDoses, params);
+                c = Math.max(0, c);
+                // CMIA correction applied to predictions to match observed CMIA values
+                // Correction: CMIA = 1.08 × LC-MS/MS + 0.55
+                if (bioassay === 2) c = 1.08 * c + 0.55;
+                return c;
+            });
+        }
+
+        // ============================================================
+        // MAP BAYESIAN ESTIMATION — 2D (ηCL, ηV) with IIV penalty
+        //
+        // FIX over original:
+        //   1. Adjusts BOTH CL and V (was only CL)
+        //   2. Adds omega penalty (true MAP, was just MLE)
+        //   3. Proportional residual error model (weighted)
+        //   4. Two-stage: coarse then fine grid
+        // ============================================================
+        function mapBayesian(popParams, measuredLevels, allDoses, bioassay) {
+            const { OMEGA_CL, OMEGA_V, SIGMA } = PK_MODEL;
+
+            if (measuredLevels.length === 0) {
+                return { ...popParams, etaCL: 0, etaV: 0, rmse: null, mpe: null, mape: null, r2: null, pe: [] };
+            }
+
+            // MAP objective: Σ[(Cobs-Cpred)²/(Cpred×σ)²] + ηCL²/ωCL² + ηV²/ωV²
+            const ofv = (eCL, eV) => {
+                const p = { CL: popParams.CL * Math.exp(eCL), V: popParams.V * Math.exp(eV), KA: popParams.KA };
+                const prior = (eCL * eCL) / OMEGA_CL + (eV * eV) / OMEGA_V;
+                const lik = measuredLevels.reduce((s, obs) => {
+                    const pred = predictAtTime(obs.time, allDoses, p);
+                    const predAdj = bioassay === 2 ? 1.08 * pred + 0.55 : pred;
+                    if (predAdj <= 0.1) return s + 1000;
+                    const w = predAdj * SIGMA;
+                    return s + Math.pow((obs.level - predAdj) / w, 2);
+                }, 0);
+                return prior + lik;
+            };
+
+            // Coarse grid: ηCL ∈ [-2.5, 2.5] step 0.15 | ηV ∈ [-1.5, 1.5] step 0.15
+            let bestCL = 0, bestV = 0, minOFV = Infinity;
+            for (let eCL = -2.5; eCL <= 2.5; eCL += 0.15) {
+                for (let eV = -1.5; eV <= 1.5; eV += 0.15) {
+                    const v = ofv(eCL, eV);
+                    if (v < minOFV) { minOFV = v; bestCL = eCL; bestV = eV; }
+                }
+            }
+
+            // Fine grid: ±0.15 around best at 0.01 resolution
+            for (let eCL = bestCL - 0.15; eCL <= bestCL + 0.15; eCL += 0.01) {
+                for (let eV = bestV - 0.15; eV <= bestV + 0.15; eV += 0.01) {
+                    const v = ofv(eCL, eV);
+                    if (v < minOFV) { minOFV = v; bestCL = eCL; bestV = eV; }
+                }
+            }
+
+            const indParams = { CL: popParams.CL * Math.exp(bestCL), V: popParams.V * Math.exp(bestV), KA: popParams.KA, etaCL: bestCL, etaV: bestV };
+            const metrics = calculateAccuracyMetrics(measuredLevels, allDoses, indParams, bioassay);
+            return { ...indParams, ...metrics };
+        }
+
+        // ============================================================
+        // ACCURACY METRICS
+        // RMSE, MPE (bias), MAPE (imprecision), R²
+        // ============================================================
+        function calculateAccuracyMetrics(measuredLevels, allDoses, params, bioassay) {
+            if (measuredLevels.length === 0) return { rmse: null, mpe: null, mape: null, r2: null, pe: [] };
+            const pe = measuredLevels.map((obs, i) => {
+                const pred = (() => {
+                    const p = predictAtTime(obs.time, allDoses, params);
+                    return bioassay === 2 ? 1.08 * p + 0.55 : p;
+                })();
+                const error = obs.level - pred;
+                const pct = obs.level > 0 ? (error / obs.level) * 100 : 0;
+                return { n: i + 1, time: obs.time, observed: obs.level, predicted: pred, error, pct };
+            });
+            const n = pe.length;
+            const rmse = Math.sqrt(pe.reduce((s, p) => s + p.error * p.error, 0) / n);
+            const mpe = pe.reduce((s, p) => s + p.pct, 0) / n;
+            const mape = pe.reduce((s, p) => s + Math.abs(p.pct), 0) / n;
+            const meanObs = measuredLevels.reduce((s, o) => s + o.level, 0) / n;
+            const ssTot = measuredLevels.reduce((s, o) => s + Math.pow(o.level - meanObs, 2), 0);
+            const ssRes = pe.reduce((s, p) => s + p.error * p.error, 0);
+            const r2 = ssTot > 1e-6 ? Math.max(0, 1 - ssRes / ssTot) : null;
+            return { rmse, mpe, mape, r2, pe };
+        }
+
+        // ============================================================
+        // MONTE CARLO CONFIDENCE INTERVALS
+        // Posterior variance narrows with each new observation — this
+        // is what makes the model "learn" and show narrowing CI bands.
+        //
+        // Posterior variance (diagonal approximation via Fisher information):
+        //   var_post_CL = 1 / (1/OMEGA_CL + n_obs × information_per_obs_CL)
+        // Approximated as: OMEGA_CL / (1 + OMEGA_CL × n / SIGMA²)
+        // ============================================================
+        function monteCarloCI(timePoints, allDoses, indParams, nObs, bioassay, nSamples = 250) {
+            const { OMEGA_CL, OMEGA_V, SIGMA } = PK_MODEL;
+            // Posterior variance — shrinks with more observations
+            const sigma2 = SIGMA * SIGMA;
+            const varPostCL = OMEGA_CL / (1 + OMEGA_CL * nObs / sigma2);
+            const varPostV = OMEGA_V / (1 + OMEGA_V * nObs / sigma2);
+            const sdCL = Math.sqrt(varPostCL);
+            const sdV = Math.sqrt(varPostV);
+
+            const curves = [];
+            for (let s = 0; s < nSamples; s++) {
+                // Box-Muller normal samples
+                const u1 = Math.random() + 1e-10, u2 = Math.random();
+                const z1 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+                const z2 = Math.sqrt(-2 * Math.log(u1)) * Math.sin(2 * Math.PI * u2);
+                const p = { CL: indParams.CL * Math.exp(z1 * sdCL), V: indParams.V * Math.exp(z2 * sdV), KA: indParams.KA };
+                curves.push(generateCurve(timePoints, allDoses, p, bioassay));
+            }
+
+            return timePoints.map((_, i) => {
+                const vals = curves.map(c => c[i]).sort((a, b) => a - b);
+                const lo = Math.floor(0.05 * nSamples), hi = Math.floor(0.95 * nSamples);
+                return { p5: vals[lo], p95: vals[hi] };
+            });
+        }
+
+        // ============================================================
+        // TTR — ROSENDAAL METHOD (correct linear interpolation)
+        // ============================================================
+        function rosendaalFraction(v1, v2, low, high) {
+            // Fraction of interval [0,1] where linearly interpolated value
+            // v(s) = v1 + s*(v2-v1) lies in [low, high]
+            if (Math.abs(v2 - v1) < 1e-10) return (v1 >= low && v1 <= high) ? 1.0 : 0.0;
+            const s_low = (low - v1) / (v2 - v1);
+            const s_high = (high - v1) / (v2 - v1);
+            const sStart = Math.max(0, Math.min(s_low, s_high));
+            const sEnd = Math.min(1, Math.max(s_low, s_high));
+            return Math.max(0, sEnd - sStart);
+        }
+
+        function runTTRCalculation(historyLog, txDate) {
+            const div = document.getElementById('ttr-output');
+            const levels = historyLog.filter(e => e.level !== null && e.level > 0).sort((a, b) => a.time - b.time);
+            if (levels.length < 2) { div.innerHTML = '<p style="color:var(--col-muted);font-size:13px;">Need ≥2 lab results</p>'; return; }
+
+            let totalTTR = 0, totalDuration = 0;
+            for (let i = 0; i < levels.length - 1; i++) {
+                const p1 = levels[i], p2 = levels[i + 1];
+                const dt = p2.time - p1.time;
+                if (dt <= 0) continue;
+                // Use range at midpoint of interval
+                const midDate = p1.recordDate.add(dt / 2, 'hour');
+                const range = getTherapeuticRange(midDate, txDate);
+                totalDuration += dt;
+                totalTTR += rosendaalFraction(p1.level, p2.level, range.low, range.high) * dt;
+            }
+
+            const pct = totalDuration > 0 ? (totalTTR / totalDuration) * 100 : 0;
+            const color = pct >= 70 ? 'var(--col-success)' : pct >= 50 ? 'var(--col-warning)' : 'var(--col-danger)';
+            div.innerHTML = `
+            <div style="text-align:center">
+                <div style="font-family:'DM Mono',monospace;font-size:36px;font-weight:500;color:${color};">${pct.toFixed(1)}%</div>
+                <div style="font-size:11.5px;color:var(--col-muted);margin-top:4px;">Rosendaal method · ${levels.length} observations</div>
+                <div style="margin-top:10px;font-size:12px;color:${color};font-family:'Sora',sans-serif;font-weight:600;">${pct >= 70 ? '✓ Good control' : pct >= 50 ? '⚠ Suboptimal' : '⚠ Poor control'}</div>
+            </div>`;
+        }
+
+        // ============================================================
+        // IPV CALCULATION
+        // ============================================================
+        function runIPV(historyLog) {
+            const div = document.getElementById('ipv-output');
+            const levels = historyLog.filter(e => e.level !== null && e.level > 0).sort((a, b) => a.time - b.time);
+            const doses = historyLog.filter(e => e.dose !== null && e.dose > 0);
+            if (levels.length < 3) { div.innerHTML = '<p style="color:var(--col-muted);font-size:13px;">Need ≥3 measured levels</p>'; return; }
+
+            const cdPairs = levels.map(lev => {
+                const prior24h = doses.filter(d => d.time < lev.time && d.time >= lev.time - 24);
+                const daily = prior24h.reduce((s, d) => s + d.dose, 0);
+                return daily > 0 ? lev.level / daily : null;
+            }).filter(Boolean);
+
+            if (cdPairs.length < 2) { div.innerHTML = '<p style="color:var(--col-muted);font-size:13px;">Insufficient dose data for C/D pairs</p>'; return; }
+
+            const mean = cdPairs.reduce((s, v) => s + v, 0) / cdPairs.length;
+            const sd = Math.sqrt(cdPairs.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / (cdPairs.length - 1));
+            const ipv = (sd / mean) * 100;  // CV% — more statistically robust than MAD
+            const status = mean > 1.5 ? 'Slow Metabolizer' : mean < 0.9 ? 'Fast Metabolizer' : 'Normal Metabolizer';
+            const ipvRisk = ipv > 40 ? ['High', 'var(--col-danger)'] : ipv > 25 ? ['Moderate', 'var(--col-warning)'] : ['Low', 'var(--col-success)'];
+
+            div.innerHTML = `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div style="text-align:center">
+                    <div style="font-size:11px;color:var(--col-muted);font-family:'Sora',sans-serif;font-weight:600;margin-bottom:4px;">IPV (CV%)</div>
+                    <div style="font-family:'DM Mono',monospace;font-size:28px;font-weight:500;color:${ipvRisk[1]};">${ipv.toFixed(1)}%</div>
+                    <div style="font-size:11px;color:${ipvRisk[1]};font-family:'Sora',sans-serif;font-weight:600;">${ipvRisk[0]} variability</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:11px;color:var(--col-muted);font-family:'Sora',sans-serif;font-weight:600;margin-bottom:4px;">Mean C/D Ratio</div>
+                    <div style="font-family:'DM Mono',monospace;font-size:28px;font-weight:500;color:var(--col-primary);">${mean.toFixed(2)}</div>
+                    <div style="font-size:11px;color:var(--col-primary);font-family:'Sora',sans-serif;font-weight:600;">${status}</div>
+                </div>
+            </div>
+            <div style="margin-top:10px;padding:8px;background:#f7f9fc;border-radius:6px;font-size:12px;color:var(--col-muted);">
+                Based on ${cdPairs.length} C/D pairs · IPV >40% associated with ↑rejection risk
+            </div>`;
+        }
+
+        // ============================================================
+        // DOSE EXTRAPOLATION
+        // ============================================================
+        function extrapolateDoses(historyLog, untilDate, txDate) {
+            const logged = historyLog.filter(e => e.dose !== null && e.dose > 0).sort((a, b) => a.time - b.time);
+            if (logged.length === 0) return [];
+            const last = logged[logged.length - 1];
+            const extra = [];
+            let nextTime = last.recordDate.add(12, 'hour');
+            while (nextTime.isBefore(untilDate)) {
+                extra.push({ id: 'ext-' + extra.length, recordDate: nextTime, dose: last.dose, level: null, time: nextTime.diff(txDate, 'hour', true) });
+                nextTime = nextTime.add(12, 'hour');
+            }
+            return extra;
+        }
+
+        // ============================================================
+        // MAIN ANALYSIS ORCHESTRATOR
+        // ============================================================
+        async function runAllAnalyses() {
+            const btn = document.getElementById('run-all-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner">⏳</span> Running MAP Bayesian...';
+            try {
+                const { patientData, historyLog, predictionDate } = gatherData();
+                document.getElementById('output-section').style.display = 'block';
+                runIPV(historyLog);
+                runTTRCalculation(historyLog, patientData.transplantDate);
+                await runForecast(patientData, historyLog, predictionDate);
+            } catch (err) {
+                showAlert(`Error: ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '▶ Run MAP Bayesian Forecast';
+            }
+        }
+
+        function gatherData() {
+            const txDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value);
+            const predDate = dayjs(document.getElementById('prediction-datetime')._flatpickr.input.value, "YYYY-MM-DD HH:mm");
+            if (!txDate.isValid()) throw new Error("Invalid transplant date");
+            if (!predDate.isValid()) throw new Error("Invalid forecast date");
+
+            const patientData = {
+                weight: parseFloat(document.getElementById('weight').value) || 60,
+                hct: parseFloat(document.getElementById('hematocrit').value) || 35,
+                mpa: document.getElementById('mpa').value,
+                bioassay: parseInt(document.getElementById('bioassay').value),
+                genotype: document.getElementById('genotype').value,
+                transplantDate: txDate
+            };
+
+            const historyLog = clinicalData.map((r, i) => {
+                const rd = dayjs(r.datetime);
+                if (rd.isBefore(txDate.startOf('day'))) throw new Error("Record before transplant date");
+                return { id: i, recordDate: rd, dose: r.dose, level: r.level, time: rd.diff(txDate, 'hour', true) };
+            });
+
+            return { patientData, historyLog, predictionDate: predDate };
+        }
+
+        function runForecast(patientData, historyLog, predictionDate) {
+            return new Promise(resolve => setTimeout(() => {
+                try {
+                    const loggedDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
+                    const measuredLevels = historyLog.filter(e => e.level !== null && e.level > 0);
+                    if (loggedDoses.length === 0) throw new Error("No doses logged.");
+
+                    const untilDate = predictionDate.add(14, 'day');
+                    const extraDoses = extrapolateDoses(historyLog, untilDate, patientData.transplantDate);
+                    const allDoses = [...loggedDoses, ...extraDoses];
+
+                    const popParams = getPopulationParameters(patientData);
+                    const indParams = mapBayesian(popParams, measuredLevels, allDoses, patientData.bioassay);
+
+                    lastForecastParams = { individual: indParams, population: popParams, allDoses, patientData };
+
+                    const lastHour = Math.max(
+                        untilDate.diff(patientData.transplantDate, 'hour', true),
+                        ...historyLog.map(e => e.time), 0
+                    );
+                    const timePoints = Array.from({ length: 600 }, (_, i) => (lastHour / 599) * i);
+
+                    const popCurve = generateCurve(timePoints, allDoses, popParams, patientData.bioassay);
+                    const indCurve = generateCurve(timePoints, allDoses, indParams, patientData.bioassay);
+
+                    // Monte Carlo CI — uses nObs to determine posterior variance
+                    const ci = monteCarloCI(timePoints, allDoses, indParams, measuredLevels.length, patientData.bioassay, 300);
+
+                    const predTime = predictionDate.diff(patientData.transplantDate, 'hour', true);
+                    const predicted = generateCurve([predTime], allDoses, indParams, patientData.bioassay)[0];
+
+                    updateChart(timePoints, popCurve, indCurve, ci, measuredLevels, patientData.transplantDate);
+                    updateSummary(predicted, predictionDate, indParams);
+                    updateModelParams(popParams, indParams);
+                    updateAccuracyPanel(indParams, measuredLevels.length);
+
+                    document.getElementById('dose-optimizer-card').style.display = 'block';
+                } catch (err) {
+                    showAlert(`Forecast error: ${err.message}`, 'error');
+                }
+                resolve();
+            }, 100));
+        }
+
+        // ============================================================
+        // UI UPDATES
+        // ============================================================
+        function updateAccuracyPanel(indParams, nObs) {
+            const grid = document.getElementById('accuracy-metrics-grid');
+            const bar = document.getElementById('intel-bar');
+            const label = document.getElementById('intel-label');
+
+            // Intelligence level based on nObs
+            const intelPct = Math.min(100, 10 + nObs * 18);  // 0 obs → 10%, 5 obs → 100%
+            const intelColor = intelPct < 35 ? 'var(--col-warning)' : intelPct < 65 ? '#d97706' : 'var(--col-success)';
+            const intelText = nObs === 0 ? 'Population Estimate' : nObs < 2 ? 'Weakly Individualized' : nObs < 4 ? 'Moderately Individualized' : 'Well Individualized';
+            bar.style.width = intelPct + '%';
+            bar.style.background = intelColor;
+            label.textContent = intelText;
+            label.style.color = intelColor;
+
+            if (nObs === 0 || !indParams.rmse) {
+                grid.innerHTML = `
+                <div class="metric-card" style="grid-column:1/-1;background:var(--col-warning-bg);border-color:#fde68a;">
+                    <div style="font-size:13px;color:var(--col-warning);font-family:'Sora',sans-serif;font-weight:600;">Population estimate — add measured trough levels to personalize</div>
+                    <div style="font-size:12px;color:var(--col-muted);margin-top:6px;">Each level reduces 90% CI width by ~40%</div>
+                </div>`;
+                document.getElementById('pe-table-section').style.display = 'none';
+                return;
+            }
+
+            const rmseColor = indParams.rmse < 1.5 ? 'var(--col-success)' : indParams.rmse < 2.5 ? 'var(--col-warning)' : 'var(--col-danger)';
+            const mpeColor = Math.abs(indParams.mpe) < 10 ? 'var(--col-success)' : Math.abs(indParams.mpe) < 20 ? 'var(--col-warning)' : 'var(--col-danger)';
+            const mapeColor = indParams.mape < 15 ? 'var(--col-success)' : indParams.mape < 25 ? 'var(--col-warning)' : 'var(--col-danger)';
+            const r2Color = !indParams.r2 ? 'var(--col-muted)' : indParams.r2 > 0.8 ? 'var(--col-success)' : indParams.r2 > 0.6 ? 'var(--col-warning)' : 'var(--col-danger)';
+
+            grid.innerHTML = `
+            <div class="metric-card">
+                <div class="metric-label">RMSE</div>
+                <div class="metric-value" style="color:${rmseColor}">${indParams.rmse.toFixed(2)}</div>
+                <div class="metric-sub">ng/mL · target &lt;2.0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">MPE% (Bias)</div>
+                <div class="metric-value" style="color:${mpeColor}">${indParams.mpe > 0 ? '+' : ''}${indParams.mpe.toFixed(1)}%</div>
+                <div class="metric-sub">+over / -under · target ±15%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">MAPE% (Imprecision)</div>
+                <div class="metric-value" style="color:${mapeColor}">${indParams.mape.toFixed(1)}%</div>
+                <div class="metric-sub">target &lt;20%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">R²</div>
+                <div class="metric-value" style="color:${r2Color}">${indParams.r2 !== null ? indParams.r2.toFixed(3) : '—'}</div>
+                <div class="metric-sub">model fit · target &gt;0.80</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Observations</div>
+                <div class="metric-value" style="color:var(--col-primary);">${nObs}</div>
+                <div class="metric-sub">${nObs < 5 ? 'add more for tighter CI' : 'well characterized'}</div>
+            </div>`;
+
+            // PE table
+            if (indParams.pe && indParams.pe.length > 0) {
+                document.getElementById('pe-table-section').style.display = 'block';
+                const rows = indParams.pe.map(p => {
+                    const cls = Math.abs(p.pct) < 15 ? 'pe-good' : Math.abs(p.pct) < 25 ? 'pe-ok' : 'pe-bad';
+                    const quality = Math.abs(p.pct) < 15 ? '✓ Good' : Math.abs(p.pct) < 25 ? '⚠ Acceptable' : '✗ Poor';
+                    return `<tr>
+                    <td style="font-weight:600;">#${p.n}</td>
+                    <td style="font-family:'DM Mono',monospace;">${p.time.toFixed(1)}</td>
+                    <td style="font-family:'DM Mono',monospace;">${p.observed.toFixed(1)}</td>
+                    <td style="font-family:'DM Mono',monospace;">${p.predicted.toFixed(1)}</td>
+                    <td style="font-family:'DM Mono',monospace;">${p.error > 0 ? '+' : ''}${p.error.toFixed(2)}</td>
+                    <td class="${cls}" style="font-family:'DM Mono',monospace;">${p.pct > 0 ? '+' : ''}${p.pct.toFixed(1)}%</td>
+                    <td><span class="badge ${Math.abs(p.pct) < 15 ? 'badge-success' : Math.abs(p.pct) < 25 ? 'badge-warning' : 'badge-danger'}">${quality}</span></td>
+                </tr>`;
+                }).join('');
+                document.getElementById('pe-table-body').innerHTML = rows;
+            }
+        }
+
+        function updateModelParams(popParams, indParams) {
+            const div = document.getElementById('model-params-output');
+            const pctCL = (indParams.CL / popParams.CL - 1) * 100;
+            const pctV  = (indParams.V  / popParams.V  - 1) * 100;
+            const clColor = Math.abs(pctCL) > 25 ? 'var(--col-warning)' : 'var(--col-success)';
+            const vColor  = Math.abs(pctV)  > 25 ? 'var(--col-warning)' : 'var(--col-success)';
+            const t12_CL = (Math.log(2) * indParams.V / indParams.CL).toFixed(1);
+            const ke_str = (indParams.CL / indParams.V).toFixed(3);
+            div.innerHTML = `
+            <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:11.5px;color:var(--col-muted);font-family:'Sora',sans-serif;font-weight:600;margin-bottom:4px;">
+                    <span>PARAM</span><span>POPULATION</span><span>INDIVIDUAL</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:8px;background:#f7f9fc;border-radius:6px;">
+                    <span style="font-weight:600;">CL/F</span>
+                    <span style="font-family:'DM Mono',monospace;">${popParams.CL.toFixed(1)} L/hr</span>
+                    <span style="font-family:'DM Mono',monospace;color:${clColor};">${indParams.CL.toFixed(1)} L/hr <span style="font-size:11px;">(${pctCL > 0 ? '+' : ''}${pctCL.toFixed(1)}%)</span></span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:8px;background:#f7f9fc;border-radius:6px;">
+                    <span style="font-weight:600;">V/F</span>
+                    <span style="font-family:'DM Mono',monospace;">${popParams.V.toFixed(0)} L</span>
+                    <span style="font-family:'DM Mono',monospace;color:${vColor};">${indParams.V.toFixed(0)} L <span style="font-size:11px;">(${pctV > 0 ? '+' : ''}${pctV.toFixed(1)}%)</span></span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:8px;background:#f7f9fc;border-radius:6px;">
+                    <span style="font-weight:600;">KA</span>
+                    <span style="font-family:'DM Mono',monospace;">${popParams.KA.toFixed(2)} hr⁻¹</span>
+                    <span style="font-family:'DM Mono',monospace;">${indParams.KA.toFixed(2)} hr⁻¹</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
+                    <div style="padding:8px;background:var(--col-primary-light);border-radius:6px;text-align:center;">
+                        <div style="font-size:11px;color:var(--col-muted);font-family:'Sora',sans-serif;font-weight:600;">t½ (elimination)</div>
+                        <div style="font-family:'DM Mono',monospace;font-weight:500;color:var(--col-primary);">${t12_CL} hr</div>
+                    </div>
+                    <div style="padding:8px;background:var(--col-primary-light);border-radius:6px;text-align:center;">
+                        <div style="font-size:11px;color:var(--col-muted);font-family:'Sora',sans-serif;font-weight:600;">ke</div>
+                        <div style="font-family:'DM Mono',monospace;font-weight:500;color:var(--col-primary);">${ke_str} hr⁻¹</div>
+                    </div>
+                </div>
+                ${indParams.rmse !== null ? `
+                <div style="padding:8px;background:${indParams.rmse < 2 ? 'var(--col-success-bg)' : 'var(--col-warning-bg)'};border-radius:6px;text-align:center;border:1px solid ${indParams.rmse < 2 ? '#a7f3d0' : '#fde68a'};">
+                    <div style="font-size:11px;font-family:'Sora',sans-serif;font-weight:600;color:${indParams.rmse < 2 ? 'var(--col-success)' : 'var(--col-warning)'};">
+                        ${indParams.rmse < 2 ? '✓ Good model fit' : '⚠ Check dose timings'} · RMSE ${indParams.rmse.toFixed(2)} ng/mL
+                    </div>
+                </div>` : ''}
+            </div>`;
+        }
+
+        function updateSummary(predicted, predDate, indParams) {
+            const div = document.getElementById('results-summary');
+            const ci90_half = indParams.rmse ? (indParams.rmse * 1.645).toFixed(1) : '?';
+            div.innerHTML = `
+            Predicted trough at <strong>${predDate.format('DD-MMM-YY HH:mm')}</strong>:
+            <span style="font-family:'DM Mono',monospace;font-size:32px;font-weight:500;color:var(--col-primary);"> ${predicted.toFixed(1)}</span>
+            <span style="font-size:18px;color:var(--col-muted);"> ng/mL</span>
+            ${indParams.rmse ? `<div style="font-size:12px;color:var(--col-muted);margin-top:6px;">Approx. 90% CI: ${Math.max(0, predicted - 1.645 * indParams.rmse).toFixed(1)} – ${(predicted + 1.645 * indParams.rmse).toFixed(1)} ng/mL</div>` : ''}`;
+            div.style.display = 'block';
+        }
+
+        function updateChart(timePoints, popCurve, indCurve, ci, measuredLevels, txDate) {
+            const ctx = document.getElementById('concentration-chart').getContext('2d');
+
+            const datasets = [
+                // 90% CI band (lower)
+                {
+                    label: '90% CI Lower',
+                    data: ci.map((c, i) => ({ x: timePoints[i], y: c.p5 })),
+                    borderColor: 'transparent',
+                    backgroundColor: 'rgba(19,84,211,0.08)',
+                    pointRadius: 0, fill: '+1', tension: 0.4, borderWidth: 0,
+                    order: 4
+                },
+                // 90% CI band (upper)
+                {
+                    label: '90% CI Upper',
+                    data: ci.map((c, i) => ({ x: timePoints[i], y: c.p95 })),
+                    borderColor: 'rgba(19,84,211,0.15)',
+                    backgroundColor: 'rgba(19,84,211,0.08)',
+                    pointRadius: 0, fill: '-1', tension: 0.4, borderWidth: 1,
+                    borderDash: [2, 4], order: 3
+                },
+                // Population
+                {
+                    label: 'Population Prediction',
+                    data: popCurve.map((y, i) => ({ x: timePoints[i], y })),
+                    borderColor: 'rgba(156,163,175,0.55)',
+                    borderWidth: 1.5, pointRadius: 0, tension: 0.4,
+                    borderDash: [6, 4], fill: false, order: 2
+                },
+                // Individual
+                {
+                    label: 'Individualized Forecast',
+                    data: indCurve.map((y, i) => ({ x: timePoints[i], y })),
+                    borderColor: 'rgb(19,84,211)',
+                    borderWidth: 2.5, pointRadius: 0, tension: 0.4,
+                    fill: false, order: 1
+                }
+            ];
+
+            if (measuredLevels.length > 0) {
+                datasets.push({
+                    label: 'Measured Levels',
+                    data: measuredLevels.map(l => ({ x: l.time, y: l.level })),
+                    backgroundColor: 'rgb(220,38,38)', borderColor: '#fff',
+                    borderWidth: 2, pointRadius: 7, pointHoverRadius: 9,
+                    showLine: false, type: 'scatter', order: 0
+                });
+            }
+
+            if (myChart) myChart.destroy();
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear', position: 'bottom',
+                            title: { display: true, text: 'Hours Post-Transplant', font: { family: 'Sora', size: 12 } },
+                            grid: { color: 'rgba(0,0,0,0.04)' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Tacrolimus (ng/mL)', font: { family: 'Sora', size: 12 } },
+                            min: 0,
+                            grid: { color: 'rgba(0,0,0,0.04)' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: { family: 'Sora', size: 11 }, padding: 16,
+                                filter: item => !['90% CI Lower', '90% CI Upper'].includes(item.text)
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: ctx => {
+                                    const h = ctx[0].parsed.x.toFixed(1);
+                                    return `Hour ${h} · ${txDate.add(h, 'hour').format('DD-MMM HH:mm')}`;
+                                }
+                            }
+                        }
+                    },
+                    interaction: { intersect: false, mode: 'index' }
+                },
+                plugins: [{
+                    id: 'targetRange',
+                    afterDatasetsDraw: chart => {
+                        const { ctx, chartArea: { left, right }, scales: { x, y } } = chart;
+                        ctx.save();
+                        let lastKey = '', ranges = [];
+                        timePoints.forEach(h => {
+                            const r = getTherapeuticRange(txDate.add(h, 'hour'), txDate);
+                            const k = `${r.low}-${r.high}`;
+                            if (k !== lastKey) { ranges.push({ h, r }); lastKey = k; }
+                        });
+                        ranges.forEach((seg, i) => {
+                            const x1 = Math.max(x.getPixelForValue(seg.h), left);
+                            const x2 = Math.min(i + 1 < ranges.length ? x.getPixelForValue(ranges[i + 1].h) : right, right);
+                            const yT = y.getPixelForValue(seg.r.high);
+                            const yB = y.getPixelForValue(seg.r.low);
+                            ctx.fillStyle = 'rgba(253,224,71,0.18)';
+                            ctx.fillRect(x1, yT, x2 - x1, yB - yT);
+                            ctx.strokeStyle = 'rgba(202,138,4,0.3)';
+                            ctx.lineWidth = 1;
+                            ctx.setLineDash([4, 4]);
+                            ctx.strokeRect(x1, yT, x2 - x1, yB - yT);
+                            ctx.setLineDash([]);
+                        });
+                        ctx.restore();
+                    }
+                }]
+            });
+        }
+
+        // ============================================================
+        // DOSE OPTIMIZER
+        // ============================================================
+        function runDoseOptimizer() {
+            const div = document.getElementById('optimizer-output');
+            if (!lastForecastParams.individual) { showAlert('Run forecast first', 'error'); return; }
+
+            const target = parseFloat(document.getElementById('target-trough-input').value);
+            const tgtDate = dayjs(document.getElementById('target-date-input')._flatpickr.input.value, "YYYY-MM-DD HH:mm");
+            if (isNaN(target) || !tgtDate.isValid()) { showAlert('Enter valid target and date', 'error'); return; }
+
+            const { individual: ind, allDoses, patientData } = lastForecastParams;
+            const logged = allDoses.filter(d => d.dose !== null && !String(d.id).startsWith('ext'));
+            if (logged.length === 0) { showAlert('No logged doses', 'error'); return; }
+            const last = logged[logged.length - 1];
+
+            const doses = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0];
+            const results = doses.map(d => {
+                const sim = [];
+                let t = last.recordDate.add(12, 'hour');
+                while (t.isBefore(tgtDate.add(1, 'hour'))) {
+                    sim.push({ recordDate: t, dose: d, level: null, time: t.diff(patientData.transplantDate, 'hour', true) });
+                    t = t.add(12, 'hour');
+                }
+                const full = [...logged, ...sim];
+                const trough = generateCurve([tgtDate.diff(patientData.transplantDate, 'hour', true)], full, ind, patientData.bioassay)[0];
+                return { d, trough, diff: Math.abs(trough - target) };
+            });
+
+            results.sort((a, b) => a.d - b.d);
+            const best = results.reduce((m, r) => r.diff < m.diff ? r : m, results[0]);
+
+            let html = '<div style="overflow-x:auto;"><table><thead><tr><th>Dose BID (mg)</th><th>Predicted Trough</th><th>vs Target</th><th></th></tr></thead><tbody>';
+            results.forEach(r => {
+                const diff = r.trough - target;
+                const isBest = r.d === best.d;
+                const close = Math.abs(diff) < 0.5;
+                html += `<tr style="${isBest ? 'background:var(--col-success-bg);' : ''}">
+                <td style="font-family:'DM Mono',monospace;font-weight:${isBest ? '700' : '400'};">${r.d.toFixed(1)} mg</td>
+                <td style="font-family:'DM Mono',monospace;">${r.trough.toFixed(1)} ng/mL</td>
+                <td style="font-family:'DM Mono',monospace;color:${diff > 0 ? '#b45309' : '#dc2626'};">${diff > 0 ? '+' : ''}${diff.toFixed(1)}</td>
+                <td>${isBest ? '<span class="badge badge-success">★ Recommended</span>' : (close ? '<span class="badge badge-info">Near target</span>' : '')}</td>
             </tr>`;
-    });
-            
-    tableHtml += `</tbody></table></div>
-        <div class="text-sm text-center mt-3 italic text-gray-600">
-            Note: This simulation starts from your <span class="font-medium">last logged dose</span> and assumes BID dosing.
-        </div>`;
-    outputDiv.innerHTML = tableHtml;
-}
+            });
+            html += '</tbody></table></div><p style="font-size:11.5px;color:var(--col-muted);margin-top:10px;text-align:center;">Assumes BID dosing from last logged dose · Individual PK parameters used</p>';
+            div.innerHTML = html;
+        }
 
+        // ============================================================
+        // QUICK HCT ADJUSTMENT (saturable Bmax/Kd RBC binding model)
+        // ============================================================
+        function runQuickHctAdjustment() {
+            const out = document.getElementById('quick-hct-output');
+            const Cwb = parseFloat(document.getElementById('quick-hct-level').value);
+            const hct = parseFloat(document.getElementById('quick-hct-initial').value);
+            if (isNaN(Cwb) || isNaN(hct) || Cwb <= 0 || hct <= 0 || hct >= 100) { out.textContent = '--'; return; }
+            const { HCT_BMAX: Bmax, HCT_KD: Kd } = PK_MODEL;
+            const toPlasma = (cwb, f) => {
+                const a = 1 - f, b = Kd - cwb - f * Kd + f * Bmax, c = -cwb * Kd;
+                return (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+            };
+            const toWB = (cp, f) => cp * (1 - f) + f * (Bmax * cp) / (Kd + cp);
+            const cp = toPlasma(Cwb, hct / 100);
+            out.textContent = toWB(cp, 0.35).toFixed(1);
+        }
 
-</script>
-
+    </script>
 </body>
 </html>
-
-
