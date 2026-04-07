@@ -1519,16 +1519,40 @@
         }
 
         // ============================================================
-        // DOSE EXTRAPOLATION
+        // DOSE INTERPOLATION & EXTRAPOLATION
         // ============================================================
-        function extrapolateDoses(historyLog, untilDate, txDate) {
+        function fillHistoricalGaps(historyLog, txDate) {
+            const filled = [];
             const logged = historyLog.filter(e => e.dose !== null && e.dose > 0).sort((a, b) => a.time - b.time);
             if (logged.length === 0) return [];
-            const last = logged[logged.length - 1];
+            
+            for (let i = 0; i < logged.length; i++) {
+                filled.push(logged[i]);
+                if (i === logged.length - 1) break;
+                
+                let nextTime = logged[i].recordDate.add(12, 'hour');
+                // Fill 12-hour steps until we hit the next logged dose (with a 4hr buffer to avoid overlapping)
+                while (nextTime.isBefore(logged[i+1].recordDate.subtract(4, 'hour'))) {
+                    const isAm = nextTime.hour() < 12;
+                    const priorSameShift = [...filled].reverse().find(d => (d.recordDate.hour() < 12) === isAm);
+                    const doseToGive = priorSameShift ? priorSameShift.dose : logged[i].dose;
+                    filled.push({ id: 'inter-' + i + '-' + nextTime.valueOf(), recordDate: nextTime, dose: doseToGive, level: null, time: nextTime.diff(txDate, 'hour', true) });
+                    nextTime = nextTime.add(12, 'hour');
+                }
+            }
+            return filled;
+        }
+
+        function extrapolateDoses(filledHistory, untilDate, txDate) {
+            if (filledHistory.length === 0) return [];
+            const last = filledHistory[filledHistory.length - 1];
             const extra = [];
             let nextTime = last.recordDate.add(12, 'hour');
             while (nextTime.isBefore(untilDate)) {
-                extra.push({ id: 'ext-' + extra.length, recordDate: nextTime, dose: last.dose, level: null, time: nextTime.diff(txDate, 'hour', true) });
+                const isAm = nextTime.hour() < 12;
+                const priorSameShift = [...filledHistory].reverse().find(d => (d.recordDate.hour() < 12) === isAm);
+                const doseToGive = priorSameShift ? priorSameShift.dose : last.dose;
+                extra.push({ id: 'ext-' + extra.length, recordDate: nextTime, dose: doseToGive, level: null, time: nextTime.diff(txDate, 'hour', true) });
                 nextTime = nextTime.add(12, 'hour');
             }
             return extra;
@@ -1582,13 +1606,14 @@
         function runForecast(patientData, historyLog, predictionDate) {
             return new Promise(resolve => setTimeout(() => {
                 try {
-                    const loggedDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
                     const measuredLevels = historyLog.filter(e => e.level !== null && e.level > 0);
-                    if (loggedDoses.length === 0) throw new Error("No doses logged.");
+                    const loggedDosesRaw = historyLog.filter(e => e.dose !== null && e.dose > 0);
+                    if (loggedDosesRaw.length === 0) throw new Error("No doses logged.");
 
+                    const filledHistory = fillHistoricalGaps(historyLog, patientData.transplantDate);
                     const untilDate = predictionDate.add(14, 'day');
-                    const extraDoses = extrapolateDoses(historyLog, untilDate, patientData.transplantDate);
-                    const allDoses = [...loggedDoses, ...extraDoses];
+                    const extraDoses = extrapolateDoses(filledHistory, untilDate, patientData.transplantDate);
+                    const allDoses = [...filledHistory, ...extraDoses];
 
                     const popParams = getPopulationParameters(patientData);
                     const indParams = mapBayesian(popParams, measuredLevels, allDoses, patientData.bioassay);
