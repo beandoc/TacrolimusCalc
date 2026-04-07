@@ -1183,13 +1183,24 @@
             else { base = dayjs(txStr, "YYYY-MM-DD").add(1, 'day'); }
             const lastDose = [...clinicalData].reverse().find(r => r.dose !== null);
             const wt = parseFloat(document.getElementById('weight').value) || 60;
-            const doseVal = lastDose ? lastDose.dose : ((wt * 0.15) / 2).toFixed(1);
+            // Initial dose: 0.15 mg/kg/day ÷ 2 = each BID dose, rounded to nearest 0.5mg
+            const rawDose = lastDose ? lastDose.dose : Math.round((wt * 0.15 / 2) * 2) / 2;
+            const doseVal = rawDose;
             const am = base.hour(7).minute(0).format("YYYY-MM-DD HH:mm");
             const pm = base.hour(19).minute(0).format("YYYY-MM-DD HH:mm");
             if (!clinicalData.find(r => r.datetime === am)) clinicalData.push({ datetime: am, dose: parseFloat(doseVal), level: null });
             if (!clinicalData.find(r => r.datetime === pm)) clinicalData.push({ datetime: pm, dose: parseFloat(doseVal), level: null });
             clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
-            renderDoseLog(); renderLevelLog(); savePatientData(); showAlert('Dose day added', 'success');
+
+            // Auto-suggest: next trough = Day 4 after this dose at 07:00 AM (clinical standard)
+            const nextLevelDate = base.add(4, 'day').hour(7).minute(0);
+            const predFP = document.getElementById('prediction-datetime')._flatpickr;
+            const tgtFP  = document.getElementById('target-date-input')._flatpickr;
+            if (predFP) predFP.setDate(nextLevelDate.toDate(), true);
+            if (tgtFP)  tgtFP.setDate(nextLevelDate.toDate(), true);
+
+            renderDoseLog(); renderLevelLog(); savePatientData();
+            showAlert(`Dose day added (${doseVal.toFixed(1)} mg BID). Next trough suggested: ${nextLevelDate.format('DD-MMM-YY HH:mm')} (Day 4)`, 'success');
         }
 
         function renderDoseLog() {
