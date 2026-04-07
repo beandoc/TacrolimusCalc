@@ -1181,15 +1181,21 @@
             const last = clinicalData.length > 0 ? clinicalData[clinicalData.length - 1] : null;
             if (last) { base = dayjs(last.datetime).startOf('day').add(1, 'day'); }
             else { base = dayjs(txStr, "YYYY-MM-DD").add(1, 'day'); }
-            const lastDose = [...clinicalData].reverse().find(r => r.dose !== null);
+            
             const wt = parseFloat(document.getElementById('weight').value) || 60;
-            // Initial dose: 0.15 mg/kg/day ÷ 2 = each BID dose, rounded to nearest 0.5mg
-            const rawDose = lastDose ? lastDose.dose : Math.round((wt * 0.15 / 2) * 2) / 2;
-            const doseVal = rawDose;
+            const defaultInitDose = Math.round((wt * 0.15 / 2) * 2) / 2;
+            
+            const reversedDoses = [...clinicalData].reverse().filter(r => r.dose !== null);
+            const lastAM = reversedDoses.find(r => dayjs(r.datetime).hour() < 12);
+            const lastPM = reversedDoses.find(r => dayjs(r.datetime).hour() >= 12);
+            
+            const doseAM = lastAM ? lastAM.dose : (reversedDoses.length > 0 ? reversedDoses[0].dose : defaultInitDose);
+            const dosePM = lastPM ? lastPM.dose : (reversedDoses.length > 0 ? reversedDoses[0].dose : defaultInitDose);
+
             const am = base.hour(7).minute(0).format("YYYY-MM-DD HH:mm");
             const pm = base.hour(19).minute(0).format("YYYY-MM-DD HH:mm");
-            if (!clinicalData.find(r => r.datetime === am)) clinicalData.push({ datetime: am, dose: parseFloat(doseVal), level: null });
-            if (!clinicalData.find(r => r.datetime === pm)) clinicalData.push({ datetime: pm, dose: parseFloat(doseVal), level: null });
+            if (!clinicalData.find(r => r.datetime === am)) clinicalData.push({ datetime: am, dose: doseAM, level: null });
+            if (!clinicalData.find(r => r.datetime === pm)) clinicalData.push({ datetime: pm, dose: dosePM, level: null });
             clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
 
             // Auto-suggest: next trough = Day 4 after this dose at 07:00 AM (clinical standard)
@@ -1200,7 +1206,7 @@
             if (tgtFP)  tgtFP.setDate(nextLevelDate.toDate(), true);
 
             renderDoseLog(); renderLevelLog(); savePatientData();
-            showAlert(`Dose day added (${doseVal.toFixed(1)} mg BID). Next trough suggested: ${nextLevelDate.format('DD-MMM-YY HH:mm')} (Day 4)`, 'success');
+            showAlert(`Dose day added (AM: ${doseAM.toFixed(1)}, PM: ${dosePM.toFixed(1)}). Next trough suggested: Day 4`, 'success');
         }
 
         function renderDoseLog() {
@@ -1888,35 +1894,47 @@
             if (logged.length === 0) { showAlert('No logged doses', 'error'); return; }
             const last = logged[logged.length - 1];
 
-            const doses = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0];
-            const results = doses.map(d => {
+            // Simulate total daily doses from 1.0 to 18.0 in 0.5mg steps
+            const dailyDoses = Array.from({length: 35}, (_, i) => 1.0 + (i * 0.5));
+            const results = dailyDoses.map(tdd => {
+                // For asymmetric dosing (e.g. 9.5mg total), favor larger dose in the morning: AM=5.0, PM=4.5
+                const amDose = Math.ceil(tdd) / 2;
+                const pmDose = tdd - amDose;
+
                 const sim = [];
                 let t = last.recordDate.add(12, 'hour');
                 while (t.isBefore(tgtDate.add(1, 'hour'))) {
-                    sim.push({ recordDate: t, dose: d, level: null, time: t.diff(patientData.transplantDate, 'hour', true) });
+                    const isAm = t.hour() < 12;
+                    sim.push({ recordDate: t, dose: isAm ? amDose : pmDose, level: null, time: t.diff(patientData.transplantDate, 'hour', true) });
                     t = t.add(12, 'hour');
                 }
                 const full = [...logged, ...sim];
                 const trough = generateCurve([tgtDate.diff(patientData.transplantDate, 'hour', true)], full, ind, patientData.bioassay)[0];
-                return { d, trough, diff: Math.abs(trough - target) };
+                return { tdd, amDose, pmDose, trough, diff: Math.abs(trough - target) };
             });
 
-            results.sort((a, b) => a.d - b.d);
+            results.sort((a, b) => a.tdd - b.tdd);
             const best = results.reduce((m, r) => r.diff < m.diff ? r : m, results[0]);
 
-            let html = '<div style="overflow-x:auto;"><table><thead><tr><th>Dose BID (mg)</th><th>Predicted Trough</th><th>vs Target</th><th></th></tr></thead><tbody>';
-            results.forEach(r => {
+            let html = '<div style="overflow-x:auto;"><table><thead><tr><th>Dose Regimen</th><th>Predicted Trough</th><th>vs Target</th><th></th></tr></thead><tbody>';
+            
+            // Only show regimens within a reasonable clinical window to avoid clutter
+            const visibleResults = results.filter(r => Math.abs(r.trough - target) <= 3.5 || r.tdd === best.tdd);
+            
+            visibleResults.forEach(r => {
                 const diff = r.trough - target;
-                const isBest = r.d === best.d;
+                const isBest = r.tdd === best.tdd;
                 const close = Math.abs(diff) < 0.5;
-                html += `<tr style="${isBest ? 'background:var(--col-success-bg);' : ''}">
-                <td style="font-family:'DM Mono',monospace;font-weight:${isBest ? '700' : '400'};">${r.d.toFixed(1)} mg</td>
-                <td style="font-family:'DM Mono',monospace;">${r.trough.toFixed(1)} ng/mL</td>
-                <td style="font-family:'DM Mono',monospace;color:${diff > 0 ? '#b45309' : '#dc2626'};">${diff > 0 ? '+' : ''}${diff.toFixed(1)}</td>
+                const rowLabel = (r.amDose === r.pmDose) ? `${r.amDose.toFixed(1)} mg BID` : `<span style="color:#6366f1">AM: ${r.amDose.toFixed(1)}</span> <span style="color:#8b5cf6">PM: ${r.pmDose.toFixed(1)}</span>`;
+                
+                html += `<tr style="${isBest ? 'background:var(--col-success-bg);' : (close ? 'background:#f8fafc;' : '')}">
+                <td style="font-family:'DM Mono',monospace;font-weight:${isBest ? '700' : '500'};font-size:13px;">${rowLabel}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:13px;">${r.trough.toFixed(1)} ng/mL</td>
+                <td style="font-family:'DM Mono',monospace;font-size:13px;color:${diff > 0 ? '#b45309' : '#dc2626'};">${diff > 0 ? '+' : ''}${diff.toFixed(1)}</td>
                 <td>${isBest ? '<span class="badge badge-success">★ Recommended</span>' : (close ? '<span class="badge badge-info">Near target</span>' : '')}</td>
             </tr>`;
             });
-            html += '</tbody></table></div><p style="font-size:11.5px;color:var(--col-muted);margin-top:10px;text-align:center;">Assumes BID dosing from last logged dose · Individual PK parameters used</p>';
+            html += '</tbody></table></div><p style="font-size:11.5px;color:var(--col-muted);margin-top:10px;text-align:center;">Assumes asymmetric dosing with larger fraction assigned to morning (AM) if needed.<br/>Individual PK parameters (Bayesian MAP) used for forecast.</p>';
             div.innerHTML = html;
         }
 
