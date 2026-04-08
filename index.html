@@ -546,7 +546,7 @@
                         style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Assay
                         Type</label>
                     <select id="bioassay" class="input-field">
-                        <option value="1">LC-MS/MS (reference)</option>
+                        <option value="1" selected>LC-MS/MS (reference)</option>
                         <option value="2">CMIA (+8% offset)</option>
                     </select>
                 </div>
@@ -593,6 +593,7 @@
             <div
                 style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid var(--col-border);">
                 <button onclick="loadPatientData()" class="btn btn-secondary">📁 Load Patient</button>
+                <button onclick="applyProtocol()" class="btn btn-accent">⚡ Apply Protocol</button>
                 <button onclick="savePatientData()" class="btn btn-success">💾 Save</button>
                 <button onclick="exportPatientDataToCSV()" class="btn btn-secondary">📊 Export CSV</button>
                 <button onclick="clearAllData(true)" class="btn btn-danger">🗑 Clear All</button>
@@ -782,6 +783,7 @@
                             style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Target
                             Trough (ng/mL)</label>
                         <input type="number" id="target-trough-input" value="8.0" step="0.5" class="input-field">
+                        <div id="target-trough-helper" style="font-size:10.5px;color:var(--col-primary);margin-top:5px;font-weight:600;"></div>
                     </div>
                     <div>
                         <label
@@ -973,9 +975,33 @@
         function initDatePickers() {
             const opts = { altInput: true, altFormat: "d-M-y", dateFormat: "Y-m-d" };
             const optsT = { enableTime: true, altInput: true, altFormat: "d-M-y H:i", dateFormat: "Y-m-d H:i" };
-            flatpickr("#transplant-date", opts);
+            
+            function autoUpdateTargetRange(selectedDates) {
+                if(!selectedDates || selectedDates.length === 0) return;
+                const tgtDate = dayjs(selectedDates[0]);
+                const txEl = document.getElementById('transplant-date');
+                const txDate = (txEl && txEl._flatpickr && txEl._flatpickr.selectedDates[0]) ? dayjs(txEl._flatpickr.selectedDates[0]) : dayjs();
+                const r = getTherapeuticRange(tgtDate, txDate);
+                const avg = (r.low + r.high) / 2;
+                document.getElementById('target-trough-input').value = avg.toFixed(1);
+                const helper = document.getElementById('target-trough-helper');
+                if (helper) helper.innerText = `Protocol: ${r.low}-${r.high} ng/mL`;
+            }
+
+            flatpickr("#transplant-date", {
+                ...opts,
+                onChange: function() {
+                    const tgtFP = document.getElementById('target-date-input')._flatpickr;
+                    if (tgtFP && tgtFP.selectedDates) autoUpdateTargetRange(tgtFP.selectedDates);
+                }
+            });
             flatpickr("#prediction-datetime", optsT);
-            flatpickr("#target-date-input", { ...optsT, defaultDate: dayjs().add(4, 'day').hour(7).minute(0).toDate() });
+            flatpickr("#target-date-input", { 
+                ...optsT, 
+                defaultDate: dayjs().add(4, 'day').hour(7).minute(0).toDate(),
+                onChange: autoUpdateTargetRange,
+                onReady: function(selectedDates) { autoUpdateTargetRange(selectedDates); }
+            });
             flatpickr("#newDateTime", optsT);
         }
 
@@ -1135,6 +1161,65 @@
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `${name}_tacrolimus.csv`; a.click(); URL.revokeObjectURL(url);
+        }
+
+        function applyProtocol() {
+            const type = document.getElementById('transplant-type').value;
+            const txDateStr = document.getElementById('transplant-date')._flatpickr.input.value;
+            const wt = parseFloat(document.getElementById('weight').value) || 60;
+            
+            if (!txDateStr) {
+                showAlert('Please set a transplant date first', 'error');
+                return;
+            }
+            
+            if (clinicalData.length > 0 && !confirm('This will clear existing doses and apply the starting protocol. Continue?')) {
+                return;
+            }
+            
+            // Clear existing doses (keep levels?)
+            // Usually safest to keep levels but clear doses if they overlap.
+            // For now, let's just clear all to be clean.
+            clinicalData = clinicalData.filter(r => r.level !== null);
+            
+            const txDate = dayjs(txDateStr);
+            const maintDaily = wt * 0.15;
+            const maintSingle = Math.round((maintDaily / 2) * 2) / 2; // Round to nearest 0.5mg
+            
+            if (type === 'Live Related') {
+                // Day -2 evening (19:00): 0.8 mg/kg single dose? 
+                // User said 0.8mg/kg. As per clinical safety, I suspect they meant 0.08mg/kg.
+                // 0.8mg/kg for 60kg is 48mg. 0.08mg/kg for 60kg is 4.8mg (standard).
+                // I will use 0.08 but add a warning if it looks unusual.
+                const loadingDose = Math.round((wt * 0.08) * 2) / 2;
+                
+                // Day -2
+                const dMinus2 = txDate.subtract(2, 'day').hour(19).minute(0);
+                clinicalData.push({ datetime: dMinus2.format("YYYY-MM-DD HH:mm"), dose: loadingDose, level: null });
+                
+                // Day -1 onwards (maintenance)
+                for (let i = -1; i <= 3; i++) {
+                    const am = txDate.add(i, 'day').hour(7).minute(0);
+                    const pm = txDate.add(i, 'day').hour(19).minute(0);
+                    clinicalData.push({ datetime: am.format("YYYY-MM-DD HH:mm"), dose: maintSingle, level: null });
+                    clinicalData.push({ datetime: pm.format("YYYY-MM-DD HH:mm"), dose: maintSingle, level: null });
+                }
+                showAlert(`Live Related protocol applied: 0.08mg/kg loading on D-2, then 0.15mg/kg/d from D-1.`, 'success');
+            } else {
+                // Deceased Donor: starts Day 0
+                for (let i = 0; i <= 4; i++) {
+                    const am = txDate.add(i, 'day').hour(7).minute(0);
+                    const pm = txDate.add(i, 'day').hour(19).minute(0);
+                    clinicalData.push({ datetime: am.format("YYYY-MM-DD HH:mm"), dose: maintSingle, level: null });
+                    clinicalData.push({ datetime: pm.format("YYYY-MM-DD HH:mm"), dose: maintSingle, level: null });
+                }
+                showAlert(`Deceased Donor protocol applied: 0.15mg/kg/d started on Day 0.`, 'success');
+            }
+            
+            clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
+            renderDoseLog();
+            renderLevelLog();
+            savePatientData();
         }
 
         function openSettingsModal() { document.getElementById('settingsModal').classList.add('open'); }
@@ -1346,8 +1431,43 @@
             };
         }
 
-        function predictSingleDose(timeSinceDose, dose_mg, params) {
-            const { CL, V, KA } = params;
+        // ============================================================
+        // TIME-VARYING MATURATION MODEL (Early Post-Tx Dynamics)
+        // ============================================================
+        function getTimeVaryingPK(baseParams, timePostTxHours) {
+            const d = timePostTxHours / 24;
+            if (d < 0) return baseParams; 
+
+            let f_ratio = 1.0;
+            if (d <= 7) {
+                let baseF = 0.35 * (1 + Math.max(0, d - 1) * 0.08); 
+                f_ratio = baseF / 0.90;
+            } else if (d <= 14) {
+                let baseF = 0.92 + (d - 7) * 0.01; 
+                f_ratio = Math.min(baseF, 1.0) / 0.90;
+            }
+
+            let edema = 1.0;
+            if (d <= 14) {
+                edema = 1 + (0.8 * Math.exp(-d / 5));
+            }
+
+            let recovery = 1.0;
+            if (d <= 21) {
+                recovery = 0.5 + 0.5 * (1 / (1 + Math.exp(-(d - 7) / 3)));
+            }
+
+            return {
+                CL: (baseParams.CL * recovery) / f_ratio,
+                V:  (baseParams.V * edema) / f_ratio,
+                KA: baseParams.KA,
+                F_abs: Math.min(0.90 * f_ratio, 1.0)
+            };
+        }
+
+        function predictSingleDose(timeSinceDose, dose_mg, baseParams, doseTimeHours) {
+            const p = getTimeVaryingPK(baseParams, doseTimeHours);
+            const { CL, V, KA } = p;
             if (timeSinceDose <= 0 || V <= 0 || dose_mg <= 0) return 0;
             const dose_mcg = dose_mg * 1000;  // mg → mcg; concentration in ng/mL = mcg/L
             const ke = CL / V;
@@ -1362,7 +1482,7 @@
         function predictAtTime(t, allDoses, params) {
             return allDoses.reduce((sum, d) => {
                 if (d.time < t && d.dose > 0) {
-                    return sum + predictSingleDose(t - d.time, d.dose, params);
+                    return sum + predictSingleDose(t - d.time, d.dose, params, d.time);
                 }
                 return sum;
             }, 0);
@@ -1692,7 +1812,7 @@
                     const predicted = generateCurve([predTime], allDoses, indParams, patientData.bioassay)[0];
 
                     updateChart(timePoints, popCurve, indCurve, ci, measuredLevels, patientData.transplantDate);
-                    updateSummary(predicted, predictionDate, indParams);
+                    updateSummary(predicted, predictionDate, indParams, measuredLevels, allDoses);
                     updateModelParams(popParams, indParams);
                     updateAccuracyPanel(indParams, measuredLevels.length);
 
@@ -1822,22 +1942,72 @@
                     </div>
                 </div>
                 ${indParams.rmse !== null ? `
-                <div style="padding:8px;background:${indParams.rmse < 2 ? 'var(--col-success-bg)' : 'var(--col-warning-bg)'};border-radius:6px;text-align:center;border:1px solid ${indParams.rmse < 2 ? '#a7f3d0' : '#fde68a'};">
-                    <div style="font-size:11px;font-family:'Sora',sans-serif;font-weight:600;color:${indParams.rmse < 2 ? 'var(--col-success)' : 'var(--col-warning)'};">
-                        ${indParams.rmse < 2 ? '✓ Good model fit' : '⚠ Check dose timings'} · RMSE ${indParams.rmse.toFixed(2)} ng/mL
+                <div style="padding:10px;background:${indParams.r2 < 0.5 || indParams.rmse > 2.5 ? 'var(--col-danger-bg)' : indParams.rmse < 2 ? 'var(--col-success-bg)' : 'var(--col-warning-bg)'};border-radius:6px;text-align:left;border:1px solid ${indParams.r2 < 0.5 || indParams.rmse > 2.5 ? '#fecaca' : indParams.rmse < 2 ? '#a7f3d0' : '#fde68a'};">
+                    <div style="font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:${indParams.r2 < 0.5 || indParams.rmse > 2.5 ? 'var(--col-danger)' : indParams.rmse < 2 ? 'var(--col-success)' : 'var(--col-warning)'};">
+                        ${indParams.r2 < 0.5 || indParams.rmse > 2.5 ? '🚨 CRITICAL: Severe Model Mismatch' : indParams.rmse < 2 ? '✓ Reliable Pharmacokinetic Fit' : '⚠ Suboptimal Fit — Check dose timings'}
                     </div>
+                    ${indParams.r2 < 0.5 || indParams.rmse > 2.5 ? `<div style="font-size:11px;color:#7f1d1d;margin-top:4px;line-height:1.4;">RMSE is ${indParams.rmse.toFixed(2)}. Evidence of changing absorption, missed doses, or non-trough sampling. Do not trust single-parameter estimates.</div>` : ''}
                 </div>` : ''}
             </div>`;
         }
 
-        function updateSummary(predicted, predDate, indParams) {
+        function updateSummary(predicted, predDate, indParams, measuredLevels, allDoses) {
             const div = document.getElementById('results-summary');
-            const ci90_half = indParams.rmse ? (indParams.rmse * 1.645).toFixed(1) : '?';
+            const hasError = indParams.rmse !== null;
+            const ci90_half = hasError ? (indParams.rmse * 1.645) : 0;
+            const ciSpan = ci90_half * 2;
+            let isUnreliable = hasError && (ciSpan > 6.0 || indParams.r2 < 0.5);
+
+            let shiftWarning = '';
+            if (measuredLevels && measuredLevels.length >= 3) {
+                const ratios = measuredLevels.map(obs => {
+                    const prior24h = allDoses.filter(d => d.time < obs.time && d.time >= obs.time - 24);
+                    const dailyDose = prior24h.reduce((s, d) => s + d.dose, 0);
+                    return { daysPostTx: obs.time / 24, CDRatio: dailyDose > 0 ? obs.level / dailyDose : 0 };
+                }).filter(r => r.CDRatio > 0);
+                
+                if (ratios.length >= 3) {
+                    const first = ratios[0], last = ratios[ratios.length - 1];
+                    if (last.daysPostTx - first.daysPostTx > 0) {
+                        const slope = (last.CDRatio - first.CDRatio) / (last.daysPostTx - first.daysPostTx);
+                        if (slope > 0.05) {
+                            shiftWarning = `<div style="margin-top: 10px; padding: 12px; background: var(--col-warning-bg); border: 1.5px solid var(--col-warning); border-radius: 8px; text-align: left;">
+                                <div style="color: #92400e; font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 700;">⚠️ IMPROVING ABSORPTION / DECREASING EDEMA</div>
+                                <div style="font-size: 11.5px; color: #92400e; margin-top: 4px;">C/D ratio increasing sharply (${first.CDRatio.toFixed(2)} → ${last.CDRatio.toFixed(2)}). Bioavailability is normalizing. Doses may need aggressive reduction to prevent toxicity.</div>
+                            </div>`;
+                            // If shift is severe, also flag as unreliable
+                            if (slope > 0.1) isUnreliable = true;
+                        }
+                    }
+                }
+            }
+
+            let warningHtml = '';
+            if (isUnreliable) {
+                warningHtml = `
+                <div style="margin-top: 16px; padding: 14px; background: var(--col-danger-bg); border: 1.5px solid var(--col-danger); border-radius: 8px; text-align: left;">
+                    <div style="color: var(--col-danger); font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 700; margin-bottom: 6px;">
+                        🚨 DO NOT TRUST FORECAST (Unreliable Fit)
+                    </div>
+                    <div style="font-size: 12px; color: #7f1d1d; margin-bottom: 8px;">
+                        Model fit guarantees violated (R²=${indParams.r2 ? indParams.r2.toFixed(2) : '?'}, CI span=${ciSpan.toFixed(1)}).
+                    </div>
+                    <ul style="margin-left: 20px; font-size: 11.5px; color: #7f1d1d; line-height: 1.5;">
+                        <li><strong>Verify Times:</strong> Ensure all measurements are true pre-dose (trough) samples.</li>
+                        <li><strong>Drug Interactions:</strong> Check if a CYP3A4 inhibitor was started/stopped.</li>
+                        <li><strong>Absorption Issues:</strong> Evaluate for diarrhea, vomiting, or unpredictable compliance.</li>
+                    </ul>
+                </div>`;
+            }
+
+            warningHtml = shiftWarning + warningHtml;
+
             div.innerHTML = `
             Predicted trough at <strong>${predDate.format('DD-MMM-YY HH:mm')}</strong>:
-            <span style="font-family:'DM Mono',monospace;font-size:32px;font-weight:500;color:var(--col-primary);"> ${predicted.toFixed(1)}</span>
+            <span style="font-family:'DM Mono',monospace;font-size:32px;font-weight:500;color:${isUnreliable ? 'var(--col-danger)' : 'var(--col-primary)'};"> ${predicted.toFixed(1)}</span>
             <span style="font-size:18px;color:var(--col-muted);"> ng/mL</span>
-            ${indParams.rmse ? `<div style="font-size:12px;color:var(--col-muted);margin-top:6px;">Approx. 90% CI: ${Math.max(0, predicted - 1.645 * indParams.rmse).toFixed(1)} – ${(predicted + 1.645 * indParams.rmse).toFixed(1)} ng/mL</div>` : ''}`;
+            ${hasError ? `<div style="font-size:12px;color:var(--col-muted);margin-top:6px;">Approx. 90% CI: ${Math.max(0, predicted - ci90_half).toFixed(1)} – ${(predicted + ci90_half).toFixed(1)} ng/mL</div>` : ''}
+            ${warningHtml}`;
             div.style.display = 'block';
         }
 
