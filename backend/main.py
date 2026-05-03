@@ -79,3 +79,25 @@ def create_events(mrn: str, events: List[schemas.ClinicalEventCreate], db: Sessi
 def read_events(mrn: str, db: Session = Depends(get_db)):
     events = db.query(models.ClinicalEvent).filter(models.ClinicalEvent.patient_mrn == mrn).all()
     return events
+
+@app.post("/api/patients/{mrn}/outcomes", response_model=List[schemas.ClinicalOutcome])
+def create_outcomes(mrn: str, outcomes: List[schemas.ClinicalOutcomeCreate], db: Session = Depends(get_db)):
+    db_patient = db.query(models.Patient).filter(models.Patient.mrn == mrn).first()
+    if not db_patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    
+    db.query(models.ClinicalOutcome).filter(models.ClinicalOutcome.patient_mrn == mrn).delete()
+    
+    new_outcomes = []
+    for outcome in outcomes:
+        db_outcome = models.ClinicalOutcome(**outcome.dict(), patient_mrn=mrn)
+        db.add(db_outcome)
+        new_outcomes.append(db_outcome)
+        
+    db.commit()
+    return db.query(models.ClinicalOutcome).filter(models.ClinicalOutcome.patient_mrn == mrn).all()
+
+@app.get("/api/patients/{mrn}/outcomes", response_model=List[schemas.ClinicalOutcome])
+def read_outcomes(mrn: str, db: Session = Depends(get_db)):
+    outcomes = db.query(models.ClinicalOutcome).filter(models.ClinicalOutcome.patient_mrn == mrn).all()
+    return outcomes

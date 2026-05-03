@@ -16,8 +16,13 @@ class Patient(Base):
     albumin = Column(Float, default=3.5)
     bilirubin = Column(Float, default=1.0)
     inhibitor = Column(String, default="none")
+    
+    # ML Foundation: Immunological Risk Baseline
+    hla_mismatch = Column(Integer, nullable=True) # 0-6
+    baseline_pra = Column(Float, nullable=True)   # % PRA
 
     events = relationship("ClinicalEvent", back_populates="patient", cascade="all, delete-orphan")
+    outcomes = relationship("ClinicalOutcome", back_populates="patient", cascade="all, delete-orphan")
 
 class ClinicalEvent(Base):
     __tablename__ = "clinical_events"
@@ -27,5 +32,22 @@ class ClinicalEvent(Base):
     datetime = Column(DateTime, nullable=False)
     dose = Column(Float, nullable=True)
     level = Column(Float, nullable=True)
+    
+    # ML Foundation: Biomarkers
+    creatinine = Column(Float, nullable=True)
+    wbc = Column(Float, nullable=True)
+    crp = Column(Float, nullable=True)
 
     patient = relationship("Patient", back_populates="events")
+
+class ClinicalOutcome(Base):
+    __tablename__ = "clinical_outcomes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_mrn = Column(String, ForeignKey("patients.mrn"))
+    diagnosis_date = Column(DateTime, nullable=False)
+    diagnosis_type = Column(String, nullable=False) # e.g. ACR, AMR, CNI Toxicity, Infection, BKVAN
+    biopsy_proven = Column(Integer, default=0) # 0=Clinical, 1=Biopsy-proven
+    notes = Column(String, nullable=True)
+
+    patient = relationship("Patient", back_populates="outcomes")

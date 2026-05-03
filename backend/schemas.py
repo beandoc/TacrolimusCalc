@@ -6,11 +6,30 @@ class ClinicalEventBase(BaseModel):
     datetime: datetime
     dose: Optional[float] = None
     level: Optional[float] = None
+    creatinine: Optional[float] = None
+    wbc: Optional[float] = None
+    crp: Optional[float] = None
 
 class ClinicalEventCreate(ClinicalEventBase):
     pass
 
 class ClinicalEvent(ClinicalEventBase):
+    id: int
+    patient_mrn: str
+
+    class Config:
+        from_attributes = True
+
+class ClinicalOutcomeBase(BaseModel):
+    diagnosis_date: datetime
+    diagnosis_type: str
+    biopsy_proven: int = 0
+    notes: Optional[str] = None
+
+class ClinicalOutcomeCreate(ClinicalOutcomeBase):
+    pass
+
+class ClinicalOutcome(ClinicalOutcomeBase):
     id: int
     patient_mrn: str
 
@@ -29,12 +48,15 @@ class PatientBase(BaseModel):
     albumin: float = 3.5
     bilirubin: float = 1.0
     inhibitor: str = "none"
+    hla_mismatch: Optional[int] = None
+    baseline_pra: Optional[float] = None
 
 class PatientCreate(PatientBase):
     pass
 
 class Patient(PatientBase):
     events: List[ClinicalEvent] = []
+    outcomes: List[ClinicalOutcome] = []
 
     class Config:
         from_attributes = True
