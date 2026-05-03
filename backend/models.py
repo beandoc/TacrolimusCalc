@@ -8,6 +8,7 @@ class Patient(Base):
     mrn = Column(String, primary_key=True, index=True)
     transplant_date = Column(Date, nullable=False)
     weight = Column(Float, nullable=False)
+    height = Column(Float, nullable=True) # cm (Needed for BSA)
     hematocrit = Column(Float, default=35.0)
     mpa = Column(Integer, default=1)
     bioassay = Column(Integer, default=1)

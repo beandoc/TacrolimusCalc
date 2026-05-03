@@ -40,6 +40,7 @@ class PatientBase(BaseModel):
     mrn: str
     transplant_date: date
     weight: float
+    height: Optional[float] = None
     hematocrit: float = 35.0
     mpa: int = 1
     bioassay: int = 1
