@@ -50,6 +50,17 @@ class PatientBase(BaseModel):
     inhibitor: str = "none"
     hla_mismatch: Optional[int] = None
     baseline_pra: Optional[float] = None
+    
+    # Advanced SOTA Predictors
+    recipient_age: Optional[int] = None
+    recipient_bsa: Optional[float] = None
+    retransplant: int = 0
+    donor_age: Optional[int] = None
+    donor_bsa: Optional[float] = None
+    donor_vasoactive_drugs: int = 0
+    induction_therapy: Optional[str] = None
+    dgf: int = 0
+    cold_ischemia_time: Optional[float] = None
 
 class PatientCreate(PatientBase):
     pass

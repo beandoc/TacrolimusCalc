@@ -20,6 +20,17 @@ class Patient(Base):
     # ML Foundation: Immunological Risk Baseline
     hla_mismatch = Column(Integer, nullable=True) # 0-6
     baseline_pra = Column(Float, nullable=True)   # % PRA
+    
+    # ML Foundation: Advanced SOTA Predictors (XGBoost 30-Day Rejection Model)
+    recipient_age = Column(Integer, nullable=True)
+    recipient_bsa = Column(Float, nullable=True)  # Dubois formula
+    retransplant = Column(Integer, default=0)     # 0=False, 1=True
+    donor_age = Column(Integer, nullable=True)
+    donor_bsa = Column(Float, nullable=True)
+    donor_vasoactive_drugs = Column(Integer, default=0) # 0=False, 1=True
+    induction_therapy = Column(String, nullable=True)   # e.g., Thymoglobulin, Basiliximab
+    dgf = Column(Integer, default=0)              # Delayed Graft Function (0=No, 1=Yes)
+    cold_ischemia_time = Column(Float, nullable=True)   # Hours
 
     events = relationship("ClinicalEvent", back_populates="patient", cascade="all, delete-orphan")
     outcomes = relationship("ClinicalOutcome", back_populates="patient", cascade="all, delete-orphan")
