@@ -819,8 +819,14 @@
                     <div>
                         <label
                             style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Patient
+                            Hb (g/dL)</label>
+                        <input type="number" id="quick-hct-hb" class="input-field" placeholder="e.g. 9.3" step="0.1">
+                    </div>
+                    <div>
+                        <label
+                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Patient
                             HCT (%)</label>
-                        <input type="number" id="quick-hct-initial" class="input-field" placeholder="e.g. 28">
+                        <input type="number" id="quick-hct-initial" class="input-field" placeholder="e.g. 28" step="0.5">
                     </div>
                     <div style="display:flex;align-items:flex-end;">
                         <div
@@ -1015,8 +1021,12 @@
             document.getElementById('run-all-btn').addEventListener('click', runAllAnalyses);
             document.getElementById('run-optimizer-btn').addEventListener('click', runDoseOptimizer);
             document.getElementById('restore-file').addEventListener('change', restoreFromBackup);
-            ['quick-hct-level', 'quick-hct-initial'].forEach(id =>
-                document.getElementById(id).addEventListener('input', runQuickHctAdjustment)
+            ['quick-hct-level', 'quick-hct-initial', 'quick-hct-hb'].forEach(id =>
+                document.getElementById(id).addEventListener('input', (e) => {
+                    if (e.target.id === 'quick-hct-hb') syncHbHct('hb');
+                    if (e.target.id === 'quick-hct-initial') syncHbHct('hct');
+                    runQuickHctAdjustment();
+                })
             );
         }
 
@@ -2693,6 +2703,20 @@
         // this uncertainty to the clinician.
         // ============================================================
         let _lastHctCorrected = null;  // tracks most recent corrected value for 'use' button
+        
+        function syncHbHct(source) {
+            const hbIn = document.getElementById('quick-hct-hb');
+            const hctIn = document.getElementById('quick-hct-initial');
+            if (source === 'hb') {
+                const val = parseFloat(hbIn.value);
+                if (!isNaN(val)) hctIn.value = (val * 3).toFixed(1);
+                else hctIn.value = '';
+            } else {
+                const val = parseFloat(hctIn.value);
+                if (!isNaN(val)) hbIn.value = (val / 3).toFixed(1);
+                else hbIn.value = '';
+            }
+        }
 
         function runQuickHctAdjustment() {
             const out = document.getElementById('quick-hct-output');
