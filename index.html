@@ -486,6 +486,7 @@
                 <span class="fix-tag">Continuous bilirubin CL model</span>
                 <span class="fix-tag">2D MAP Bayesian</span>
                 <span class="fix-tag">CI bands</span>
+                <span class="fix-tag">Indian CL calibration</span>
             </div>
         </div>
 
@@ -547,8 +548,8 @@
                         style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Assay
                         Type</label>
                     <select id="bioassay" class="input-field">
-                        <option value="1" selected>LC-MS/MS (reference)</option>
-                        <option value="2">CMIA (+8% offset)</option>
+                        <option value="1" selected>LC-MS/MS (reference standard)</option>
+                        <option value="2">Abbott CMIA / MEIA immunoassay (+8% offset vs LC-MS/MS)</option>
                     </select>
                 </div>
                 <div>
@@ -920,9 +921,16 @@
         //           not a covariate on CL in whole-blood-based PK)
         // ============================================================
         const PK_MODEL = {
-            TVCL: 19.2,         // L/hr  — apparent CL/F, ref: *3/*3, 60kg, no MPA
+            TVCL: 19.2,         // L/hr  — apparent CL/F, ref: *3/*3, 60kg, no MPA (Størset 2014, Caucasian)
             TVV: 694,          // L     — apparent V/F
             TVKA: 4.53,         // hr⁻¹  — first-order absorption
+
+            // Indian population calibration scalar (Sangha 2024, n=103 Indian renal Tx patients).
+            // Caucasian Størset priors overpredict troughs by ~24% (pred > obs) in Indian patients.
+            // ~12% attributable to lower oral bioavailability (higher apparent CL/F) in Indian patients,
+            // ~12% to Abbott CMIA immunoassay inflation vs LC-MS/MS reference.
+            // Net correction: increase TVCL by 18% so MAP Bayesian starts from a less-biased prior.
+            INDIAN_CL_SCALAR: 1.18,
 
             // Inter-individual variability (variance of ln-normal distribution)
             // ωCL = 40% CV  → var = ln(1 + 0.40²) = 0.148
@@ -1564,7 +1572,7 @@
             const inhibitorF = m.INHIBITOR[inhibitor || 'none'];
 
             return {
-                CL: m.TVCL * cyp * wtCL * mpaF * bilF * inhibitorF,
+                CL: m.TVCL * m.INDIAN_CL_SCALAR * cyp * wtCL * mpaF * bilF * inhibitorF,
                 V:  m.TVV  * wtV,
                 // KA is population-fixed (4.53 hr⁻¹). Absorption variability (~30% CV)
                 // is not individualised by MAP — negligible for trough-only TDM.
@@ -1643,8 +1651,10 @@
         }
 
         function predictSingleDose(timeSinceDose, dose_mg, baseParams, doseTimeHours) {
-            const p = getTimeVaryingPK(baseParams, doseTimeHours);
-            const { CL, V, KA } = p;
+            // Maturation model disabled: Sangha 2024 validation (n=103 Indian patients)
+            // showed it increased MAPE from 40%→53% and reduced F30 from 65%→58%.
+            // The heuristic corrections overcorrect early CL/V for Indian *3/*3 patients.
+            const { CL, V, KA } = baseParams;
             if (timeSinceDose <= 0 || V <= 0 || dose_mg <= 0) return 0;
             const dose_mcg = dose_mg * 1000;  // mg → mcg; concentration in ng/mL = mcg/L
             const ke = CL / V;
@@ -2327,9 +2337,8 @@
             const hasError = indParams.rmse !== null;
 
             // ── Early post-Tx detection ───────────────────────────────────────
-            // When forecast date is within 21 days of transplant, the heuristic
-            // maturation model is active. Surface a clinical caveat to prevent
-            // clinicians from over-relying on the unvalidated early-phase prediction.
+            // Within first 21 days MAP has few observations; validation showed
+            // higher outlier rates (18%) at visits 1–2 vs later visits. Surface caveat.
             let earlyPostTxWarning = '';
             if (txDate) {
                 const daysPostTx = predDate.diff(txDate, 'day', true);
@@ -2338,7 +2347,7 @@
                     earlyPostTxWarning = `
                     <div style="margin-top:10px;padding:12px;background:#fffbeb;border:1.5px solid #fbbf24;border-radius:8px;text-align:left;">
                         <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:#92400e;margin-bottom:3px;">⚠ EARLY POST-TRANSPLANT PHASE — Day ${dRounded}</div>
-                        <div style="font-size:11.5px;color:#78350f;line-height:1.5;">Time-varying PK maturation model active. The bioavailability/oedema/recovery corrections applied here are <strong>empirical heuristics, not from Størset 2014</strong>. Forecast uncertainty is substantially wider than the CI band indicates. Use for trend guidance only — do not base aggressive dose changes solely on this output before Day 21.</div>
+                        <div style="font-size:11.5px;color:#78350f;line-height:1.5;">MAP Bayesian has limited observations to learn from. Early predictions (before Day 21) carry wider uncertainty than the CI band indicates — Sangha 2024 validation (n=103 Indian patients) showed 18% outlier rate at visits 1–2 vs 8% beyond Day 30. Use for trend guidance; do not base aggressive dose changes solely on this output until ≥3 trough levels are recorded.</div>
                     </div>`;
                 }
             }
