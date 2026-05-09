@@ -896,11 +896,103 @@
                 <button onclick="document.getElementById('restore-file').click()" class="btn btn-secondary"
                     style="width:100%;justify-content:center;">📤 Restore from Backup</button>
                 <hr style="border-color:var(--col-border);">
+                <button onclick="runCalibrationReport()" class="btn btn-secondary"
+                    style="width:100%;justify-content:center;">📊 Center Calibration Report</button>
+                <hr style="border-color:var(--col-border);">
                 <button onclick="deleteAllStoredData()" class="btn btn-danger"
                     style="width:100%;justify-content:center;">🗑 Permanently Delete All Data</button>
             </div>
             <div style="text-align:right;"><button onclick="closeSettingsModal()"
                     class="btn btn-secondary">Close</button></div>
+        </div>
+    </div>
+
+    <!-- Center Calibration Report Modal -->
+    <div id="calibrationModal" class="modal-overlay">
+        <div class="modal" style="max-width:720px;width:95vw;max-height:90vh;overflow-y:auto;">
+            <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:18px;margin-bottom:4px;">Center Calibration Report</h3>
+            <p style="font-size:12px;color:var(--col-muted);margin-bottom:20px;">Compares population predictions vs. actual observed levels across all saved patients to detect center-level bias.</p>
+
+            <div id="calib-loading" style="text-align:center;padding:40px 0;display:none;">
+                <span style="font-size:24px;">⏳</span><br>
+                <span style="font-size:14px;color:var(--col-muted);margin-top:8px;display:block;">Analyzing patient cohort...</span>
+            </div>
+
+            <div id="calib-results" style="display:none;">
+                <!-- Status banner -->
+                <div id="calib-status-banner" style="border-radius:8px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px;">
+                    <span id="calib-status-icon" style="font-size:22px;line-height:1;"></span>
+                    <div>
+                        <div id="calib-status-title" style="font-weight:700;font-size:14px;margin-bottom:2px;"></div>
+                        <div id="calib-status-desc" style="font-size:12px;line-height:1.5;"></div>
+                    </div>
+                </div>
+
+                <!-- Cohort summary row -->
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;" id="calib-summary-grid"></div>
+
+                <!-- Population vs Individual accuracy -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                    <div style="background:var(--col-surface);border:1px solid var(--col-border);border-radius:8px;padding:14px;">
+                        <div style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;">Population Prior (before MAP)</div>
+                        <div id="calib-pop-stats"></div>
+                    </div>
+                    <div style="background:var(--col-surface);border:1px solid var(--col-border);border-radius:8px;padding:14px;">
+                        <div style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;">Individualized MAP (after Bayes)</div>
+                        <div id="calib-ind-stats"></div>
+                    </div>
+                </div>
+
+                <!-- Scalar recommendation -->
+                <div id="calib-scalar-box" style="border-radius:8px;padding:14px 16px;margin-bottom:20px;border:1px solid var(--col-border);background:var(--col-surface);">
+                    <div style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">CL Scalar (INDIAN_CL_SCALAR)</div>
+                    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                        <div>
+                            <span style="font-size:11px;color:var(--col-muted);">Current</span><br>
+                            <span id="calib-scalar-current" style="font-size:20px;font-weight:700;font-family:'Sora',sans-serif;"></span>
+                        </div>
+                        <div style="font-size:20px;color:var(--col-muted);">→</div>
+                        <div>
+                            <span style="font-size:11px;color:var(--col-muted);">Suggested</span><br>
+                            <span id="calib-scalar-suggested" style="font-size:20px;font-weight:700;font-family:'Sora',sans-serif;color:var(--col-primary);"></span>
+                        </div>
+                        <div style="margin-left:auto;">
+                            <button id="calib-apply-btn" onclick="applyCalibrationScalar()" class="btn btn-primary" style="font-size:13px;">✓ Apply Suggested Scalar</button>
+                        </div>
+                    </div>
+                    <p style="font-size:11px;color:var(--col-muted);margin-top:8px;margin-bottom:0;">Applying updates the model prior for all future patients. Per-patient MAP individualization is always automatic regardless of this value.</p>
+                </div>
+
+                <!-- Per-patient table -->
+                <div style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">Per-Patient Breakdown</div>
+                <div style="overflow-x:auto;margin-bottom:20px;">
+                    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                        <thead>
+                            <tr style="border-bottom:2px solid var(--col-border);">
+                                <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">Patient</th>
+                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">Levels (N)</th>
+                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">Pop MPE%</th>
+                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">Pop MAPE%</th>
+                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">MAP MPE%</th>
+                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">MAP MAPE%</th>
+                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calib-patient-tbody"></tbody>
+                    </table>
+                </div>
+
+                <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+                    <button onclick="exportCalibrationCSV()" class="btn btn-secondary" style="font-size:13px;">⬇ Export CSV</button>
+                    <button onclick="closeCalibrationModal()" class="btn btn-secondary" style="font-size:13px;">Close</button>
+                </div>
+            </div>
+
+            <div id="calib-error" style="display:none;text-align:center;padding:30px 0;">
+                <span style="font-size:24px;">⚠️</span>
+                <div id="calib-error-msg" style="font-size:14px;color:var(--col-muted);margin-top:8px;"></div>
+                <button onclick="closeCalibrationModal()" class="btn btn-secondary" style="margin-top:16px;font-size:13px;">Close</button>
+            </div>
         </div>
     </div>
 
@@ -930,7 +1022,8 @@
             // ~12% attributable to lower oral bioavailability (higher apparent CL/F) in Indian patients,
             // ~12% to Abbott CMIA immunoassay inflation vs LC-MS/MS reference.
             // Net correction: increase TVCL by 18% so MAP Bayesian starts from a less-biased prior.
-            INDIAN_CL_SCALAR: 1.18,
+            // Override: saved by Center Calibration Report via localStorage key 'tacro_cl_scalar'.
+            INDIAN_CL_SCALAR: parseFloat(localStorage.getItem('tacro_cl_scalar')) || 1.18,
 
             // Inter-individual variability (variance of ln-normal distribution)
             // ωCL = 40% CV  → var = ln(1 + 0.40²) = 0.148
@@ -1361,6 +1454,263 @@
 
         function openSettingsModal() { document.getElementById('settingsModal').classList.add('open'); }
         function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('open'); }
+        function closeCalibrationModal() { document.getElementById('calibrationModal').classList.remove('open'); }
+
+        // ============================================================
+        // CENTER CALIBRATION REPORT
+        //
+        // Aggregates population and individualized (MAP) prediction
+        // errors across ALL saved patients with ≥3 measured levels.
+        //
+        // Population MPE tells you whether INDIAN_CL_SCALAR is right
+        // for your center. MAP MPE confirms post-Bayes residual fit.
+        //
+        // Suggested scalar correction (geometric mean):
+        //   new_scalar = old_scalar × exp(mean(log(pop_pred / obs)))
+        //   i.e. the factor that would drive mean log(pred/obs) to 0.
+        // ============================================================
+        let _calibrationData = null; // cache for CSV export
+
+        async function runCalibrationReport() {
+            closeSettingsModal();
+            const modal = document.getElementById('calibrationModal');
+            modal.classList.add('open');
+            document.getElementById('calib-loading').style.display = 'block';
+            document.getElementById('calib-results').style.display = 'none';
+            document.getElementById('calib-error').style.display = 'none';
+
+            try {
+                const patientsRes = await fetch(`${API_BASE}/patients`);
+                if (!patientsRes.ok) throw new Error('Could not reach backend. Make sure the server is running.');
+                const patientList = await patientsRes.json();
+
+                if (!patientList || patientList.length === 0) {
+                    throw new Error('No patients saved yet. Add at least 2 patients with 3+ levels each to generate a calibration report.');
+                }
+
+                const patientResults = [];
+
+                for (const p of patientList) {
+                    try {
+                        const [patRes, eventsRes] = await Promise.all([
+                            fetch(`${API_BASE}/patients/${p.mrn}`),
+                            fetch(`${API_BASE}/patients/${p.mrn}/events`)
+                        ]);
+                        if (!patRes.ok || !eventsRes.ok) continue;
+                        const patData = await patRes.json();
+                        const events  = await eventsRes.json();
+
+                        const txDate = dayjs(patData.transplant_date);
+                        if (!txDate.isValid()) continue;
+
+                        const historyLog = events.map((e, i) => {
+                            const rd = dayjs(e.datetime.replace('T', ' '));
+                            return {
+                                id: i,
+                                recordDate: rd,
+                                dose: e.dose,
+                                level: e.level,
+                                time: rd.diff(txDate, 'hour', true)
+                            };
+                        }).filter(r => r.time >= 0);
+
+                        const measuredLevels = historyLog.filter(e => e.level !== null && e.level > 0);
+                        if (measuredLevels.length < 3) continue;
+
+                        const loggedDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
+                        if (loggedDoses.length === 0) continue;
+
+                        const filledHistory = fillHistoricalGaps(historyLog, txDate);
+                        const allDoses = filledHistory;
+
+                        const pkPatientData = {
+                            weight:    parseFloat(patData.weight)     || 60,
+                            mpa:       patData.mpa                    != null ? String(patData.mpa) : '1',
+                            genotype:  patData.genotype               || 'unknown',
+                            bilirubin: parseFloat(patData.bilirubin)  || 1.0,
+                            inhibitor: patData.inhibitor              || 'none',
+                            transplantDate: txDate
+                        };
+
+                        const popParams = getPopulationParameters(pkPatientData);
+                        const popMetrics = calculateAccuracyMetrics(measuredLevels, allDoses, popParams, patData.bioassay || 1);
+
+                        const indParams  = mapBayesian(popParams, measuredLevels, allDoses, patData.bioassay || 1);
+                        const indMetrics = calculateAccuracyMetrics(measuredLevels, allDoses, indParams, patData.bioassay || 1);
+
+                        // Geometric mean of (pop_pred / obs) for scalar correction
+                        const logRatios = measuredLevels.map(obs => {
+                            let pred = predictAtTime(obs.time, allDoses, popParams);
+                            if ((patData.bioassay || 1) === 2) pred = 1.08 * pred + 0.55;
+                            return Math.log(pred / obs.level);
+                        });
+                        const geoMeanRatio = Math.exp(logRatios.reduce((s, v) => s + v, 0) / logRatios.length);
+
+                        patientResults.push({
+                            mrn:        p.mrn,
+                            nObs:       measuredLevels.length,
+                            popMPE:     popMetrics.mpe,
+                            popMAPE:    popMetrics.mape,
+                            indMPE:     indMetrics.mpe,
+                            indMAPE:    indMetrics.mape,
+                            geoMeanRatio
+                        });
+                    } catch (_) { /* skip patients with data issues */ }
+                }
+
+                if (patientResults.length < 2) {
+                    throw new Error(`Only ${patientResults.length} patient(s) had ≥3 measured levels. Need at least 2 patients to generate a meaningful report.`);
+                }
+
+                _calibrationData = patientResults;
+                renderCalibrationResults(patientResults);
+
+            } catch (err) {
+                document.getElementById('calib-loading').style.display = 'none';
+                document.getElementById('calib-error').style.display = 'block';
+                document.getElementById('calib-error-msg').textContent = err.message;
+            }
+        }
+
+        function renderCalibrationResults(results) {
+            document.getElementById('calib-loading').style.display = 'none';
+            document.getElementById('calib-results').style.display = 'block';
+
+            const nPts = results.reduce((s, r) => s + r.nObs, 0);
+            const cohortPopMPE  = results.reduce((s, r) => s + r.popMPE,  0) / results.length;
+            const cohortPopMAPE = results.reduce((s, r) => s + r.popMAPE, 0) / results.length;
+            const cohortIndMPE  = results.reduce((s, r) => s + r.indMPE,  0) / results.length;
+            const cohortIndMAPE = results.reduce((s, r) => s + r.indMAPE, 0) / results.length;
+
+            // Geometric mean correction factor across all patients
+            const logGeoMeans = results.map(r => Math.log(r.geoMeanRatio));
+            const overallGeoMeanRatio = Math.exp(logGeoMeans.reduce((s, v) => s + v, 0) / logGeoMeans.length);
+            const currentScalar = PK_MODEL.INDIAN_CL_SCALAR;
+            const suggestedScalar = Math.round(currentScalar * overallGeoMeanRatio * 1000) / 1000;
+
+            // Status assessment based on population MPE (absolute bias)
+            const absBias = Math.abs(cohortPopMPE);
+            let statusColor, statusIcon, statusTitle, statusDesc;
+            if (absBias < 10) {
+                statusColor = '#d1fae5'; statusIcon = '✅';
+                statusTitle = 'Well Calibrated';
+                statusDesc  = `Population bias is ${cohortPopMPE.toFixed(1)}% — within acceptable range (<±10%). Current scalar is appropriate for this center.`;
+            } else if (absBias < 20) {
+                statusColor = '#fef3c7'; statusIcon = '⚠️';
+                statusTitle = 'Mild Bias Detected';
+                statusDesc  = `Population bias is ${cohortPopMPE.toFixed(1)}%. Consider applying the suggested scalar to reduce systematic error.`;
+            } else {
+                statusColor = '#fee2e2'; statusIcon = '🔴';
+                statusTitle = 'Significant Bias — Recalibration Recommended';
+                statusDesc  = `Population bias is ${cohortPopMPE.toFixed(1)}% (threshold: ±20%). Apply the suggested scalar before clinical use.`;
+            }
+
+            const banner = document.getElementById('calib-status-banner');
+            banner.style.background = statusColor;
+            document.getElementById('calib-status-icon').textContent  = statusIcon;
+            document.getElementById('calib-status-title').textContent = statusTitle;
+            document.getElementById('calib-status-desc').textContent  = statusDesc;
+
+            // Summary grid
+            const grid = document.getElementById('calib-summary-grid');
+            grid.innerHTML = [
+                ['Patients', results.length],
+                ['Total Levels', nPts],
+                ['Avg Levels/Pt', (nPts / results.length).toFixed(1)],
+                ['Pop Bias', cohortPopMPE.toFixed(1) + '%']
+            ].map(([label, val]) => `
+                <div style="background:var(--col-surface);border:1px solid var(--col-border);border-radius:8px;padding:12px;text-align:center;">
+                    <div style="font-size:11px;color:var(--col-muted);margin-bottom:4px;">${label}</div>
+                    <div style="font-size:18px;font-weight:700;font-family:'Sora',sans-serif;">${val}</div>
+                </div>`).join('');
+
+            // Pop stats
+            document.getElementById('calib-pop-stats').innerHTML = statRows([
+                ['MPE (bias)',      cohortPopMPE.toFixed(1)  + '%', Math.abs(cohortPopMPE)  < 10 ? 'good' : Math.abs(cohortPopMPE)  < 20 ? 'warn' : 'bad'],
+                ['MAPE (imprecision)', cohortPopMAPE.toFixed(1) + '%', cohortPopMAPE < 20 ? 'good' : cohortPopMAPE < 30 ? 'warn' : 'bad'],
+            ]);
+
+            // Ind stats
+            document.getElementById('calib-ind-stats').innerHTML = statRows([
+                ['MPE (bias)',      cohortIndMPE.toFixed(1)  + '%', Math.abs(cohortIndMPE)  < 10 ? 'good' : Math.abs(cohortIndMPE)  < 20 ? 'warn' : 'bad'],
+                ['MAPE (imprecision)', cohortIndMAPE.toFixed(1) + '%', cohortIndMAPE < 15 ? 'good' : cohortIndMAPE < 25 ? 'warn' : 'bad'],
+            ]);
+
+            // Scalar box
+            document.getElementById('calib-scalar-current').textContent   = currentScalar.toFixed(3);
+            document.getElementById('calib-scalar-suggested').textContent = suggestedScalar.toFixed(3);
+            document.getElementById('calib-apply-btn').dataset.suggested  = suggestedScalar;
+
+            const scalarDiff = Math.abs(suggestedScalar - currentScalar);
+            if (scalarDiff < 0.01) {
+                document.getElementById('calib-apply-btn').disabled = true;
+                document.getElementById('calib-apply-btn').textContent = '✓ Already Optimal';
+            }
+
+            // Per-patient table
+            const tbody = document.getElementById('calib-patient-tbody');
+            tbody.innerHTML = results.map(r => {
+                const badge = mpeStatusBadge(r.popMPE);
+                return `<tr style="border-bottom:1px solid var(--col-border);">
+                    <td style="padding:7px 8px;font-weight:600;">${r.mrn}</td>
+                    <td style="padding:7px 8px;text-align:center;">${r.nObs}</td>
+                    <td style="padding:7px 8px;text-align:center;${mpeColor(r.popMPE)}">${r.popMPE.toFixed(1)}%</td>
+                    <td style="padding:7px 8px;text-align:center;">${r.popMAPE.toFixed(1)}%</td>
+                    <td style="padding:7px 8px;text-align:center;${mpeColor(r.indMPE)}">${r.indMPE.toFixed(1)}%</td>
+                    <td style="padding:7px 8px;text-align:center;">${r.indMAPE.toFixed(1)}%</td>
+                    <td style="padding:7px 8px;text-align:center;">${badge}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function statRows(rows) {
+            return rows.map(([label, val, status]) => {
+                const col = status === 'good' ? '#16a34a' : status === 'warn' ? '#d97706' : '#dc2626';
+                return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--col-border);">
+                    <span style="font-size:13px;">${label}</span>
+                    <span style="font-size:14px;font-weight:700;color:${col};">${val}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function mpeColor(mpe) {
+            const abs = Math.abs(mpe);
+            if (abs < 10) return 'color:#16a34a;';
+            if (abs < 20) return 'color:#d97706;';
+            return 'color:#dc2626;';
+        }
+
+        function mpeStatusBadge(popMPE) {
+            const abs = Math.abs(popMPE);
+            if (abs < 10) return `<span style="background:#d1fae5;color:#065f46;font-size:11px;padding:2px 7px;border-radius:12px;font-weight:600;">Good</span>`;
+            if (abs < 20) return `<span style="background:#fef3c7;color:#92400e;font-size:11px;padding:2px 7px;border-radius:12px;font-weight:600;">Mild Bias</span>`;
+            return `<span style="background:#fee2e2;color:#991b1b;font-size:11px;padding:2px 7px;border-radius:12px;font-weight:600;">High Bias</span>`;
+        }
+
+        function applyCalibrationScalar() {
+            const btn = document.getElementById('calib-apply-btn');
+            const newScalar = parseFloat(btn.dataset.suggested);
+            if (!newScalar || isNaN(newScalar)) return;
+            if (!confirm(`Apply new CL scalar ${newScalar.toFixed(3)}? This will update the population prior for all future patients in this browser. You can re-run calibration at any time to adjust further.`)) return;
+            localStorage.setItem('tacro_cl_scalar', newScalar.toFixed(4));
+            PK_MODEL.INDIAN_CL_SCALAR = newScalar;
+            btn.disabled = true;
+            btn.textContent = '✓ Applied';
+            document.getElementById('calib-scalar-current').textContent = newScalar.toFixed(3);
+            showAlert(`Scalar updated to ${newScalar.toFixed(3)}. Re-run any open patient forecast to use the new prior.`, 'success');
+        }
+
+        function exportCalibrationCSV() {
+            if (!_calibrationData) return;
+            const rows = [['Patient MRN', 'N Levels', 'Pop MPE%', 'Pop MAPE%', 'MAP MPE%', 'MAP MAPE%']];
+            _calibrationData.forEach(r => rows.push([r.mrn, r.nObs, r.popMPE.toFixed(2), r.popMAPE.toFixed(2), r.indMPE.toFixed(2), r.indMAPE.toFixed(2)]));
+            const csv = rows.map(r => r.join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `tacro_calibration_${dayjs().format('YYYY-MM-DD')}.csv`; a.click();
+            URL.revokeObjectURL(url);
+        }
 
         // ============================================================
         // MODAL (Add/Edit Record)
