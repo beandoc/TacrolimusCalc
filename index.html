@@ -899,6 +899,14 @@
                 <button onclick="runCalibrationReport()" class="btn btn-secondary"
                     style="width:100%;justify-content:center;">📊 Center Calibration Report</button>
                 <hr style="border-color:var(--col-border);">
+                <div style="text-align:left;">
+                    <label style="font-size:12px;font-weight:600;margin-bottom:6px;display:block;color:var(--col-text);">Backend API Base URL</label>
+                    <div style="display:flex;gap:8px;">
+                        <input id="settings-api-base" type="text" class="input-field" style="margin-bottom:0;flex:1;padding:8px 12px;font-size:13px;" placeholder="http://localhost:8000/api">
+                        <button onclick="saveApiBase()" class="btn btn-primary" style="padding:8px 16px;">Save</button>
+                    </div>
+                </div>
+                <hr style="border-color:var(--col-border);">
                 <button onclick="deleteAllStoredData()" class="btn btn-danger"
                     style="width:100%;justify-content:center;">🗑 Permanently Delete All Data</button>
             </div>
@@ -1165,9 +1173,10 @@
         // ============================================================
         // ── BACKEND INTEGRATION ────────────────────────────────────
         // Automatically uses localhost for testing, and relative '/api' for Vercel production
-        const API_BASE = (window.location.hostname === "localhost" || window.location.protocol === "file:") 
-            ? "http://localhost:8000/api" 
-            : "/api";
+        let API_BASE = localStorage.getItem('tacro_api_base') || 
+            ((window.location.hostname === "localhost" || window.location.protocol === "file:") 
+                ? "http://localhost:8000/api" 
+                : "/api");
 
         async function populatePatientList() {
             try {
@@ -1184,6 +1193,9 @@
         async function savePatientData() {
             const name = document.getElementById('patient-name').value.trim();
             if (!name) { showAlert('Enter a patient MRN/Name', 'error'); return; }
+            
+            const txDateStr = document.getElementById('transplant-date')._flatpickr.input.value;
+            if (!txDateStr) { showAlert('Please select a transplant date first', 'error'); return; }
             
             const pData = {
                 mrn: name.toLowerCase(),
@@ -1452,8 +1464,28 @@
             savePatientData();
         }
 
-        function openSettingsModal() { document.getElementById('settingsModal').classList.add('open'); }
-        function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('open'); }
+        function openSettingsModal() {
+            const defaultUrl = (window.location.hostname === "localhost" || window.location.protocol === "file:") 
+                ? "http://localhost:8000/api" 
+                : "/api";
+            document.getElementById('settings-api-base').value = localStorage.getItem('tacro_api_base') || defaultUrl;
+            document.getElementById('settingsModal').classList.add('open');
+        }
+        function saveApiBase() {
+            const url = document.getElementById('settings-api-base').value.trim();
+            if (!url) {
+                localStorage.removeItem('tacro_api_base');
+                showAlert('Reset backend to default URL', 'success');
+            } else {
+                localStorage.setItem('tacro_api_base', url);
+                showAlert(`Backend URL updated: ${url}`, 'success');
+            }
+            API_BASE = localStorage.getItem('tacro_api_base') || 
+                ((window.location.hostname === "localhost" || window.location.protocol === "file:") 
+                    ? "http://localhost:8000/api" 
+                    : "/api");
+            populatePatientList();
+        }
         function closeCalibrationModal() { document.getElementById('calibrationModal').classList.remove('open'); }
 
         // ============================================================
@@ -1758,18 +1790,18 @@
             if (indexStr !== '') {
                 const idx = parseInt(indexStr);
                 clinicalData[idx].datetime = datetime;
-                if (type === 'dose') clinicalData[idx].dose = dose ? parseFloat(dose) : null;
-                if (type === 'level') clinicalData[idx].level = level ? parseFloat(level) : null;
+                if (type === 'dose') clinicalData[idx].dose = (dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null;
+                if (type === 'level') clinicalData[idx].level = (level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null;
             } else {
                 const existing = clinicalData.find(r => r.datetime === datetime);
                 if (existing) {
-                    if (type === 'dose') existing.dose = dose ? parseFloat(dose) : null;
-                    if (type === 'level') existing.level = level ? parseFloat(level) : null;
+                    if (type === 'dose') existing.dose = (dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null;
+                    if (type === 'level') existing.level = (level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null;
                 } else {
                     clinicalData.push({
                         datetime,
-                        dose: type === 'dose' ? (dose ? parseFloat(dose) : null) : null,
-                        level: type === 'level' ? (level ? parseFloat(level) : null) : null
+                        dose: type === 'dose' ? ((dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null) : null,
+                        level: type === 'level' ? ((level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null) : null
                     });
                 }
             }

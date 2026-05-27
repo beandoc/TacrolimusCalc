@@ -1,0 +1,13 @@
+# Local SQLite database
+tacrolimus.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+venv/
+.venv/
+env/
+.env
