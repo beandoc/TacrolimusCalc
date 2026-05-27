@@ -2487,8 +2487,24 @@
 
         function gatherData() {
             const txDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value);
-            const predDate = dayjs(document.getElementById('prediction-datetime')._flatpickr.input.value, "YYYY-MM-DD HH:mm");
             if (!txDate.isValid()) throw new Error("Invalid transplant date");
+
+            let predDateVal = document.getElementById('prediction-datetime')._flatpickr.input.value;
+            let predDate;
+            if (!predDateVal) {
+                if (clinicalData.length > 0) {
+                    const latest = [...clinicalData].sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)))[clinicalData.length - 1];
+                    predDate = dayjs(latest.datetime).add(12, 'hour');
+                } else {
+                    predDate = dayjs().add(1, 'day').hour(7).minute(0);
+                }
+                const predFP = document.getElementById('prediction-datetime')._flatpickr;
+                if (predFP) {
+                    predFP.setDate(predDate.toDate(), true);
+                }
+            } else {
+                predDate = dayjs(predDateVal, "YYYY-MM-DD HH:mm");
+            }
             if (!predDate.isValid()) throw new Error("Invalid forecast date");
 
             const patientData = {
@@ -2965,7 +2981,20 @@
             if (!lastForecastParams.individual) { showAlert('Run forecast first', 'error'); return; }
 
             const target = parseFloat(document.getElementById('target-trough-input').value);
-            const tgtDate = dayjs(document.getElementById('target-date-input')._flatpickr.input.value, "YYYY-MM-DD HH:mm");
+            
+            let tgtDateVal = document.getElementById('target-date-input')._flatpickr.input.value;
+            let tgtDate;
+            if (!tgtDateVal) {
+                const predVal = document.getElementById('prediction-datetime')._flatpickr.input.value;
+                tgtDate = predVal ? dayjs(predVal, "YYYY-MM-DD HH:mm") : dayjs().add(4, 'day').hour(7).minute(0);
+                const tgtFP = document.getElementById('target-date-input')._flatpickr;
+                if (tgtFP) {
+                    tgtFP.setDate(tgtDate.toDate(), true);
+                }
+            } else {
+                tgtDate = dayjs(tgtDateVal, "YYYY-MM-DD HH:mm");
+            }
+            
             if (isNaN(target) || !tgtDate.isValid()) { showAlert('Enter valid target and date', 'error'); return; }
 
             const { individual: ind, allDoses, patientData } = lastForecastParams;
