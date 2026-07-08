@@ -1,6 +1,13 @@
+import sys
+import os
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Date
 from sqlalchemy.orm import relationship
-from .database import Base
+
+try:
+    from .database import Base
+except ImportError:
+    sys.path.insert(0, os.path.dirname(__file__))
+    from database import Base
 
 class Patient(Base):
     __tablename__ = "patients"

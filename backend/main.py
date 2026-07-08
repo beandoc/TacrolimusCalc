@@ -1,10 +1,18 @@
+import sys
+import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 
-from . import models, schemas
-from .database import engine, SessionLocal
+try:
+    from . import models, schemas
+    from .database import engine, SessionLocal
+except ImportError:
+    sys.path.insert(0, os.path.dirname(__file__))
+    import models
+    import schemas
+    from database import engine, SessionLocal
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -37,12 +45,13 @@ def read_patients(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 def create_patient(patient: schemas.PatientCreate, db: Session = Depends(get_db)):
     db_patient = db.query(models.Patient).filter(models.Patient.mrn == patient.mrn).first()
     if db_patient:
-        # Update existing
-        for var, value in vars(patient).items():
+        # Update existing with only the fields that were actually set
+        update_data = patient.model_dump(exclude_unset=True)
+        for var, value in update_data.items():
             setattr(db_patient, var, value)
     else:
         # Create new
-        db_patient = models.Patient(**patient.dict())
+        db_patient = models.Patient(**patient.model_dump())
         db.add(db_patient)
     db.commit()
     db.refresh(db_patient)
@@ -66,7 +75,7 @@ def create_events(mrn: str, events: List[schemas.ClinicalEventCreate], db: Sessi
     
     new_events = []
     for event in events:
-        db_event = models.ClinicalEvent(**event.dict(), patient_mrn=mrn)
+        db_event = models.ClinicalEvent(**event.model_dump(), patient_mrn=mrn)
         db.add(db_event)
         new_events.append(db_event)
         
@@ -90,7 +99,7 @@ def create_outcomes(mrn: str, outcomes: List[schemas.ClinicalOutcomeCreate], db:
     
     new_outcomes = []
     for outcome in outcomes:
-        db_outcome = models.ClinicalOutcome(**outcome.dict(), patient_mrn=mrn)
+        db_outcome = models.ClinicalOutcome(**outcome.model_dump(), patient_mrn=mrn)
         db.add(db_outcome)
         new_outcomes.append(db_outcome)
         
