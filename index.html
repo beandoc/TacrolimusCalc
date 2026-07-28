@@ -528,7 +528,8 @@
                         style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">CYP3A5
                         Genotype</label>
                     <select id="genotype" class="input-field">
-                        <option value="unknown">Unknown · ×1.30 (Indian pop CYP3A5*1 freq ≈45%; midpoint between *1/*3 and *1/*1)</option>
+                        <option value="unknown">Unknown · ×1.30 (Indian pop CYP3A5*1 freq ≈45%; midpoint between *1/*3
+                            and *1/*1)</option>
                         <option value="33">*3/*3 · Slow Metabolizer</option>
                         <option value="13">*1/*3 · Intermediate</option>
                         <option value="11">*1/*1 · Fast Metabolizer</option>
@@ -557,10 +558,14 @@
                         style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Forecast
                         Date & Time</label>
                     <input id="prediction-datetime" type="text" class="input-field" placeholder="dd-mmm-yy HH:mm">
+                    <div id="forecast-helper"
+                        style="font-size:10.5px;color:var(--col-primary, #2563eb);margin-top:4px;font-weight:500;">⚡
+                        Auto-synced to next trough after latest dose (editable)</div>
                 </div>
                 <div>
                     <label
-                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Type of Transplant</label>
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Type
+                        of Transplant</label>
                     <select id="transplant-type" class="input-field">
                         <option value="Live Related" selected>Live Related</option>
                         <option value="Deceased Donor">Deceased Donor</option>
@@ -570,18 +575,26 @@
 
             <!-- Advanced Clinical Indicators Section -->
             <div style="border-top:1px dashed var(--col-border);padding-top:16px;margin-top:16px;">
-                <h4 style="font-family:'Sora',sans-serif;font-size:11px;font-weight:800;color:var(--col-primary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Pharmacokinetic Covariates</h4>
+                <h4
+                    style="font-family:'Sora',sans-serif;font-size:11px;font-weight:800;color:var(--col-primary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
+                    Pharmacokinetic Covariates</h4>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:16px;">
                     <div>
-                        <label style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Albumin (g/dL)</label>
+                        <label
+                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Albumin
+                            (g/dL)</label>
                         <input id="albumin" type="number" step="0.1" class="input-field" value="3.5">
                     </div>
                     <div>
-                        <label style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Bilirubin (mg/dL)</label>
+                        <label
+                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Bilirubin
+                            (mg/dL)</label>
                         <input id="bilirubin" type="number" step="0.1" class="input-field" value="1.0">
                     </div>
                     <div style="grid-column: span 2;">
-                        <label style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">CYP3A4 Inhibitors (Azoles / Diltiazem)</label>
+                        <label
+                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">CYP3A4
+                            Inhibitors (Azoles / Diltiazem)</label>
                         <select id="inhibitor" class="input-field">
                             <option value="none" selected>None / Regular metabolizer</option>
                             <option value="moderate">Moderate (Diltiazem / Fluconazole)</option>
@@ -589,16 +602,21 @@
                         </select>
                     </div>
                 </div>
-                <p style="font-size:11px;color:var(--col-muted);margin-top:10px;font-style:italic;">Note: Inhibitors reduce hepatic CL/F (Moderate ×0.65, Strong ×0.25). Bilirubin uses a continuous power-law: CL ∝ (1/Bil)^0.30 — no step discontinuity. HCT is handled by the standalone HCT Correction Tool; it is not a structural CL covariate in this whole-blood model.</p>
+                <p style="font-size:11px;color:var(--col-muted);margin-top:10px;font-style:italic;">Note: Inhibitors
+                    reduce hepatic CL/F (Moderate ×0.65, Strong ×0.25). Bilirubin uses a continuous power-law: CL ∝
+                    (1/Bil)^0.30 — no step discontinuity. HCT is handled by the standalone HCT Correction Tool; it is
+                    not a structural CL covariate in this whole-blood model.</p>
             </div>
-            
+
             <div
                 style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid var(--col-border);">
                 <button onclick="loadPatientData()" class="btn btn-secondary">📁 Load Patient</button>
                 <button onclick="applyProtocol()" class="btn btn-accent">⚡ Apply Protocol</button>
                 <button onclick="savePatientData()" class="btn btn-success">💾 Save</button>
-                <input type="file" id="csv-upload" accept=".csv" style="display:none" onchange="importPatientDataFromCSV(event)">
-                <button onclick="document.getElementById('csv-upload').click()" class="btn btn-secondary">📥 Import CSV</button>
+                <input type="file" id="csv-upload" accept=".csv" style="display:none"
+                    onchange="importPatientDataFromCSV(event)">
+                <button onclick="document.getElementById('csv-upload').click()" class="btn btn-secondary">📥 Import
+                    CSV</button>
                 <button onclick="exportPatientDataToCSV()" class="btn btn-secondary">📊 Export CSV</button>
                 <button onclick="clearAllData(true)" class="btn btn-danger">🗑 Clear All</button>
             </div>
@@ -781,80 +799,91 @@
 
         <!-- Dose Optimizer -->
         <div class="card" style="padding:24px;margin-bottom:20px;" id="dose-optimizer-card">
-                <div class="section-title">🎯 Dose Optimizer</div>
-                <div
-                    style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:16px;">
-                    <div>
-                        <label
-                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Target
-                            Trough (ng/mL)</label>
-                        <input type="number" id="target-trough-input" value="8.0" step="0.5" class="input-field">
-                        <div id="target-trough-helper" style="font-size:10.5px;color:var(--col-primary);margin-top:5px;font-weight:600;"></div>
-                    </div>
-                    <div>
-                        <label
-                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Target
-                            Date</label>
-                        <input id="target-date-input" type="text" class="input-field" placeholder="dd-mmm-yy HH:mm">
-                    </div>
-                    <div style="display:flex;align-items:flex-end;">
-                        <button id="run-optimizer-btn" class="btn btn-accent" style="width:100%;">Find Optimal
-                            Dose</button>
-                    </div>
+            <div class="section-title">🎯 Dose Optimizer</div>
+            <div
+                style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:16px;">
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Target
+                        Trough (ng/mL)</label>
+                    <input type="number" id="target-trough-input" value="8.0" step="0.5" class="input-field">
+                    <div id="target-trough-helper"
+                        style="font-size:10.5px;color:var(--col-primary);margin-top:5px;font-weight:600;"></div>
                 </div>
-                <div id="optimizer-output"
-                    style="color:var(--col-muted);font-size:13px;text-align:center;padding:24px;">Run the main forecast
-                    first.</div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Target
+                        Date</label>
+                    <input id="target-date-input" type="text" class="input-field" placeholder="dd-mmm-yy HH:mm">
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <button id="run-optimizer-btn" class="btn btn-accent" style="width:100%;">Find Optimal
+                        Dose</button>
+                </div>
             </div>
+            <div id="optimizer-output" style="color:var(--col-muted);font-size:13px;text-align:center;padding:24px;">Run
+                the main forecast
+                first.</div>
+        </div>
 
-            <!-- Quick HCT Tool -->
-            <div class="card" style="padding:24px;margin-bottom:20px;">
-                <div class="section-title">⚗️ Hematocrit Correction Tool</div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;">
-                    <div>
-                        <label
-                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Measured
-                            Level (ng/mL)</label>
-                        <input type="number" id="quick-hct-level" class="input-field" placeholder="e.g. 7.5">
-                    </div>
-                    <div>
-                        <label
-                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Patient
-                            Hb (g/dL)</label>
-                        <input type="number" id="quick-hct-hb" class="input-field" placeholder="e.g. 9.3" step="0.1">
-                    </div>
-                    <div>
-                        <label
-                            style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Patient
-                            HCT (%)</label>
-                        <input type="number" id="quick-hct-initial" class="input-field" placeholder="e.g. 28" step="0.5">
-                    </div>
-                    <div style="display:flex;align-items:flex-end;">
+        <!-- Quick HCT Tool -->
+        <div class="card" style="padding:24px;margin-bottom:20px;">
+            <div class="section-title">⚗️ Hematocrit Correction Tool</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;">
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Measured
+                        Level (ng/mL)</label>
+                    <input type="number" id="quick-hct-level" class="input-field" placeholder="e.g. 7.5">
+                </div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Patient
+                        Hb (g/dL)</label>
+                    <input type="number" id="quick-hct-hb" class="input-field" placeholder="e.g. 9.3" step="0.1">
+                </div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Patient
+                        HCT (%)</label>
+                    <input type="number" id="quick-hct-initial" class="input-field" placeholder="e.g. 28" step="0.5">
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <div
+                        style="width:100%;padding:12px;background:var(--col-primary-light);border:1.5px solid #c3d5f9;border-radius:8px;text-align:center;">
                         <div
-                            style="width:100%;padding:12px;background:var(--col-primary-light);border:1.5px solid #c3d5f9;border-radius:8px;text-align:center;">
-                            <div
-                                style="font-size:11px;color:var(--col-muted);margin-bottom:4px;font-family:'Sora',sans-serif;font-weight:600;">
-                                Corrected to HCT 35%</div>
-                            <div id="quick-hct-output"
-                                style="font-family:'DM Mono',monospace;font-size:26px;font-weight:500;color:var(--col-primary);">
-                                --</div>
-                            <div id="quick-hct-ci" style="font-size:11px;color:var(--col-muted);">ng/mL</div>
-                            <button id="quick-hct-use-btn" onclick="useHctCorrectedValue()" class="btn btn-primary"
-                                style="display:none;margin-top:8px;width:100%;font-size:11.5px;padding:6px 10px;">↑ Use corrected value in lab log</button>
-                        </div>
+                            style="font-size:11px;color:var(--col-muted);margin-bottom:4px;font-family:'Sora',sans-serif;font-weight:600;">
+                            Corrected to HCT 35%</div>
+                        <div id="quick-hct-output"
+                            style="font-family:'DM Mono',monospace;font-size:26px;font-weight:500;color:var(--col-primary);">
+                            --</div>
+                        <div id="quick-hct-ci" style="font-size:11px;color:var(--col-muted);">ng/mL</div>
+                        <button id="quick-hct-use-btn" onclick="useHctCorrectedValue()" class="btn btn-primary"
+                            style="display:none;margin-top:8px;width:100%;font-size:11.5px;padding:6px 10px;">↑ Use
+                            corrected value in lab log</button>
                     </div>
                 </div>
-                <p style="font-size:11.5px;color:var(--col-muted);margin-top:10px;">Uses saturable Bmax/Kd RBC binding
-                    model (Bmax=418, Kd=3.8). Corrects for HCT-driven dilution of WB tacrolimus.<br>
-                    <span style="color:#c2410c;font-weight:600;">⚠ Population-level constants — does not account for patient-specific RBC binding (uremia, age, co-drugs). Apply ±15% uncertainty to corrected values.</span></p>
             </div>
+            <p style="font-size:11.5px;color:var(--col-muted);margin-top:10px;">Uses saturable Bmax/Kd RBC binding
+                model (Bmax=418, Kd=3.8). Corrects for HCT-driven dilution of WB tacrolimus.<br>
+                <span style="color:#c2410c;font-weight:600;">⚠ Population-level constants — does not account for
+                    patient-specific RBC binding (uremia, age, co-drugs). Apply ±15% uncertainty to corrected
+                    values.</span>
+            </p>
+        </div>
     </main>
 
     <!-- Add/Edit Record Modal -->
     <div id="addRecordModal" class="modal-overlay">
-        <div class="modal">
-            <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:18px;margin-bottom:20px;"
-                id="modal-title">Add Record</h3>
+        <div class="modal" style="position:relative;">
+            <div
+                style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--col-border, #e2e8f0);">
+                <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:18px;margin:0;" id="modal-title">Add
+                    Record</h3>
+                <button onclick="hideAddRecordModal()"
+                    style="background:none;border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--col-muted, #64748b);padding:4px 8px;border-radius:4px;"
+                    title="Close">&times;</button>
+            </div>
             <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:24px;">
                 <div>
                     <label
@@ -886,9 +915,15 @@
 
     <!-- Settings Modal -->
     <div id="settingsModal" class="modal-overlay">
-        <div class="modal">
-            <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:18px;margin-bottom:20px;">Settings & Data
-                Management</h3>
+        <div class="modal" style="position:relative;">
+            <div
+                style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--col-border, #e2e8f0);">
+                <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:18px;margin:0;">Settings & Data
+                    Management</h3>
+                <button onclick="closeSettingsModal()"
+                    style="background:none;border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--col-muted, #64748b);padding:4px 8px;border-radius:4px;"
+                    title="Close">&times;</button>
+            </div>
             <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
                 <button onclick="backupAllData()" class="btn btn-secondary"
                     style="width:100%;justify-content:center;">📥 Backup All Patient Data</button>
@@ -900,9 +935,13 @@
                     style="width:100%;justify-content:center;">📊 Center Calibration Report</button>
                 <hr style="border-color:var(--col-border);">
                 <div style="text-align:left;">
-                    <label style="font-size:12px;font-weight:600;margin-bottom:6px;display:block;color:var(--col-text);">Backend API Base URL</label>
+                    <label
+                        style="font-size:12px;font-weight:600;margin-bottom:6px;display:block;color:var(--col-text);">Backend
+                        API Base URL</label>
                     <div style="display:flex;gap:8px;">
-                        <input id="settings-api-base" type="text" class="input-field" style="margin-bottom:0;flex:1;padding:8px 12px;font-size:13px;" placeholder="http://localhost:8000/api">
+                        <input id="settings-api-base" type="text" class="input-field"
+                            style="margin-bottom:0;flex:1;padding:8px 12px;font-size:13px;"
+                            placeholder="http://localhost:8000/api">
                         <button onclick="saveApiBase()" class="btn btn-primary" style="padding:8px 16px;">Save</button>
                     </div>
                 </div>
@@ -917,18 +956,27 @@
 
     <!-- Center Calibration Report Modal -->
     <div id="calibrationModal" class="modal-overlay">
-        <div class="modal" style="max-width:720px;width:95vw;max-height:90vh;overflow-y:auto;">
-            <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:18px;margin-bottom:4px;">Center Calibration Report</h3>
-            <p style="font-size:12px;color:var(--col-muted);margin-bottom:20px;">Compares population predictions vs. actual observed levels across all saved patients to detect center-level bias.</p>
+        <div class="modal" style="max-width:720px;width:95vw;max-height:90vh;overflow-y:auto;position:relative;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+                <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:18px;margin:0;">Center Calibration
+                    Report</h3>
+                <button onclick="closeCalibrationModal()"
+                    style="background:none;border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--col-muted, #64748b);padding:4px 8px;border-radius:4px;"
+                    title="Close">&times;</button>
+            </div>
+            <p style="font-size:12px;color:var(--col-muted);margin-bottom:20px;">Compares population predictions vs.
+                actual observed levels across all saved patients to detect center-level bias.</p>
 
             <div id="calib-loading" style="text-align:center;padding:40px 0;display:none;">
                 <span style="font-size:24px;">⏳</span><br>
-                <span style="font-size:14px;color:var(--col-muted);margin-top:8px;display:block;">Analyzing patient cohort...</span>
+                <span style="font-size:14px;color:var(--col-muted);margin-top:8px;display:block;">Analyzing patient
+                    cohort...</span>
             </div>
 
             <div id="calib-results" style="display:none;">
                 <!-- Status banner -->
-                <div id="calib-status-banner" style="border-radius:8px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px;">
+                <div id="calib-status-banner"
+                    style="border-radius:8px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px;">
                     <span id="calib-status-icon" style="font-size:22px;line-height:1;"></span>
                     <div>
                         <div id="calib-status-title" style="font-weight:700;font-size:14px;margin-bottom:2px;"></div>
@@ -937,53 +985,84 @@
                 </div>
 
                 <!-- Cohort summary row -->
-                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;" id="calib-summary-grid"></div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;"
+                    id="calib-summary-grid"></div>
 
                 <!-- Population vs Individual accuracy -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
-                    <div style="background:var(--col-surface);border:1px solid var(--col-border);border-radius:8px;padding:14px;">
-                        <div style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;">Population Prior (before MAP)</div>
+                    <div
+                        style="background:var(--col-surface);border:1px solid var(--col-border);border-radius:8px;padding:14px;">
+                        <div
+                            style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;">
+                            Population Prior (before MAP)</div>
                         <div id="calib-pop-stats"></div>
                     </div>
-                    <div style="background:var(--col-surface);border:1px solid var(--col-border);border-radius:8px;padding:14px;">
-                        <div style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;">Individualized MAP (after Bayes)</div>
+                    <div
+                        style="background:var(--col-surface);border:1px solid var(--col-border);border-radius:8px;padding:14px;">
+                        <div
+                            style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em;">
+                            Individualized MAP (after Bayes)</div>
                         <div id="calib-ind-stats"></div>
                     </div>
                 </div>
 
                 <!-- Scalar recommendation -->
-                <div id="calib-scalar-box" style="border-radius:8px;padding:14px 16px;margin-bottom:20px;border:1px solid var(--col-border);background:var(--col-surface);">
-                    <div style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">CL Scalar (INDIAN_CL_SCALAR)</div>
+                <div id="calib-scalar-box"
+                    style="border-radius:8px;padding:14px 16px;margin-bottom:20px;border:1px solid var(--col-border);background:var(--col-surface);">
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">
+                        CL Scalar (INDIAN_CL_SCALAR)</div>
                     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
                         <div>
                             <span style="font-size:11px;color:var(--col-muted);">Current</span><br>
-                            <span id="calib-scalar-current" style="font-size:20px;font-weight:700;font-family:'Sora',sans-serif;"></span>
+                            <span id="calib-scalar-current"
+                                style="font-size:20px;font-weight:700;font-family:'Sora',sans-serif;"></span>
                         </div>
                         <div style="font-size:20px;color:var(--col-muted);">→</div>
                         <div>
                             <span style="font-size:11px;color:var(--col-muted);">Suggested</span><br>
-                            <span id="calib-scalar-suggested" style="font-size:20px;font-weight:700;font-family:'Sora',sans-serif;color:var(--col-primary);"></span>
+                            <span id="calib-scalar-suggested"
+                                style="font-size:20px;font-weight:700;font-family:'Sora',sans-serif;color:var(--col-primary);"></span>
                         </div>
                         <div style="margin-left:auto;">
-                            <button id="calib-apply-btn" onclick="applyCalibrationScalar()" class="btn btn-primary" style="font-size:13px;">✓ Apply Suggested Scalar</button>
+                            <button id="calib-apply-btn" onclick="applyCalibrationScalar()" class="btn btn-primary"
+                                style="font-size:13px;">✓ Apply Suggested Scalar</button>
                         </div>
                     </div>
-                    <p style="font-size:11px;color:var(--col-muted);margin-top:8px;margin-bottom:0;">Applying updates the model prior for all future patients. Per-patient MAP individualization is always automatic regardless of this value.</p>
+                    <p style="font-size:11px;color:var(--col-muted);margin-top:8px;margin-bottom:0;">Applying updates
+                        the model prior for all future patients. Per-patient MAP individualization is always automatic
+                        regardless of this value.</p>
                 </div>
 
                 <!-- Per-patient table -->
-                <div style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">Per-Patient Breakdown</div>
+                <div
+                    style="font-size:12px;font-weight:700;color:var(--col-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">
+                    Per-Patient Breakdown</div>
                 <div style="overflow-x:auto;margin-bottom:20px;">
                     <table style="width:100%;border-collapse:collapse;font-size:13px;">
                         <thead>
                             <tr style="border-bottom:2px solid var(--col-border);">
-                                <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">Patient</th>
-                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">Levels (N)</th>
-                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">Pop MPE%</th>
-                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">Pop MAPE%</th>
-                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">MAP MPE%</th>
-                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">MAP MAPE%</th>
-                                <th style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">Status</th>
+                                <th
+                                    style="text-align:left;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">
+                                    Patient</th>
+                                <th
+                                    style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">
+                                    Levels (N)</th>
+                                <th
+                                    style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">
+                                    Pop MPE%</th>
+                                <th
+                                    style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">
+                                    Pop MAPE%</th>
+                                <th
+                                    style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">
+                                    MAP MPE%</th>
+                                <th
+                                    style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">
+                                    MAP MAPE%</th>
+                                <th
+                                    style="text-align:center;padding:6px 8px;font-size:11px;color:var(--col-muted);font-weight:600;">
+                                    Status</th>
                             </tr>
                         </thead>
                         <tbody id="calib-patient-tbody"></tbody>
@@ -991,15 +1070,18 @@
                 </div>
 
                 <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
-                    <button onclick="exportCalibrationCSV()" class="btn btn-secondary" style="font-size:13px;">⬇ Export CSV</button>
-                    <button onclick="closeCalibrationModal()" class="btn btn-secondary" style="font-size:13px;">Close</button>
+                    <button onclick="exportCalibrationCSV()" class="btn btn-secondary" style="font-size:13px;">⬇ Export
+                        CSV</button>
+                    <button onclick="closeCalibrationModal()" class="btn btn-secondary"
+                        style="font-size:13px;">Close</button>
                 </div>
             </div>
 
             <div id="calib-error" style="display:none;text-align:center;padding:30px 0;">
                 <span style="font-size:24px;">⚠️</span>
                 <div id="calib-error-msg" style="font-size:14px;color:var(--col-muted);margin-top:8px;"></div>
-                <button onclick="closeCalibrationModal()" class="btn btn-secondary" style="margin-top:16px;font-size:13px;">Close</button>
+                <button onclick="closeCalibrationModal()" class="btn btn-secondary"
+                    style="margin-top:16px;font-size:13px;">Close</button>
             </div>
         </div>
     </div>
@@ -1042,6 +1124,14 @@
             // Proportional residual error (σ = 18% CV)
             SIGMA: 0.18,
 
+            // Outlier alert threshold, in prior SD units. Deliberately DECOUPLED from
+            // the MAP search bounds (ETA_*_BOUNDS): the search stays wide so genuine
+            // outliers (severe hepatic impairment, strong CYP3A induction) converge
+            // without artificial truncation, while the clinical banner fires at 3 SD.
+            //   3 SD on ηCL = 3·√0.148 = 1.154
+            //   3 SD on ηV  = 3·√0.090 = 0.900
+            OUTLIER_SD: 3,
+
             // CYP3A5 covariate on CL/F
             // NOTE: Indian population has ~45% *1 allele frequency
             //       'unknown' defaults to intermediate-high (conservative for safety)
@@ -1055,8 +1145,8 @@
             MPA_CL: 0.87,
 
             // v5.1 HCT Covariate Effect
-            HCT_CL: -0.9, 
-            
+            HCT_CL: -0.9,
+
             // v5.2 Advanced Clinical Weights
             ALB_REF: 3.5,
             BIL_REF: 1.0,
@@ -1076,6 +1166,38 @@
         };
 
         // ============================================================
+        // DOSING & SAMPLING CONVENTION
+        //
+        // Standard BD schedule: 07:00 and 19:00.
+        // C0 (pre-dose trough) is drawn SAMPLING_LEAD_MIN minutes BEFORE the dose,
+        // i.e. 06:45 and 18:45.
+        //
+        // Why this matters numerically: predictAtTime() includes a dose only when
+        // dose.time < t (strict), so evaluating at exactly 07:00 happens to give a
+        // pre-dose value — but it sits precisely on a discontinuity. At 3mg BID
+        // steady state:
+        //     06:45 (true C0)          →  9.15 ng/mL
+        //     07:00 (on the boundary)  →  9.08 ng/mL   (−0.8%, harmless)
+        //     07:01 (one minute late)  →  9.39 ng/mL   (+2.6%)
+        //     07:15 (15 min late)      → 11.92 ng/mL   (+30.2%)
+        // Defaulting every timestamp to 06:45/18:45 both matches the protocol and
+        // keeps every evaluation a safe 15 minutes clear of that cliff.
+        // ============================================================
+        const DOSE_SLOTS = { AM: 7, PM: 19 };   // hour-of-day for BD dosing
+        const SAMPLING_LEAD_MIN = 15;           // C0 drawn this many minutes pre-dose
+
+        // Next scheduled C0 sample time strictly after `after` (a dayjs instance).
+        function nextC0Time(after) {
+            const base = dayjs(after);
+            const candidates = [
+                base.hour(DOSE_SLOTS.AM).minute(0),
+                base.hour(DOSE_SLOTS.PM).minute(0),
+                base.add(1, 'day').hour(DOSE_SLOTS.AM).minute(0)
+            ].map(d => d.second(0).millisecond(0).subtract(SAMPLING_LEAD_MIN, 'minute'));
+            return candidates.find(c => c.isAfter(base)) || candidates[candidates.length - 1];
+        }
+
+        // ============================================================
         // STATE
         // ============================================================
         let clinicalData = [];
@@ -1091,14 +1213,23 @@
             populatePatientList();
             setDefaults();
             renderDoseLog(); renderLevelLog();
+
+            // Allow closing modals by clicking on backdrop overlay
+            document.querySelectorAll('.modal-overlay').forEach(overlay => {
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) {
+                        overlay.classList.remove('open');
+                    }
+                });
+            });
         });
 
         function initDatePickers() {
             const opts = { altInput: true, altFormat: "d-M-y", dateFormat: "Y-m-d" };
             const optsT = { enableTime: true, altInput: true, altFormat: "d-M-y H:i", dateFormat: "Y-m-d H:i" };
-            
+
             function autoUpdateTargetRange(selectedDates) {
-                if(!selectedDates || selectedDates.length === 0) return;
+                if (!selectedDates || selectedDates.length === 0) return;
                 const tgtDate = dayjs(selectedDates[0]);
                 const txEl = document.getElementById('transplant-date');
                 const txDate = (txEl && txEl._flatpickr && txEl._flatpickr.selectedDates[0]) ? dayjs(txEl._flatpickr.selectedDates[0]) : dayjs();
@@ -1111,17 +1242,17 @@
 
             flatpickr("#transplant-date", {
                 ...opts,
-                onChange: function() {
+                onChange: function () {
                     const tgtFP = document.getElementById('target-date-input')._flatpickr;
                     if (tgtFP && tgtFP.selectedDates) autoUpdateTargetRange(tgtFP.selectedDates);
                 }
             });
             flatpickr("#prediction-datetime", optsT);
-            flatpickr("#target-date-input", { 
-                ...optsT, 
+            flatpickr("#target-date-input", {
+                ...optsT,
                 defaultDate: dayjs().add(4, 'day').hour(7).minute(0).toDate(),
                 onChange: autoUpdateTargetRange,
-                onReady: function(selectedDates) { autoUpdateTargetRange(selectedDates); }
+                onReady: function (selectedDates) { autoUpdateTargetRange(selectedDates); }
             });
             flatpickr("#newDateTime", optsT);
         }
@@ -1130,6 +1261,16 @@
             document.getElementById('run-all-btn').addEventListener('click', runAllAnalyses);
             document.getElementById('run-optimizer-btn').addEventListener('click', runDoseOptimizer);
             document.getElementById('restore-file').addEventListener('change', restoreFromBackup);
+
+            // Auto-load patient profile & history when selected from datalist dropdown
+            const pNameEl = document.getElementById('patient-name');
+            if (pNameEl) {
+                pNameEl.addEventListener('change', () => {
+                    const name = pNameEl.value.trim();
+                    if (name) loadPatientData();
+                });
+            }
+
             ['quick-hct-level', 'quick-hct-initial', 'quick-hct-hb'].forEach(id =>
                 document.getElementById(id).addEventListener('input', (e) => {
                     if (e.target.id === 'quick-hct-hb') syncHbHct('hb');
@@ -1139,11 +1280,32 @@
             );
         }
 
+        function updateForecastDateAuto() {
+            // Forecast target is the next scheduled C0 — 15 min before the next
+            // 07:00/19:00 dose, per the sampling protocol. Landing exactly on the
+            // dose time would sit on the absorption discontinuity (see nextC0Time).
+            let nextTrough;
+            const doses = clinicalData.filter(d => d.dose !== null && d.dose > 0);
+            if (doses.length > 0) {
+                const sorted = [...doses].sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
+                const latest = sorted[sorted.length - 1];
+                nextTrough = nextC0Time(dayjs(latest.datetime));
+            } else {
+                const txDateStr = getFormattedDate('transplant-date', 'YYYY-MM-DD');
+                const base = txDateStr ? dayjs(txDateStr) : dayjs();
+                nextTrough = nextC0Time(base.add(1, 'day').startOf('day'));
+            }
+
+            const predFP = document.getElementById('prediction-datetime') ? document.getElementById('prediction-datetime')._flatpickr : null;
+            const tgtFP = document.getElementById('target-date-input') ? document.getElementById('target-date-input')._flatpickr : null;
+            if (predFP) predFP.setDate(nextTrough.toDate(), true);
+            if (tgtFP) tgtFP.setDate(nextTrough.toDate(), true);
+        }
+
         function setDefaults() {
             const td = document.getElementById('transplant-date')._flatpickr;
-            const pd = document.getElementById('prediction-datetime')._flatpickr;
             if (!td.input.value) td.setDate(dayjs().subtract(30, 'day').toDate(), true);
-            if (!pd.input.value) pd.setDate(dayjs().hour(7).minute(0).toDate(), true);
+            updateForecastDateAuto();
         }
 
         // ============================================================
@@ -1172,110 +1334,266 @@
         // PATIENT PERSISTENCE
         // ============================================================
         // ── BACKEND INTEGRATION ────────────────────────────────────
-        // Automatically uses localhost for testing, and relative '/api' for Vercel production
-        let API_BASE = localStorage.getItem('tacro_api_base') || 
-            ((window.location.hostname === "localhost" || window.location.protocol === "file:") 
-                ? "http://localhost:8000/api" 
+        // Automatically uses localhost/127.0.0.1 for testing, and relative '/api' for Vercel production
+        let API_BASE = localStorage.getItem('tacro_api_base') ||
+            ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:")
+                ? "http://localhost:8000/api"
                 : "/api");
 
         async function populatePatientList() {
+            let list = [];
             try {
                 const res = await fetch(`${API_BASE}/patients`);
-                if (!res.ok) throw new Error("Failed to fetch");
-                const list = await res.json();
-                const dl = document.getElementById('patient-list');
-                dl.innerHTML = list.map(p => `<option value="${p.mrn}">`).join('');
+                if (res.ok) {
+                    const apiList = await res.json();
+                    list = apiList.map(p => p.mrn);
+                }
             } catch (err) {
-                console.error("Backend offline, relying on cache/UI", err);
+                console.warn("Backend offline or unreachable, using local storage cache", err);
+            }
+
+            // Merge with LocalStorage cached list
+            try {
+                const localList = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+                localList.forEach(item => {
+                    const nameStr = typeof item === 'string' ? item : (item.mrn || item.name);
+                    if (nameStr && !list.map(l => l.toLowerCase()).includes(nameStr.toLowerCase())) {
+                        list.push(nameStr);
+                    }
+                });
+            } catch (e) {
+                console.error("Failed to parse local patient list:", e);
+            }
+
+            const dl = document.getElementById('patient-list');
+            if (dl) {
+                dl.innerHTML = list.map(p => `<option value="${p}">`).join('');
             }
         }
 
+        function getFormattedDate(elementId, formatStr = 'YYYY-MM-DD') {
+            const el = document.getElementById(elementId);
+            if (!el) return '';
+
+            // 1. Try flatpickr selectedDates (most reliable)
+            if (el._flatpickr && el._flatpickr.selectedDates && el._flatpickr.selectedDates.length > 0) {
+                const d = el._flatpickr.selectedDates[0];
+                if (d && !isNaN(d.getTime())) {
+                    return dayjs(d).format(formatStr);
+                }
+            }
+
+            // 2. Try flatpickr raw hidden input
+            if (el._flatpickr && el._flatpickr.input && el._flatpickr.input.value) {
+                const rawVal = el._flatpickr.input.value.trim();
+                const parsed = dayjs(rawVal);
+                if (parsed.isValid()) return parsed.format(formatStr);
+            }
+
+            // 3. Fallback to DOM input value directly
+            if (el.value) {
+                const val = el.value.trim();
+                let parsed = dayjs(val);
+                if (parsed.isValid()) return parsed.format(formatStr);
+
+                // Custom regex parsing for dd-Mmm-yy or dd/mm/yyyy
+                const parts = val.split(/[-/ ]/);
+                if (parts.length === 3) {
+                    const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+                    const mIdx = months.findIndex(m => parts[1].toLowerCase().startsWith(m));
+                    if (mIdx !== -1) {
+                        let day = parseInt(parts[0]);
+                        let yr = parseInt(parts[2]);
+                        if (yr < 100) yr += 2000;
+                        const d = new Date(yr, mIdx, day);
+                        if (!isNaN(d.getTime())) return dayjs(d).format(formatStr);
+                    }
+                }
+            }
+            return '';
+        }
+
         async function savePatientData() {
-            const name = document.getElementById('patient-name').value.trim();
-            if (!name) { showAlert('Enter a patient MRN/Name', 'error'); return; }
-            
-            const txDateStr = document.getElementById('transplant-date')._flatpickr.input.value;
-            if (!txDateStr) { showAlert('Please select a transplant date first', 'error'); return; }
-            
+            const nameInput = document.getElementById('patient-name');
+            const name = nameInput ? nameInput.value.trim() : '';
+            if (!name) {
+                if (nameInput) {
+                    nameInput.style.borderColor = 'var(--col-danger, #ef4444)';
+                    nameInput.focus();
+                    nameInput.addEventListener('input', () => { nameInput.style.borderColor = ''; }, { once: true });
+                }
+                showAlert('Please enter a Patient Name / MRN before saving', 'error');
+                return;
+            }
+
+            const txDateStr = getFormattedDate('transplant-date', 'YYYY-MM-DD');
+            if (!txDateStr) {
+                showAlert('Please select a transplant date first', 'error');
+                return;
+            }
+
             const pData = {
                 mrn: name.toLowerCase(),
-                transplant_date: document.getElementById('transplant-date')._flatpickr.input.value,
+                transplant_date: txDateStr,
                 weight: parseFloat(document.getElementById('weight').value) || 60,
                 hematocrit: parseFloat(document.getElementById('hematocrit').value) || 35,
                 mpa: parseInt(document.getElementById('mpa').value) || 1,
                 bioassay: parseInt(document.getElementById('bioassay').value) || 1,
                 genotype: document.getElementById('genotype').value || 'unknown',
-                transplant_type: document.getElementById('transplant-type').value,
+                transplant_type: document.getElementById('transplant-type').value || 'Live Related',
                 albumin: parseFloat(document.getElementById('albumin').value) || 3.5,
                 bilirubin: parseFloat(document.getElementById('bilirubin').value) || 1.0,
                 inhibitor: document.getElementById('inhibitor').value || 'none'
             };
-            
+
+            // 1. Always save locally first (ensures offline persistence)
             try {
-                // Save Patient Profile
+                const fullLocalRecord = {
+                    profile: pData,
+                    events: clinicalData,
+                    updatedAt: new Date().toISOString()
+                };
+                localStorage.setItem(`tacrolimusDashboard_${pData.mrn}`, JSON.stringify(fullLocalRecord));
+
+                let localList = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+                if (!localList.map(n => typeof n === 'string' ? n.toLowerCase() : '').includes(pData.mrn)) {
+                    localList.push(name);
+                    localStorage.setItem('tacrolimusPatientList', JSON.stringify(localList));
+                }
+            } catch (e) {
+                console.error("LocalStorage save error:", e);
+            }
+
+            // 2. Sync to Backend Database
+            let backendSaved = false;
+            let backendErr = null;
+            try {
                 let res = await fetch(`${API_BASE}/patients`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(pData)
                 });
-                if (!res.ok) throw new Error("Failed to save patient profile");
-                
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.detail ? (typeof errData.detail === 'string' ? errData.detail : JSON.stringify(errData.detail)) : `HTTP ${res.status}`);
+                }
+
                 // Save Clinical Events
                 const events = clinicalData.map(c => ({
-                    datetime: c.datetime,
-                    dose: c.dose,
-                    level: c.level
+                    datetime: c.datetime ? c.datetime.replace(' ', 'T') : new Date().toISOString(),
+                    dose: c.dose !== undefined ? c.dose : null,
+                    level: c.level !== undefined ? c.level : null
                 }));
-                
+
                 res = await fetch(`${API_BASE}/patients/${pData.mrn}/events`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(events)
                 });
-                if (!res.ok) throw new Error("Failed to save clinical events");
-                
-                populatePatientList();
-                showAlert(`Saved: ${name} to Database`, 'success');
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.detail ? (typeof errData.detail === 'string' ? errData.detail : JSON.stringify(errData.detail)) : `HTTP ${res.status}`);
+                }
+
+                backendSaved = true;
             } catch (err) {
-                showAlert(`Database Error: ${err.message}`, 'error');
+                console.warn("Backend save skipped or failed:", err);
+                backendErr = err.message;
+            }
+
+            populatePatientList();
+
+            if (backendSaved) {
+                showAlert(`Saved: ${name} to Database & Local Cache`, 'success');
+            } else {
+                showAlert(`Saved: ${name} Locally (${backendErr ? backendErr : 'Backend offline'})`, 'warning');
             }
         }
 
         async function loadPatientData() {
-            const name = document.getElementById('patient-name').value.trim().toLowerCase();
-            if (!name) { showAlert('Enter a patient MRN/Name', 'error'); return; }
-            
+            const nameInput = document.getElementById('patient-name');
+            const name = nameInput ? nameInput.value.trim().toLowerCase() : '';
+            if (!name) {
+                if (nameInput) { nameInput.style.borderColor = 'var(--col-danger, #ef4444)'; nameInput.focus(); }
+                showAlert('Enter a patient MRN/Name to load', 'error');
+                return;
+            }
+
+            let loadedData = null;
+            let loadedFrom = '';
+
+            // 1. Try Backend API first
             try {
                 const res = await fetch(`${API_BASE}/patients/${name}`);
-                if (!res.ok) throw new Error("Patient not found in Database");
-                const p = await res.json();
-                
-                document.getElementById('transplant-date')._flatpickr.setDate(p.transplant_date, true);
-                document.getElementById('weight').value = p.weight;
-                document.getElementById('hematocrit').value = p.hematocrit;
-                document.getElementById('mpa').value = p.mpa;
-                document.getElementById('bioassay').value = p.bioassay;
-                document.getElementById('genotype').value = p.genotype;
-                document.getElementById('transplant-type').value = p.transplant_type || 'Live Related';
-                document.getElementById('albumin').value = p.albumin;
-                document.getElementById('bilirubin').value = p.bilirubin;
-                document.getElementById('inhibitor').value = p.inhibitor;
-                
-                const eventsRes = await fetch(`${API_BASE}/patients/${name}/events`);
-                const events = await eventsRes.json();
-                
-                clinicalData = events.map(e => ({
-                    id: e.id,
-                    datetime: e.datetime.replace('T', ' ').substring(0, 16),
-                    dose: e.dose,
-                    level: e.level
-                }));
-                
-                renderDoseLog(); renderLevelLog(); hideOutput();
-                showAlert(`Loaded: ${name} from Database`, 'success');
+                if (res.ok) {
+                    const p = await res.json();
+                    const eventsRes = await fetch(`${API_BASE}/patients/${name}/events`);
+                    const events = eventsRes.ok ? await eventsRes.json() : [];
+
+                    loadedData = {
+                        profile: p,
+                        events: events.map(e => ({
+                            id: e.id,
+                            datetime: e.datetime ? e.datetime.replace('T', ' ').substring(0, 16) : '',
+                            dose: e.dose,
+                            level: e.level
+                        }))
+                    };
+                    loadedFrom = 'Database';
+                }
             } catch (err) {
-                showAlert(`Error: ${err.message}`, 'error');
+                console.warn("Backend load offline, checking LocalStorage...", err);
             }
+
+            // 2. Fallback to LocalStorage
+            if (!loadedData) {
+                const localRaw = localStorage.getItem(`tacrolimusDashboard_${name}`);
+                if (localRaw) {
+                    try {
+                        const parsed = JSON.parse(localRaw);
+                        if (parsed.profile) {
+                            loadedData = { profile: parsed.profile, events: parsed.events || [] };
+                        } else {
+                            loadedData = { profile: parsed, events: [] };
+                        }
+                        loadedFrom = 'Local Cache';
+                    } catch (e) {
+                        console.error("Local record parsing error:", e);
+                    }
+                }
+            }
+
+            if (!loadedData) {
+                showAlert(`Patient "${name}" not found in Database or Local Storage`, 'error');
+                return;
+            }
+
+            // Populate UI fields
+            const p = loadedData.profile;
+            if (p.transplant_date) {
+                const txEl = document.getElementById('transplant-date');
+                if (txEl && txEl._flatpickr) {
+                    txEl._flatpickr.setDate(p.transplant_date, true);
+                } else if (txEl) {
+                    txEl.value = p.transplant_date;
+                }
+            }
+            if (p.weight !== undefined) document.getElementById('weight').value = p.weight;
+            if (p.hematocrit !== undefined) document.getElementById('hematocrit').value = p.hematocrit;
+            if (p.mpa !== undefined) document.getElementById('mpa').value = p.mpa;
+            if (p.bioassay !== undefined) document.getElementById('bioassay').value = p.bioassay;
+            if (p.genotype !== undefined) document.getElementById('genotype').value = p.genotype;
+            if (p.transplant_type !== undefined) document.getElementById('transplant-type').value = p.transplant_type || 'Live Related';
+            if (p.albumin !== undefined) document.getElementById('albumin').value = p.albumin;
+            if (p.bilirubin !== undefined) document.getElementById('bilirubin').value = p.bilirubin;
+            if (p.inhibitor !== undefined) document.getElementById('inhibitor').value = p.inhibitor;
+
+            clinicalData = loadedData.events || [];
+
+            renderDoseLog();
+            renderLevelLog();
+            hideOutput();
+            showAlert(`Loaded: ${name} (from ${loadedFrom})`, 'success');
         }
 
         function clearAllData(clearName = true) {
@@ -1347,18 +1665,18 @@
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 try {
                     const text = e.target.result;
                     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-                    
+
                     let parseMode = 0;
                     let newClinicalData = [];
-                    
+
                     for (let i = 0; i < lines.length; i++) {
                         const line = lines[i];
                         const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
-                        
+
                         if (cols[0] === 'Patient') {
                             parseMode = 1;
                             continue;
@@ -1366,7 +1684,7 @@
                             parseMode = 3;
                             continue;
                         }
-                        
+
                         if (parseMode === 1) {
                             document.getElementById('patient-name').value = cols[0] || '';
                             if (cols[1]) document.getElementById('transplant-date')._flatpickr.setDate(cols[1], true);
@@ -1391,7 +1709,7 @@
                             }
                         }
                     }
-                    
+
                     clinicalData = newClinicalData;
                     renderDoseLog();
                     renderLevelLog();
@@ -1409,36 +1727,36 @@
             const type = document.getElementById('transplant-type').value;
             const txDateStr = document.getElementById('transplant-date')._flatpickr.input.value;
             const wt = parseFloat(document.getElementById('weight').value) || 60;
-            
+
             if (!txDateStr) {
                 showAlert('Please set a transplant date first', 'error');
                 return;
             }
-            
+
             if (clinicalData.length > 0 && !confirm('This will clear existing doses and apply the starting protocol. Continue?')) {
                 return;
             }
-            
+
             // Clear existing doses (keep levels?)
             // Usually safest to keep levels but clear doses if they overlap.
             // For now, let's just clear all to be clean.
             clinicalData = clinicalData.filter(r => r.level !== null);
-            
+
             const txDate = dayjs(txDateStr);
             const maintDaily = wt * 0.15;
             const maintSingle = Math.round((maintDaily / 2) * 2) / 2; // Round to nearest 0.5mg
-            
+
             if (type === 'Live Related') {
                 // Day -2 evening (19:00): 0.8 mg/kg single dose? 
                 // User said 0.8mg/kg. As per clinical safety, I suspect they meant 0.08mg/kg.
                 // 0.8mg/kg for 60kg is 48mg. 0.08mg/kg for 60kg is 4.8mg (standard).
                 // I will use 0.08 but add a warning if it looks unusual.
                 const loadingDose = Math.round((wt * 0.08) * 2) / 2;
-                
+
                 // Day -2
                 const dMinus2 = txDate.subtract(2, 'day').hour(19).minute(0);
                 clinicalData.push({ datetime: dMinus2.format("YYYY-MM-DD HH:mm"), dose: loadingDose, level: null });
-                
+
                 // Day -1 onwards (maintenance)
                 for (let i = -1; i <= 3; i++) {
                     const am = txDate.add(i, 'day').hour(7).minute(0);
@@ -1457,7 +1775,7 @@
                 }
                 showAlert(`Deceased Donor protocol applied: 0.15mg/kg/d started on Day 0.`, 'success');
             }
-            
+
             clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
             renderDoseLog();
             renderLevelLog();
@@ -1465,8 +1783,8 @@
         }
 
         function openSettingsModal() {
-            const defaultUrl = (window.location.hostname === "localhost" || window.location.protocol === "file:") 
-                ? "http://localhost:8000/api" 
+            const defaultUrl = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:")
+                ? "http://localhost:8000/api"
                 : "/api";
             document.getElementById('settings-api-base').value = localStorage.getItem('tacro_api_base') || defaultUrl;
             document.getElementById('settingsModal').classList.add('open');
@@ -1480,9 +1798,9 @@
                 localStorage.setItem('tacro_api_base', url);
                 showAlert(`Backend URL updated: ${url}`, 'success');
             }
-            API_BASE = localStorage.getItem('tacro_api_base') || 
-                ((window.location.hostname === "localhost" || window.location.protocol === "file:") 
-                    ? "http://localhost:8000/api" 
+            API_BASE = localStorage.getItem('tacro_api_base') ||
+                ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:")
+                    ? "http://localhost:8000/api"
                     : "/api");
             populatePatientList();
         }
@@ -1530,7 +1848,7 @@
                         ]);
                         if (!patRes.ok || !eventsRes.ok) continue;
                         const patData = await patRes.json();
-                        const events  = await eventsRes.json();
+                        const events = await eventsRes.json();
 
                         const txDate = dayjs(patData.transplant_date);
                         if (!txDate.isValid()) continue;
@@ -1556,35 +1874,35 @@
                         const allDoses = filledHistory;
 
                         const pkPatientData = {
-                            weight:    parseFloat(patData.weight)     || 60,
-                            mpa:       patData.mpa                    != null ? String(patData.mpa) : '1',
-                            genotype:  patData.genotype               || 'unknown',
-                            bilirubin: parseFloat(patData.bilirubin)  || 1.0,
-                            inhibitor: patData.inhibitor              || 'none',
+                            weight: parseFloat(patData.weight) || 60,
+                            mpa: patData.mpa != null ? String(patData.mpa) : '1',
+                            genotype: patData.genotype || 'unknown',
+                            bilirubin: parseFloat(patData.bilirubin) || 1.0,
+                            inhibitor: patData.inhibitor || 'none',
                             transplantDate: txDate
                         };
 
                         const popParams = getPopulationParameters(pkPatientData);
                         const popMetrics = calculateAccuracyMetrics(measuredLevels, allDoses, popParams, patData.bioassay || 1);
 
-                        const indParams  = mapBayesian(popParams, measuredLevels, allDoses, patData.bioassay || 1);
+                        const indParams = mapBayesian(popParams, measuredLevels, allDoses, patData.bioassay || 1);
                         const indMetrics = calculateAccuracyMetrics(measuredLevels, allDoses, indParams, patData.bioassay || 1);
 
                         // Geometric mean of (pop_pred / obs) for scalar correction
                         const logRatios = measuredLevels.map(obs => {
                             let pred = predictAtTime(obs.time, allDoses, popParams);
-                            if ((patData.bioassay || 1) === 2) pred = 1.08 * pred + 0.55;
+                            if ((patData.bioassay || 1) === 2) pred = cmiaAdjust(pred);
                             return Math.log(pred / obs.level);
                         });
                         const geoMeanRatio = Math.exp(logRatios.reduce((s, v) => s + v, 0) / logRatios.length);
 
                         patientResults.push({
-                            mrn:        p.mrn,
-                            nObs:       measuredLevels.length,
-                            popMPE:     popMetrics.mpe,
-                            popMAPE:    popMetrics.mape,
-                            indMPE:     indMetrics.mpe,
-                            indMAPE:    indMetrics.mape,
+                            mrn: p.mrn,
+                            nObs: measuredLevels.length,
+                            popMPE: popMetrics.mpe,
+                            popMAPE: popMetrics.mape,
+                            indMPE: indMetrics.mpe,
+                            indMAPE: indMetrics.mape,
                             geoMeanRatio
                         });
                     } catch (_) { /* skip patients with data issues */ }
@@ -1609,9 +1927,9 @@
             document.getElementById('calib-results').style.display = 'block';
 
             const nPts = results.reduce((s, r) => s + r.nObs, 0);
-            const cohortPopMPE  = results.reduce((s, r) => s + r.popMPE,  0) / results.length;
+            const cohortPopMPE = results.reduce((s, r) => s + r.popMPE, 0) / results.length;
             const cohortPopMAPE = results.reduce((s, r) => s + r.popMAPE, 0) / results.length;
-            const cohortIndMPE  = results.reduce((s, r) => s + r.indMPE,  0) / results.length;
+            const cohortIndMPE = results.reduce((s, r) => s + r.indMPE, 0) / results.length;
             const cohortIndMAPE = results.reduce((s, r) => s + r.indMAPE, 0) / results.length;
 
             // Geometric mean correction factor across all patients
@@ -1626,22 +1944,22 @@
             if (absBias < 10) {
                 statusColor = '#d1fae5'; statusIcon = '✅';
                 statusTitle = 'Well Calibrated';
-                statusDesc  = `Population bias is ${cohortPopMPE.toFixed(1)}% — within acceptable range (<±10%). Current scalar is appropriate for this center.`;
+                statusDesc = `Population bias is ${cohortPopMPE.toFixed(1)}% — within acceptable range (<±10%). Current scalar is appropriate for this center.`;
             } else if (absBias < 20) {
                 statusColor = '#fef3c7'; statusIcon = '⚠️';
                 statusTitle = 'Mild Bias Detected';
-                statusDesc  = `Population bias is ${cohortPopMPE.toFixed(1)}%. Consider applying the suggested scalar to reduce systematic error.`;
+                statusDesc = `Population bias is ${cohortPopMPE.toFixed(1)}%. Consider applying the suggested scalar to reduce systematic error.`;
             } else {
                 statusColor = '#fee2e2'; statusIcon = '🔴';
                 statusTitle = 'Significant Bias — Recalibration Recommended';
-                statusDesc  = `Population bias is ${cohortPopMPE.toFixed(1)}% (threshold: ±20%). Apply the suggested scalar before clinical use.`;
+                statusDesc = `Population bias is ${cohortPopMPE.toFixed(1)}% (threshold: ±20%). Apply the suggested scalar before clinical use.`;
             }
 
             const banner = document.getElementById('calib-status-banner');
             banner.style.background = statusColor;
-            document.getElementById('calib-status-icon').textContent  = statusIcon;
+            document.getElementById('calib-status-icon').textContent = statusIcon;
             document.getElementById('calib-status-title').textContent = statusTitle;
-            document.getElementById('calib-status-desc').textContent  = statusDesc;
+            document.getElementById('calib-status-desc').textContent = statusDesc;
 
             // Summary grid
             const grid = document.getElementById('calib-summary-grid');
@@ -1658,20 +1976,20 @@
 
             // Pop stats
             document.getElementById('calib-pop-stats').innerHTML = statRows([
-                ['MPE (bias)',      cohortPopMPE.toFixed(1)  + '%', Math.abs(cohortPopMPE)  < 10 ? 'good' : Math.abs(cohortPopMPE)  < 20 ? 'warn' : 'bad'],
+                ['MPE (bias)', cohortPopMPE.toFixed(1) + '%', Math.abs(cohortPopMPE) < 10 ? 'good' : Math.abs(cohortPopMPE) < 20 ? 'warn' : 'bad'],
                 ['MAPE (imprecision)', cohortPopMAPE.toFixed(1) + '%', cohortPopMAPE < 20 ? 'good' : cohortPopMAPE < 30 ? 'warn' : 'bad'],
             ]);
 
             // Ind stats
             document.getElementById('calib-ind-stats').innerHTML = statRows([
-                ['MPE (bias)',      cohortIndMPE.toFixed(1)  + '%', Math.abs(cohortIndMPE)  < 10 ? 'good' : Math.abs(cohortIndMPE)  < 20 ? 'warn' : 'bad'],
+                ['MPE (bias)', cohortIndMPE.toFixed(1) + '%', Math.abs(cohortIndMPE) < 10 ? 'good' : Math.abs(cohortIndMPE) < 20 ? 'warn' : 'bad'],
                 ['MAPE (imprecision)', cohortIndMAPE.toFixed(1) + '%', cohortIndMAPE < 15 ? 'good' : cohortIndMAPE < 25 ? 'warn' : 'bad'],
             ]);
 
             // Scalar box
-            document.getElementById('calib-scalar-current').textContent   = currentScalar.toFixed(3);
+            document.getElementById('calib-scalar-current').textContent = currentScalar.toFixed(3);
             document.getElementById('calib-scalar-suggested').textContent = suggestedScalar.toFixed(3);
-            document.getElementById('calib-apply-btn').dataset.suggested  = suggestedScalar;
+            document.getElementById('calib-apply-btn').dataset.suggested = suggestedScalar;
 
             const scalarDiff = Math.abs(suggestedScalar - currentScalar);
             if (scalarDiff < 0.01) {
@@ -1763,7 +2081,13 @@
                 document.getElementById('newLevel').value = r.level || '';
             } else {
                 const last = clinicalData.length > 0 ? dayjs(clinicalData[clinicalData.length - 1].datetime) : dayjs();
-                defaultDate = last.add(1, 'day').hour(7).minute(0).toDate();
+                // Doses go on the 07:00/19:00 slot; levels are C0 samples, drawn
+                // SAMPLING_LEAD_MIN before the dose (06:45/18:45). Defaulting a
+                // level to the dose time itself puts it on the discontinuity where
+                // being 15 min late inflates the reading ~30%.
+                defaultDate = type === 'level'
+                    ? nextC0Time(last.add(1, 'day').startOf('day')).toDate()
+                    : last.add(1, 'day').hour(DOSE_SLOTS.AM).minute(0).toDate();
                 document.getElementById('newDose').value = '';
                 document.getElementById('newLevel').value = '';
             }
@@ -1776,22 +2100,50 @@
         function hideAddRecordModal() { document.getElementById('addRecordModal').classList.remove('open'); }
 
         function saveRecord() {
-            const datetimeStr = document.getElementById('newDateTime').value;
+            const dtEl = document.getElementById('newDateTime');
+            let datetimeStr = '';
+            if (dtEl && dtEl._flatpickr && dtEl._flatpickr.selectedDates && dtEl._flatpickr.selectedDates.length > 0) {
+                datetimeStr = dayjs(dtEl._flatpickr.selectedDates[0]).format("YYYY-MM-DD HH:mm");
+            } else if (dtEl && dtEl.value) {
+                datetimeStr = dtEl.value;
+            }
+
             const dose = document.getElementById('newDose').value;
             const level = document.getElementById('newLevel').value;
             const indexStr = document.getElementById('editIndex').value;
             const type = document.getElementById('recordType').value;
-            if (!datetimeStr) { showAlert('Enter a valid date/time', 'error'); return; }
+
+            if (!datetimeStr || !dayjs(datetimeStr).isValid()) {
+                showAlert('Please enter a valid date & time', 'error');
+                return;
+            }
+
             const datetime = dayjs(datetimeStr).format("YYYY-MM-DD HH:mm");
-            const txDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value);
-            if (!txDate.isValid()) { showAlert('Set transplant date first', 'error'); return; }
-            if (dayjs(datetime).isBefore(txDate.startOf('day'))) { showAlert('Record cannot be before transplant date', 'error'); return; }
+
+            // Check transplant date validation safely without blocking
+            const txEl = document.getElementById('transplant-date');
+            let txDateStr = '';
+            if (txEl && txEl._flatpickr && txEl._flatpickr.selectedDates && txEl._flatpickr.selectedDates.length > 0) {
+                txDateStr = dayjs(txEl._flatpickr.selectedDates[0]).format('YYYY-MM-DD');
+            } else if (txEl && txEl.value) {
+                txDateStr = txEl.value;
+            }
+
+            if (txDateStr) {
+                const txDate = dayjs(txDateStr);
+                if (txDate.isValid() && dayjs(datetime).isBefore(txDate.startOf('day'))) {
+                    showAlert('Record date cannot be before transplant date', 'error');
+                    return;
+                }
+            }
 
             if (indexStr !== '') {
                 const idx = parseInt(indexStr);
-                clinicalData[idx].datetime = datetime;
-                if (type === 'dose') clinicalData[idx].dose = (dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null;
-                if (type === 'level') clinicalData[idx].level = (level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null;
+                if (clinicalData[idx]) {
+                    clinicalData[idx].datetime = datetime;
+                    if (type === 'dose') clinicalData[idx].dose = (dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null;
+                    if (type === 'level') clinicalData[idx].level = (level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null;
+                }
             } else {
                 const existing = clinicalData.find(r => r.datetime === datetime);
                 if (existing) {
@@ -1805,8 +2157,19 @@
                     });
                 }
             }
+
             clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
-            renderDoseLog(); renderLevelLog(); hideAddRecordModal(); savePatientData(); showAlert('Saved', 'success');
+            renderDoseLog();
+            renderLevelLog();
+            hideAddRecordModal();
+
+            // Auto-save patient record
+            const name = document.getElementById('patient-name').value.trim();
+            if (name) {
+                savePatientData();
+            } else {
+                showAlert('Record updated in log (Enter a Patient Name & click Save to persist)', 'info');
+            }
         }
 
         function deleteRecord(index, type) {
@@ -1828,29 +2191,29 @@
             const last = clinicalData.length > 0 ? clinicalData[clinicalData.length - 1] : null;
             if (last) { base = dayjs(last.datetime).startOf('day').add(1, 'day'); }
             else { base = dayjs(txStr, "YYYY-MM-DD").add(1, 'day'); }
-            
+
             const wt = parseFloat(document.getElementById('weight').value) || 60;
             const defaultInitDose = Math.round((wt * 0.15 / 2) * 2) / 2;
-            
+
             const reversedDoses = [...clinicalData].reverse().filter(r => r.dose !== null);
             const lastAM = reversedDoses.find(r => dayjs(r.datetime).hour() < 12);
             const lastPM = reversedDoses.find(r => dayjs(r.datetime).hour() >= 12);
-            
+
             const doseAM = lastAM ? lastAM.dose : (reversedDoses.length > 0 ? reversedDoses[0].dose : defaultInitDose);
             const dosePM = lastPM ? lastPM.dose : (reversedDoses.length > 0 ? reversedDoses[0].dose : defaultInitDose);
 
-            const am = base.hour(7).minute(0).format("YYYY-MM-DD HH:mm");
-            const pm = base.hour(19).minute(0).format("YYYY-MM-DD HH:mm");
+            const am = base.hour(DOSE_SLOTS.AM).minute(0).format("YYYY-MM-DD HH:mm");
+            const pm = base.hour(DOSE_SLOTS.PM).minute(0).format("YYYY-MM-DD HH:mm");
             if (!clinicalData.find(r => r.datetime === am)) clinicalData.push({ datetime: am, dose: doseAM, level: null });
             if (!clinicalData.find(r => r.datetime === pm)) clinicalData.push({ datetime: pm, dose: dosePM, level: null });
             clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
 
-            // Auto-suggest: next trough = Day 4 after this dose at 07:00 AM (clinical standard)
-            const nextLevelDate = base.add(4, 'day').hour(7).minute(0);
+            // Auto-suggest: next trough = Day 4 C0 (06:45, i.e. 15 min pre-dose)
+            const nextLevelDate = nextC0Time(base.add(4, 'day').startOf('day'));
             const predFP = document.getElementById('prediction-datetime')._flatpickr;
-            const tgtFP  = document.getElementById('target-date-input')._flatpickr;
+            const tgtFP = document.getElementById('target-date-input')._flatpickr;
             if (predFP) predFP.setDate(nextLevelDate.toDate(), true);
-            if (tgtFP)  tgtFP.setDate(nextLevelDate.toDate(), true);
+            if (tgtFP) tgtFP.setDate(nextLevelDate.toDate(), true);
 
             renderDoseLog(); renderLevelLog(); savePatientData();
             showAlert(`Dose day added (AM: ${doseAM.toFixed(1)}, PM: ${dosePM.toFixed(1)}). Next trough suggested: Day 4`, 'success');
@@ -1870,6 +2233,7 @@
                 </tr>` : '')
                 .join('');
             tbody.innerHTML = rows || '<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--col-muted);">No doses logged</td></tr>';
+            updateForecastDateAuto();
         }
 
         function renderLevelLog() {
@@ -1927,7 +2291,7 @@
             const m = PK_MODEL;
             const cyp = m.CYP3A5[genotype] || m.CYP3A5['unknown'];
             const wtCL = Math.pow(weight / m.WT_REF, m.WT_CL);
-            const wtV  = Math.pow(weight / m.WT_REF, m.WT_V);
+            const wtV = Math.pow(weight / m.WT_REF, m.WT_V);
             const mpaF = parseInt(mpa) === 1 ? m.MPA_CL : 1.0;
 
             // ── HCT REMOVED FROM CL ──────────────────────────────────────────────
@@ -1955,7 +2319,7 @@
 
             return {
                 CL: m.TVCL * m.INDIAN_CL_SCALAR * cyp * wtCL * mpaF * bilF * inhibitorF,
-                V:  m.TVV  * wtV,
+                V: m.TVV * wtV,
                 // KA is population-fixed (4.53 hr⁻¹). Absorption variability (~30% CV)
                 // is not individualised by MAP — negligible for trough-only TDM.
                 KA: m.TVKA
@@ -1963,74 +2327,25 @@
         }
 
         // ============================================================
-        // TIME-VARYING MATURATION MODEL (Early Post-Transplant)
+        // TIME-VARYING MATURATION MODEL — REMOVED
         //
-        // ⚠ CLINICAL NOTICE: This is a HEURISTIC submodel.
-        // The Størset 2014 population PK model does NOT include a
-        // time-varying maturation component. The coefficients below
-        // are empirically derived approximations and have NOT been
-        // prospectively validated. Predictions in the first 21 days
-        // post-transplant carry substantially wider uncertainty than
-        // the MC CI bands indicate.
+        // A heuristic early-post-transplant submodel (bioavailability
+        // recovery / oedema / hepatic CL maturation factors) previously
+        // lived here. It was disabled after the Sangha 2024 validation
+        // (n=103 Indian patients) showed it made predictions worse:
+        // MAPE 40% → 53%, F30 65% → 58%. The corrections overcorrected
+        // early CL/V for Indian *3/*3 patients.
         //
-        // Pharmacological rationale:
-        //   CL/F and V/F are APPARENT parameters (F is embedded in
-        //   Størset reference estimates). Early post-transplant, oral
-        //   bioavailability (F) is depressed by surgical gut oedema
-        //   and delayed gastric emptying — causing APPARENT CL/F to
-        //   be HIGHER than at steady state (CL/F = CL_true / F_actual).
-        //   Dividing by f_ratio < 1 correctly inflates apparent CL/F.
+        // The code has now been deleted rather than left dormant — it was
+        // never called, and ~70 lines of detailed documentation for
+        // behaviour the app does not have is actively misleading. Recover
+        // it from git history if it is ever revisited.
         //
-        // Three heuristic correction factors (d = days post-transplant):
-        //
-        //   f_ratio  — bioavailability recovery (smooth exponential).
-        //              f_ratio = 1 − 0.60 × exp(−d / 4.5)
-        //              d=0→0.40, d=7→0.87, d=14→0.97, d=21→0.99
-        //              Replaces the original piecewise formula which had
-        //              a hard 10% step discontinuity at d=14 due to the
-        //              hardcoded 0.90 normalization denominator.
-        //
-        //   edema    — post-surgical volume expansion.
-        //              edema = 1 + 0.80 × exp(−d / 5)
-        //              d=0→1.80, d=7→1.27, d=14→1.09
-        //
-        //   recovery — hepatic CL maturation (logistic sigmoid).
-        //              recovery = 0.5 + 0.5 / (1 + exp(−(d−7)/3))
-        //              d=0→0.54, d=7→0.75, d=14→0.92, d=21→0.99
-        //
-        // Dose-time vs. post-dose time (design note):
-        //   Called with DOSE administration time post-transplant. For
-        //   trough-only TDM this is correct — PK parameters used to
-        //   compute a dose contribution reflect physiology at dose time.
-        //
-        // Pre-transplant doses (d < 0):
-        //   Base population PK returned unchanged. Chronic CL/F is a
-        //   conservative approximation for loading doses.
+        // Consequence to keep in mind: the model has NO early-phase
+        // adjustment, so predictions in the first ~21 days rest on
+        // steady-state population PK. updateSummary() surfaces this as the
+        // "EARLY POST-TRANSPLANT PHASE" caveat.
         // ============================================================
-        function getTimeVaryingPK(baseParams, timePostTxHours) {
-            const d = timePostTxHours / 24;
-
-            // Pre-transplant or beyond 21 days: use base PK unchanged
-            if (d < 0 || d > 21) return { ...baseParams };
-
-            // ── f_ratio: bioavailability recovery ───────────────────────────────
-            // Smooth exponential: continuous, monotone, no hardcoded denominator.
-            // Calibrated to -d / 12.0 to meet Devender validation benchmark (RMSE < 2.0).
-            const f_ratio = 1 - 0.60 * Math.exp(-d / 12.0);
-
-            // ── edema: post-surgical volume expansion ───────────────────────
-            const edema = d <= 14 ? (1 + 0.80 * Math.exp(-d / 5)) : 1.0;
-
-            // ── recovery: hepatic CL maturation (sigmoid) ──────────────────
-            const recovery = 0.5 + 0.5 / (1 + Math.exp(-(d - 7) / 3));
-
-            return {
-                CL: (baseParams.CL * recovery) / f_ratio,
-                V:  (baseParams.V  * edema)    / f_ratio,
-                KA: baseParams.KA,
-                F_abs: Math.min(f_ratio, 1.0)
-            };
-        }
 
         function predictSingleDose(timeSinceDose, dose_mg, baseParams, doseTimeHours) {
             // Maturation model disabled: Sangha 2024 validation (n=103 Indian patients)
@@ -2057,14 +2372,21 @@
             }, 0);
         }
 
+        // CMIA (Abbott immunoassay) correction applied to LC-MS/MS-scale predictions
+        // so they are comparable with observed CMIA values:
+        //     CMIA = 1.08 × LC-MS/MS + 0.55
+        // The +0.55 intercept is only meaningful where drug is actually present.
+        // Applying it at c = 0 (before the first dose, or pre-transplant) produced
+        // a spurious 0.55 ng/mL floor on the chart and made the OFV's
+        // `predAdj <= 0.1` degenerate-prediction guard unreachable under CMIA.
+        function cmiaAdjust(c) {
+            return c > 0.01 ? 1.08 * c + 0.55 : c;
+        }
+
         function generateCurve(times, allDoses, params, bioassay) {
             return times.map(t => {
-                let c = predictAtTime(t, allDoses, params);
-                c = Math.max(0, c);
-                // CMIA correction applied to predictions to match observed CMIA values
-                // Correction: CMIA = 1.08 × LC-MS/MS + 0.55
-                if (bioassay === 2) c = 1.08 * c + 0.55;
-                return c;
+                const c = Math.max(0, predictAtTime(t, allDoses, params));
+                return bioassay === 2 ? cmiaAdjust(c) : c;
             });
         }
 
@@ -2084,9 +2406,9 @@
 
             // Build initial simplex around (x0, y0)
             let s = [
-                [x0,        y0,        fn(x0,        y0)],
-                [x0 + step, y0,        fn(x0 + step, y0)],
-                [x0,        y0 + step, fn(x0,        y0 + step)]
+                [x0, y0, fn(x0, y0)],
+                [x0 + step, y0, fn(x0 + step, y0)],
+                [x0, y0 + step, fn(x0, y0 + step)]
             ];
 
             for (let iter = 0; iter < maxIter; iter++) {
@@ -2118,7 +2440,7 @@
                     const [bx, by, bf] = rf < s[2][2] ? [rx, ry, rf] : s[2];
                     const cxc = cx + rho * (bx - cx);
                     const cyc = cy + rho * (by - cy);
-                    const cf  = fn(cxc, cyc);
+                    const cf = fn(cxc, cyc);
                     if (cf < bf) {
                         s[2] = [cxc, cyc, cf];
                     } else {
@@ -2142,34 +2464,54 @@
         // Three-phase optimizer:
         //   Phase 1 — Coarse global grid: basin identification
         //   Phase 2 — Nelder-Mead simplex: convergence to true minimum
-        //   Phase 3 — Boundary-hit detection: clinical reliability flag
+        //   Phase 3 — Outlier / boundary flags: clinical reliability
         //
         // Proportional residual error model (NONMEM-standard WLS):
         //   w = predAdj × SIGMA  (predicted-value weighting, not observed)
         // ============================================================
+        //
+        // SEARCH BOUNDS vs OUTLIER ALERT — deliberately separate concepts.
+        //
+        // The search box is wide on purpose: ±2.5 on ηCL is ±6.5 prior SD
+        // (ω = √0.148 = 0.385) and ±1.5 on ηV is ±5.0 SD (ω = 0.300). That
+        // freedom lets genuine outliers — severe hepatic impairment, strong
+        // CYP3A induction — converge without artificial truncation.
+        //
+        // Because the prior pulls so hard, the search bound is essentially
+        // never reached (a patient with true CL at 15% of population, ηCL =
+        // −1.90 ≈ 5 SD, converges to −1.71). An earlier revision fired the
+        // clinical warning only on a bound hit and described that bound as
+        // "±3 SD", so the warning could never appear. The alert now keys off
+        // PK_MODEL.OUTLIER_SD (3 SD → ηCL 1.154, ηV 0.900), with a separate,
+        // rarer flag for a genuinely truncated fit.
         const ETA_CL_BOUNDS = [-2.5, 2.5];
-        const ETA_V_BOUNDS  = [-1.5, 1.5];
-        const ETA_BOUNDARY_TOL = 0.02;   // warn within 0.02 of hard bound
+        const ETA_V_BOUNDS = [-1.5, 1.5];
+        const ETA_BOUNDARY_TOL = 0.02;   // treat as truncated within this of a hard bound
+        const clamp = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
 
         function mapBayesian(popParams, measuredLevels, allDoses, bioassay) {
             const { OMEGA_CL, OMEGA_V, SIGMA } = PK_MODEL;
 
             if (measuredLevels.length === 0) {
-                return { ...popParams, etaCL: 0, etaV: 0,
-                         rmse: null, mpe: null, mape: null, r2: null, pe: [],
-                         boundaryHit: false };
+                return {
+                    ...popParams, etaCL: 0, etaV: 0,
+                    rmse: null, mpe: null, mape: null, r2: null, pe: [],
+                    boundaryHit: false
+                };
             }
 
             // ── MAP objective function ────────────────────────────────────────
             // OFV = ηCL²/ωCL + ηV²/ωV  +  Σ[(Cobs − Cpred)² / (Cpred·σ)²]
             const ofv = (eCL, eV) => {
-                const p = { CL: popParams.CL * Math.exp(eCL),
-                            V:  popParams.V  * Math.exp(eV),
-                            KA: popParams.KA };
+                const p = {
+                    CL: popParams.CL * Math.exp(eCL),
+                    V: popParams.V * Math.exp(eV),
+                    KA: popParams.KA
+                };
                 const prior = (eCL * eCL) / OMEGA_CL + (eV * eV) / OMEGA_V;
                 const lik = measuredLevels.reduce((s, obs) => {
-                    const pred    = predictAtTime(obs.time, allDoses, p);
-                    const predAdj = bioassay === 2 ? 1.08 * pred + 0.55 : pred;
+                    const pred = predictAtTime(obs.time, allDoses, p);
+                    const predAdj = bioassay === 2 ? cmiaAdjust(pred) : pred;
                     if (predAdj <= 0.1) return s + 1000;
                     const w = predAdj * SIGMA;   // WLS: predicted-value denominator
                     return s + Math.pow((obs.level - predAdj) / w, 2);
@@ -2180,9 +2522,17 @@
             // ── Phase 1: Coarse global grid — basin identification ─────────────
             // Step 0.25 across full eta space to locate the basin of attraction.
             // Kept coarse intentionally; Nelder-Mead refines from here.
+            // Driven by an integer step count: accumulating `e += 0.25` in a float
+            // loop drifts, so the final grid point could fall just past the bound
+            // and be skipped, making the search grid asymmetric.
+            const GRID_STEP = 0.25;
+            const nCL = Math.round((ETA_CL_BOUNDS[1] - ETA_CL_BOUNDS[0]) / GRID_STEP);
+            const nV = Math.round((ETA_V_BOUNDS[1] - ETA_V_BOUNDS[0]) / GRID_STEP);
             let bestCL = 0, bestV = 0, minOFV = Infinity;
-            for (let eCL = ETA_CL_BOUNDS[0]; eCL <= ETA_CL_BOUNDS[1]; eCL += 0.25) {
-                for (let eV = ETA_V_BOUNDS[0]; eV <= ETA_V_BOUNDS[1]; eV += 0.25) {
+            for (let i = 0; i <= nCL; i++) {
+                const eCL = ETA_CL_BOUNDS[0] + i * GRID_STEP;
+                for (let j = 0; j <= nV; j++) {
+                    const eV = ETA_V_BOUNDS[0] + j * GRID_STEP;
                     const v = ofv(eCL, eV);
                     if (v < minOFV) { minOFV = v; bestCL = eCL; bestV = eV; }
                 }
@@ -2191,32 +2541,47 @@
             // ── Phase 2: Nelder-Mead simplex refinement ───────────────────────
             // Starts at the grid winner; converges to sub-1e-8 precision,
             // eliminating the ~7% CL error from a 0.15-step grid.
+            // nelderMead2D is UNCONSTRAINED, so clamp back into the search box —
+            // otherwise indParams could carry an eta the grid would never allow.
             const nm = nelderMead2D(ofv, bestCL, bestV);
-            bestCL = nm.x;
-            bestV  = nm.y;
+            bestCL = clamp(nm.x, ETA_CL_BOUNDS);
+            bestV = clamp(nm.y, ETA_V_BOUNDS);
 
-            // ── Phase 3: Boundary-hit detection ──────────────────────────────
-            // If the optimum sits within ETA_BOUNDARY_TOL of a hard bound,
-            // the MAP estimate is boundary-constrained and potentially
-            // unreliable (patient is a true PK outlier beyond ±3 SD).
+            // ── Phase 3a: Outlier alert (clinical) ───────────────────────────
+            // Fires when the converged fit is beyond OUTLIER_SD prior SDs.
+            // Thresholds derived from ω so they stay correct if the population
+            // variances are ever recalibrated: 3·√0.148 = 1.154, 3·√0.090 = 0.900.
+            const outlierCL = PK_MODEL.OUTLIER_SD * Math.sqrt(OMEGA_CL);
+            const outlierV = PK_MODEL.OUTLIER_SD * Math.sqrt(OMEGA_V);
+            const sdCL = bestCL / Math.sqrt(OMEGA_CL);
+            const sdV = bestV / Math.sqrt(OMEGA_V);
+
+            let outlierMsg = '';
+            if (bestCL <= -outlierCL) outlierMsg += `ηCL ${sdCL.toFixed(1)} SD below population (unusually fast clearance). `;
+            if (bestCL >= outlierCL) outlierMsg += `ηCL ${sdCL.toFixed(1)} SD above population (unusually slow clearance). `;
+            if (bestV <= -outlierV) outlierMsg += `ηV ${sdV.toFixed(1)} SD below population (unusually small V). `;
+            if (bestV >= outlierV) outlierMsg += `ηV ${sdV.toFixed(1)} SD above population (unusually large V). `;
+            const outlierHit = outlierMsg.length > 0;
+
+            // ── Phase 3b: Search-bound truncation (numerical) ────────────────
+            // Distinct from the above: this means the optimiser was actually
+            // stopped by the box, so the estimate is not a free optimum.
             const hitCLLo = bestCL <= ETA_CL_BOUNDS[0] + ETA_BOUNDARY_TOL;
             const hitCLHi = bestCL >= ETA_CL_BOUNDS[1] - ETA_BOUNDARY_TOL;
-            const hitVLo  = bestV  <= ETA_V_BOUNDS[0]  + ETA_BOUNDARY_TOL;
-            const hitVHi  = bestV  >= ETA_V_BOUNDS[1]  - ETA_BOUNDARY_TOL;
+            const hitVLo = bestV <= ETA_V_BOUNDS[0] + ETA_BOUNDARY_TOL;
+            const hitVHi = bestV >= ETA_V_BOUNDS[1] - ETA_BOUNDARY_TOL;
             const boundaryHit = hitCLLo || hitCLHi || hitVLo || hitVHi;
 
-            let boundaryMsg = '';
-            if (hitCLLo) boundaryMsg += 'ηCL at lower bound (very fast CL). ';
-            if (hitCLHi) boundaryMsg += 'ηCL at upper bound (very slow CL). ';
-            if (hitVLo)  boundaryMsg += 'ηV at lower bound (very small V). ';
-            if (hitVHi)  boundaryMsg += 'ηV at upper bound (very large V). ';
+            let boundaryMsg = outlierMsg;
+            if (boundaryHit) boundaryMsg += 'Estimate was truncated at the search boundary — treat the parameter values themselves as unreliable. ';
 
             const indParams = {
                 CL: popParams.CL * Math.exp(bestCL),
-                V:  popParams.V  * Math.exp(bestV),
+                V: popParams.V * Math.exp(bestV),
                 KA: popParams.KA,
                 etaCL: bestCL,
-                etaV:  bestV,
+                etaV: bestV,
+                outlierHit,
                 boundaryHit,
                 boundaryMsg: boundaryMsg.trim()
             };
@@ -2233,7 +2598,7 @@
             const pe = measuredLevels.map((obs, i) => {
                 const pred = (() => {
                     const p = predictAtTime(obs.time, allDoses, params);
-                    return bioassay === 2 ? 1.08 * p + 0.55 : p;
+                    return bioassay === 2 ? cmiaAdjust(p) : p;
                 })();
                 const error = obs.level - pred;
                 const pct = obs.level > 0 ? (error / obs.level) * 100 : 0;
@@ -2251,50 +2616,123 @@
         }
 
         // ============================================================
+        // LAPLACE POSTERIOR COVARIANCE
+        //
+        // Exact (to second order) posterior covariance of (ηCL, ηV) at the
+        // MAP estimate:
+        //
+        //     Σ_post = (Ω⁻¹ + JᵀJ / σ²)⁻¹
+        //
+        // where J[i] = [∂ln C(tᵢ)/∂ηCL, ∂ln C(tᵢ)/∂ηV] is the sensitivity of
+        // each PREDICTED observation to a log-scale change in the parameter.
+        // Differentiating on the η (log) scale is essential — using absolute
+        // CL/V produces a matrix in the wrong units and can yield a "posterior"
+        // wider than the prior, which is impossible.
+        //
+        // This replaces an earlier closed-form heuristic
+        //     var_post = Ω / (1 + Ω·nObs/σ²),  ρ = −0.45 (hardcoded)
+        // which assumed every observation informs CL and V equally with unit
+        // sensitivity. It does not. For a steady-state trough:
+        //     ∂lnC/∂lnCL = −1.20      ∂lnC/∂lnV = +0.20
+        // A trough carries almost no information about V, and because the two
+        // sensitivities have OPPOSITE signs the posterior correlation is
+        // POSITIVE, not negative. (Raising V lowers ke = CL/V and therefore
+        // RAISES the trough, so CL and V move together along the ridge of
+        // equally good fits.)
+        //
+        // Exact values for this model (3mg BID steady state, C0 at 06:45;
+        // prior sd(ηCL) = 0.385, sd(ηV) = 0.300):
+        //     n=1 trough   sd 0.147 / 0.298   ρ = +0.285
+        //     n=3 troughs  sd 0.097 / 0.298   ρ = +0.475
+        //     n=5 troughs  sd 0.081 / 0.298   ρ = +0.576
+        //     n=4 mixed    sd 0.085 / 0.267   ρ = +0.166   (C0 + C2 peak)
+        // sd(ηV) barely moves off the prior because troughs do not identify V —
+        // corroborated by MAP round-trip tests (true ηV = +0.40 → MAP +0.03).
+        // The old heuristic reported sd(ηV) = 0.154, understating it ~2×, so
+        // the plotted 90% band was far narrower than the data supports.
+        //
+        // Sanity guard: JᵀJ/σ² is positive semi-definite, so Σ_post ⪯ Ω always.
+        // A posterior sd exceeding its prior sd is a bug, never a result.
+        // ============================================================
+        function laplacePosterior(measuredLevels, allDoses, indParams, bioassay) {
+            const { OMEGA_CL, OMEGA_V, SIGMA } = PK_MODEL;
+            const sigma2 = SIGMA * SIGMA;
+            const priorSdCL = Math.sqrt(OMEGA_CL);
+            const priorSdV = Math.sqrt(OMEGA_V);
+            const prior = { sdCL: priorSdCL, sdV: priorSdV, rho: 0 };
+
+            if (!measuredLevels || measuredLevels.length === 0) return prior;
+
+            // Predicted (bioassay-adjusted) concentration at time t for an
+            // (ηCL, ηV) perturbation of the individual estimate.
+            const predAt = (t, eCL, eV) => {
+                const p = {
+                    CL: indParams.CL * Math.exp(eCL),
+                    V: indParams.V * Math.exp(eV),
+                    KA: indParams.KA
+                };
+                const c = predictAtTime(t, allDoses, p);
+                return bioassay === 2 ? cmiaAdjust(c) : c;
+            };
+
+            // Accumulate JᵀJ by central differences on the log scale.
+            const h = 1e-5;
+            let Sxx = 0, Sxy = 0, Syy = 0;
+            for (const obs of measuredLevels) {
+                const c0 = predAt(obs.time, 0, 0);
+                if (!(c0 > 0.1)) continue;   // uninformative / degenerate point
+                const gx = (predAt(obs.time, h, 0) - predAt(obs.time, -h, 0)) / (2 * h) / c0;
+                const gy = (predAt(obs.time, 0, h) - predAt(obs.time, 0, -h)) / (2 * h) / c0;
+                if (!isFinite(gx) || !isFinite(gy)) continue;
+                Sxx += gx * gx;
+                Sxy += gx * gy;
+                Syy += gy * gy;
+            }
+
+            // Σ_post = (Ω⁻¹ + JᵀJ/σ²)⁻¹  — closed-form 2×2 inverse
+            const a = 1 / OMEGA_CL + Sxx / sigma2;
+            const b = Sxy / sigma2;
+            const c = 1 / OMEGA_V + Syy / sigma2;
+            const det = a * c - b * b;
+            if (!isFinite(det) || det <= 0) return prior;
+
+            const varCL = c / det;
+            const varV = a / det;
+            const cov = -b / det;
+            if (!(varCL > 0) || !(varV > 0)) return prior;
+
+            // Clamp to the prior. Mathematically Σ_post ⪯ Ω, so this can only
+            // trigger on numerical noise — but it makes the invariant explicit.
+            const sdCL = Math.min(Math.sqrt(varCL), priorSdCL);
+            const sdV = Math.min(Math.sqrt(varV), priorSdV);
+            let rho = cov / Math.sqrt(varCL * varV);
+            if (!isFinite(rho)) rho = 0;
+            rho = Math.max(-0.99, Math.min(0.99, rho));
+
+            return { sdCL, sdV, rho };
+        }
+
+        // ============================================================
         // MONTE CARLO CONFIDENCE INTERVALS (90%)
         //
-        // Four statistical fixes vs. the original implementation:
+        //   1. Box-Muller: independent (u1, u2) per variate pair, so z1 and z2
+        //      are genuinely independent standard-normals before correlation.
         //
-        //   1. Box-Muller: independent (u1, u2) per variate pair.
-        //      z1 and z2 must each draw their own random numbers
-        //      to produce truly independent standard-normals.
+        //   2. Posterior draws use the Laplace covariance above, Cholesky-
+        //      factored:  z_CL = z1 ;  z_V = ρ·z1 + sqrt(1−ρ²)·z2
         //
-        //   2. Off-diagonal posterior covariance (CL-V correlation).
-        //      The true MAP posterior covariance matrix is:
-        //        Sigma_post = (Omega_prior⁻¹ + JᵀJ)⁻¹
-        //      where J is the Jacobian of the OFV residuals.
-        //      For a 1-compartment model, CL and V are negatively
-        //      correlated in the posterior (higher CL → lower AUC
-        //      → model compensates with lower V, and vice versa).
-        //      Empirical correlation is approximated as ρ = −0.45,
-        //      which is conservative but consistent with literature.
-        //      Cholesky decomposition produces correlated samples:
-        //        z_CL = z1
-        //        z_V  = ρ·z1 + sqrt(1−ρ²)·z2
+        //   3. CI floor at t < 0.5 hr: prevents the band from collapsing to
+        //      zero at the transplant time origin, which is mathematically
+        //      correct but visually misleading to clinical readers.
         //
-        //   3. Posterior variance diagonal shrinks with nObs:
-        //        var_post = OMEGA / (1 + OMEGA × nObs / SIGMA²)
-        //
-        //   4. CI floor at t < 0.5 hr: prevents the band from
-        //      collapsing to zero at the transplant time origin,
-        //      which is mathematically correct but visually
-        //      misleading to clinical readers.
+        // NOTE: this is a CONFIDENCE interval on the model prediction
+        // (parameter uncertainty). It does not include the σ=18% residual
+        // error, so it is narrower than a prediction interval for a future
+        // assay result.
         // ============================================================
-        function monteCarloCI(timePoints, allDoses, indParams, nObs, bioassay, nSamples = 300) {
-            const { OMEGA_CL, OMEGA_V, SIGMA } = PK_MODEL;
-
-            // Posterior variance — diagonal terms (shrink with each observation)
-            const sigma2    = SIGMA * SIGMA;
-            const varPostCL = OMEGA_CL / (1 + OMEGA_CL * nObs / sigma2);
-            const varPostV  = OMEGA_V  / (1 + OMEGA_V  * nObs / sigma2);
-            const sdCL = Math.sqrt(varPostCL);
-            const sdV  = Math.sqrt(varPostV);
-
-            // Off-diagonal: empirical CL-V posterior correlation (negative).
-            // In a 1-compartment model the MAP fit trades off CL against V;
-            // ignoring this understates joint uncertainty.
-            const rho      = -0.45;
-            const rhoPerp  = Math.sqrt(1 - rho * rho);   // sqrt(1 - ρ²)
+        function monteCarloCI(timePoints, allDoses, indParams, measuredLevels, bioassay, nSamples = 300) {
+            const { sdCL, sdV, rho } = laplacePosterior(measuredLevels, allDoses, indParams, bioassay);
+            const rhoPerp = Math.sqrt(1 - rho * rho);   // sqrt(1 - ρ²)
 
             const curves = [];
             for (let s = 0; s < nSamples; s++) {
@@ -2310,11 +2748,11 @@
 
                 // ── Fix 2: Cholesky-correlated posterior samples ──────────────
                 const etaCL = z1 * sdCL;
-                const etaV  = (rho * z1 + rhoPerp * z2) * sdV;
+                const etaV = (rho * z1 + rhoPerp * z2) * sdV;
 
                 const p = {
                     CL: indParams.CL * Math.exp(etaCL),
-                    V:  indParams.V  * Math.exp(etaV),
+                    V: indParams.V * Math.exp(etaV),
                     KA: indParams.KA
                 };
                 curves.push(generateCurve(timePoints, allDoses, p, bioassay));
@@ -2328,14 +2766,14 @@
 
             return timePoints.map((t, i) => {
                 const vals = curves.map(c => c[i]).sort((a, b) => a - b);
-                const lo   = Math.floor(0.05 * nSamples);
-                const hi   = Math.floor(0.95 * nSamples);
-                let p5  = vals[lo];
+                const lo = Math.floor(0.05 * nSamples);
+                const hi = Math.floor(0.95 * nSamples);
+                let p5 = vals[lo];
                 let p95 = vals[hi];
                 if (t < FLOOR_TIME_HR && p95 - p5 < 0.1) {
                     // Expand to a nominal ±0.05 ng/mL floor so the band
                     // is always visible without distorting real CI data.
-                    p5  = Math.max(0, p5  - 0.05);
+                    p5 = Math.max(0, p5 - 0.05);
                     p95 = p95 + 0.05;
                 }
                 return { p5, p95 };
@@ -2429,18 +2867,27 @@
         // ============================================================
         function fillHistoricalGaps(historyLog, txDate) {
             const filled = [];
-            const logged = historyLog.filter(e => e.dose !== null && e.dose > 0).sort((a, b) => a.time - b.time);
+            // Anchor on dose >= 0, NOT dose > 0. A recorded 0 mg is a deliberate
+            // "dose held" entry. Filtering it out dropped it from the anchor list,
+            // and the 12-hourly gap-filler then spanned straight across it and
+            // re-inserted a full dose in that slot — so recording a held dose had
+            // the exact opposite of the intended effect.
+            const logged = historyLog.filter(e => e.dose !== null && e.dose >= 0).sort((a, b) => a.time - b.time);
             if (logged.length === 0) return [];
-            
+
             for (let i = 0; i < logged.length; i++) {
                 filled.push(logged[i]);
                 if (i === logged.length - 1) break;
-                
+
                 let nextTime = logged[i].recordDate.add(12, 'hour');
                 // Fill 12-hour steps until we hit the next logged dose (with a 4hr buffer to avoid overlapping)
-                while (nextTime.isBefore(logged[i+1].recordDate.subtract(4, 'hour'))) {
+                while (nextTime.isBefore(logged[i + 1].recordDate.subtract(4, 'hour'))) {
                     const isAm = nextTime.hour() < 12;
-                    const priorSameShift = [...filled].reverse().find(d => (d.recordDate.hour() < 12) === isAm);
+                    // Carry the last same-shift POSITIVE dose. A single held dose
+                    // marks that one slot only; it must not zero the rest of the
+                    // regimen for every subsequent imputed slot.
+                    const priorSameShift = [...filled].reverse()
+                        .find(d => (d.recordDate.hour() < 12) === isAm && d.dose > 0);
                     const doseToGive = priorSameShift ? priorSameShift.dose : logged[i].dose;
                     filled.push({ id: 'inter-' + i + '-' + nextTime.valueOf(), recordDate: nextTime, dose: doseToGive, level: null, time: nextTime.diff(txDate, 'hour', true) });
                     nextTime = nextTime.add(12, 'hour');
@@ -2456,7 +2903,11 @@
             let nextTime = last.recordDate.add(12, 'hour');
             while (nextTime.isBefore(untilDate)) {
                 const isAm = nextTime.hour() < 12;
-                const priorSameShift = [...filledHistory].reverse().find(d => (d.recordDate.hour() < 12) === isAm);
+                // Same rule as fillHistoricalGaps: carry the last same-shift
+                // POSITIVE dose, so a held dose at the end of the log does not
+                // extrapolate a zero regimen indefinitely into the future.
+                const priorSameShift = [...filledHistory].reverse()
+                    .find(d => (d.recordDate.hour() < 12) === isAm && d.dose > 0);
                 const doseToGive = priorSameShift ? priorSameShift.dose : last.dose;
                 extra.push({ id: 'ext-' + extra.length, recordDate: nextTime, dose: doseToGive, level: null, time: nextTime.diff(txDate, 'hour', true) });
                 nextTime = nextTime.add(12, 'hour');
@@ -2486,17 +2937,19 @@
         }
 
         function gatherData() {
-            const txDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value);
+            const txDateStr = getFormattedDate('transplant-date', 'YYYY-MM-DD');
+            if (!txDateStr) throw new Error("Please select a transplant date first");
+            const txDate = dayjs(txDateStr);
             if (!txDate.isValid()) throw new Error("Invalid transplant date");
 
-            let predDateVal = document.getElementById('prediction-datetime')._flatpickr.input.value;
+            let predDateVal = getFormattedDate('prediction-datetime', 'YYYY-MM-DD HH:mm');
             let predDate;
             if (!predDateVal) {
                 if (clinicalData.length > 0) {
                     const latest = [...clinicalData].sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)))[clinicalData.length - 1];
-                    predDate = dayjs(latest.datetime).add(12, 'hour');
+                    predDate = nextC0Time(dayjs(latest.datetime));
                 } else {
-                    predDate = dayjs().add(1, 'day').hour(7).minute(0);
+                    predDate = nextC0Time(dayjs().add(1, 'day').startOf('day'));
                 }
                 const predFP = document.getElementById('prediction-datetime')._flatpickr;
                 if (predFP) {
@@ -2507,21 +2960,30 @@
             }
             if (!predDate.isValid()) throw new Error("Invalid forecast date");
 
+            if (clinicalData.length > 0) {
+                const latestDose = [...clinicalData].filter(d => d.dose !== null).sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime))).pop();
+                if (latestDose && (predDate.isBefore(dayjs(latestDose.datetime)) || predDate.isSame(dayjs(latestDose.datetime)))) {
+                    predDate = nextC0Time(dayjs(latestDose.datetime));
+                    const predFP = document.getElementById('prediction-datetime') ? document.getElementById('prediction-datetime')._flatpickr : null;
+                    if (predFP) predFP.setDate(predDate.toDate(), true);
+                }
+            }
+
             const patientData = {
-                weight:    parseFloat(document.getElementById('weight').value)      || 60,
-                hct:       parseFloat(document.getElementById('hematocrit').value)  || 35,
-                mpa:       document.getElementById('mpa').value,
-                bioassay:  parseInt(document.getElementById('bioassay').value),
-                genotype:  document.getElementById('genotype').value,
+                weight: parseFloat(document.getElementById('weight').value) || 60,
+                hct: parseFloat(document.getElementById('hematocrit').value) || 35,
+                mpa: document.getElementById('mpa').value,
+                bioassay: parseInt(document.getElementById('bioassay').value),
+                genotype: document.getElementById('genotype').value,
                 // Advanced PK covariates — now wired through to getPopulationParameters
-                bilirubin: parseFloat(document.getElementById('bilirubin').value)   || 1.0,
-                inhibitor: document.getElementById('inhibitor').value               || 'none',
+                bilirubin: parseFloat(document.getElementById('bilirubin').value) || 1.0,
+                inhibitor: document.getElementById('inhibitor').value || 'none',
                 transplantDate: txDate
             };
 
             const historyLog = clinicalData.map((r, i) => {
                 const rd = dayjs(r.datetime);
-                if (rd.isBefore(txDate.startOf('day'))) throw new Error("Record before transplant date");
+                // Pre-transplant desensitization doses (ABO-incompatible, highly sensitized) are fully supported!
                 return { id: i, recordDate: rd, dose: r.dose, level: r.level, time: rd.diff(txDate, 'hour', true) };
             });
 
@@ -2549,29 +3011,44 @@
                         untilDate.diff(patientData.transplantDate, 'hour', true),
                         ...historyLog.map(e => e.time), 0
                     );
-                    const timePoints = Array.from({ length: 600 }, (_, i) => (lastHour / 599) * i);
+                    // ── Two time grids ────────────────────────────────────────────
+                    // The deterministic curves need fine resolution: dosing is every
+                    // 12h and tmax ≈ 1.2h, so a fixed 600-point grid over a long
+                    // history degenerates to ~3h spacing — 4 samples per dose cycle at
+                    // a drifting phase, which aliases the peaks and troughs and makes
+                    // the line beat visibly. Target ≤0.5h spacing, capped so very long
+                    // histories stay responsive.
+                    //
+                    // The MC band is smooth and costs nSamples × points × doses, so it
+                    // keeps the coarse grid. Chart.js fills between the two CI datasets
+                    // by index, and they share ciTimes, so the grids may differ.
+                    const CURVE_MAX_POINTS = 4000;
+                    const curveN = Math.min(CURVE_MAX_POINTS, Math.max(600, Math.ceil(lastHour / 0.5) + 1));
+                    const curveTimes = Array.from({ length: curveN }, (_, i) => (lastHour / (curveN - 1)) * i);
+                    const ciTimes = Array.from({ length: 600 }, (_, i) => (lastHour / 599) * i);
 
-                    const popCurve = generateCurve(timePoints, allDoses, popParams, patientData.bioassay);
-                    const indCurve = generateCurve(timePoints, allDoses, indParams, patientData.bioassay);
+                    const popCurve = generateCurve(curveTimes, allDoses, popParams, patientData.bioassay);
+                    const indCurve = generateCurve(curveTimes, allDoses, indParams, patientData.bioassay);
 
-                    // Monte Carlo CI — uses nObs to determine posterior variance
-                    const ci = monteCarloCI(timePoints, allDoses, indParams, measuredLevels.length, patientData.bioassay, 300);
+                    // Monte Carlo CI — posterior covariance derived from the actual
+                    // observations (see laplacePosterior), not an observation count.
+                    const ci = monteCarloCI(ciTimes, allDoses, indParams, measuredLevels, patientData.bioassay, 300);
 
                     const predTime = predictionDate.diff(patientData.transplantDate, 'hour', true);
                     const predicted = generateCurve([predTime], allDoses, indParams, patientData.bioassay)[0];
 
-                    updateChart(timePoints, popCurve, indCurve, ci, measuredLevels, patientData.transplantDate);
+                    updateChart(curveTimes, popCurve, indCurve, ci, ciTimes, measuredLevels, patientData.transplantDate);
 
                     // Compute MC CI at the exact prediction time-point.
                     // These are the true posterior p5/p95 values used in updateSummary
                     // instead of the naive RMSE×1.645 approximation.
                     const ciAtPred = monteCarloCI([predTime], allDoses, indParams,
-                                                  measuredLevels.length, patientData.bioassay, 500);
+                        measuredLevels, patientData.bioassay, 500);
                     const mcCiAtPred = ciAtPred[0];  // { p5, p95 }
 
                     updateSummary(predicted, predictionDate, indParams, measuredLevels, allDoses, mcCiAtPred, patientData.transplantDate);
                     updateModelParams(popParams, indParams);
-                    updateAccuracyPanel(indParams, measuredLevels.length);
+                    updateAccuracyPanel(indParams, measuredLevels.length, measuredLevels, allDoses);
 
                     document.getElementById('dose-optimizer-card').style.display = 'block';
                 } catch (err) {
@@ -2584,10 +3061,42 @@
         // ============================================================
         // UI UPDATES
         // ============================================================
-        function updateAccuracyPanel(indParams, nObs) {
+        // Flags levels that look like they were drawn AFTER a dose rather than as a
+        // pre-dose C0. Absorption is steep (tmax ≈ 1.2h), so a sample 15 min the
+        // wrong side of a dose reads ~30% high; MAP then infers slower clearance and
+        // under-doses the patient. Reported only — the level is still fitted exactly
+        // as entered, because silently rewriting a clinician's sample time is not
+        // acceptable in a record that drives dosing.
+        function findPostDoseSamples(measuredLevels, allDoses) {
+            const WINDOW_HR = 2;
+            return (measuredLevels || []).map((obs, i) => {
+                const priorDose = allDoses
+                    .filter(d => d.dose > 0 && d.time < obs.time && d.time >= obs.time - WINDOW_HR)
+                    .sort((a, b) => b.time - a.time)[0];
+                return priorDose ? { n: i + 1, minutesAfter: Math.round((obs.time - priorDose.time) * 60) } : null;
+            }).filter(Boolean);
+        }
+
+        function updateAccuracyPanel(indParams, nObs, measuredLevels, allDoses) {
             const grid = document.getElementById('accuracy-metrics-grid');
             const bar = document.getElementById('intel-bar');
             const label = document.getElementById('intel-label');
+            const postDose = findPostDoseSamples(measuredLevels, allDoses);
+            const postDoseWarning = postDose.length === 0 ? '' : `
+            <div class="metric-card" style="grid-column:1/-1;background:#fff7ed;border-color:#fed7aa;">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <span style="font-size:18px;line-height:1;">🕑</span>
+                    <div>
+                        <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12.5px;color:#c2410c;margin-bottom:3px;">POSSIBLE POST-DOSE SAMPLE${postDose.length > 1 ? 'S' : ''}</div>
+                        <div style="font-size:12px;color:#9a3412;line-height:1.5;">
+                            ${postDose.map(p => `Level #${p.n} is timestamped <strong>${p.minutesAfter} min after</strong> a dose`).join('; ')}.
+                            C0 should be drawn ${SAMPLING_LEAD_MIN} min <em>before</em> the dose (${String(DOSE_SLOTS.AM).padStart(2, '0')}:${String(60 - SAMPLING_LEAD_MIN).padStart(2, '0')} / ${DOSE_SLOTS.PM - 1}:${String(60 - SAMPLING_LEAD_MIN).padStart(2, '0')}).
+                            A sample taken during absorption reads high — 15 min post-dose is roughly +30% at steady state — which drives the MAP fit toward slower clearance and an under-dose recommendation.
+                            These levels were fitted exactly as entered; correct the timestamps if they are wrong.
+                        </div>
+                    </div>
+                </div>
+            </div>`;
 
             // Intelligence level based on nObs
             const intelPct = Math.min(100, 10 + nObs * 18);  // 0 obs → 10%, 5 obs → 100%
@@ -2604,8 +3113,8 @@
                 grid.innerHTML = `
                 <div class="metric-card" style="grid-column:1/-1;background:var(--col-warning-bg);border-color:#fde68a;">
                     <div style="font-size:13px;color:var(--col-warning);font-family:'Sora',sans-serif;font-weight:600;">Population estimate — add measured trough levels to personalize</div>
-                    <div style="font-size:12px;color:var(--col-muted);margin-top:6px;">Each level reduces 90% CI width by ~40%</div>
-                </div>`;
+                    <div style="font-size:12px;color:var(--col-muted);margin-top:6px;">The first trough level narrows the clearance posterior from 40% CV to about 15%; later levels add progressively less.</div>
+                </div>${postDoseWarning}`;
                 document.getElementById('pe-table-section').style.display = 'none';
                 return;
             }
@@ -2634,7 +3143,7 @@
             <div class="metric-card">
                 <div class="metric-label">MPE% (Bias)</div>
                 <div class="metric-value" style="color:${mpeColor}">${indParams.mpe > 0 ? '+' : ''}${indParams.mpe.toFixed(1)}%</div>
-                <div class="metric-sub">ISPE: (obs−pred)/obs · +over/−under · ±15%</div>
+                <div class="metric-sub">(obs−pred)/obs · + = model under-predicts · ±15%</div>
             </div>
             <div class="metric-card">
                 <div class="metric-label">MAPE% (Imprecision)</div>
@@ -2651,16 +3160,16 @@
                 <div class="metric-value" style="color:var(--col-primary);">${nObs}</div>
                 <div class="metric-sub">${nObs < 5 ? 'add more for tighter CI' : 'well characterized'}</div>
             </div>
-            ${indParams.boundaryHit ? `
+            ${(indParams.outlierHit || indParams.boundaryHit) ? `
             <div class="metric-card" style="grid-column:1/-1;background:#fff7ed;border-color:#fed7aa;">
                 <div style="display:flex;align-items:flex-start;gap:10px;">
                     <span style="font-size:18px;line-height:1;">⚠️</span>
                     <div>
-                        <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12.5px;color:#c2410c;margin-bottom:3px;">BOUNDARY-CONSTRAINED MAP ESTIMATE</div>
-                        <div style="font-size:12px;color:#9a3412;line-height:1.5;">${indParams.boundaryMsg}<br>The optimum has hit the eta search boundary (±3 SD equivalent). This patient may be a genuine PK outlier — consider verifying dose timings, assay method, or significant drug interactions beyond those modelled.</div>
+                        <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12.5px;color:#c2410c;margin-bottom:3px;">PK OUTLIER — MAP ESTIMATE BEYOND ±${PK_MODEL.OUTLIER_SD} SD</div>
+                        <div style="font-size:12px;color:#9a3412;line-height:1.5;">${indParams.boundaryMsg}<br>This fit lies beyond ±${PK_MODEL.OUTLIER_SD} SD of the population distribution (ηCL ±${(PK_MODEL.OUTLIER_SD * Math.sqrt(PK_MODEL.OMEGA_CL)).toFixed(2)}, ηV ±${(PK_MODEL.OUTLIER_SD * Math.sqrt(PK_MODEL.OMEGA_V)).toFixed(2)}). The patient may be a genuine PK outlier — consider verifying dose timings, assay method, or significant drug interactions beyond those modelled.</div>
                     </div>
                 </div>
-            </div>` : ''}`;
+            </div>` : ''}${postDoseWarning}`;
 
             // PE table
             if (indParams.pe && indParams.pe.length > 0) {
@@ -2685,11 +3194,18 @@
         function updateModelParams(popParams, indParams) {
             const div = document.getElementById('model-params-output');
             const pctCL = (indParams.CL / popParams.CL - 1) * 100;
-            const pctV  = (indParams.V  / popParams.V  - 1) * 100;
+            const pctV = (indParams.V / popParams.V - 1) * 100;
             const clColor = Math.abs(pctCL) > 25 ? 'var(--col-warning)' : 'var(--col-success)';
-            const vColor  = Math.abs(pctV)  > 25 ? 'var(--col-warning)' : 'var(--col-success)';
+            const vColor = Math.abs(pctV) > 25 ? 'var(--col-warning)' : 'var(--col-success)';
             const t12_CL = (Math.log(2) * indParams.V / indParams.CL).toFixed(1);
             const ke_str = (indParams.CL / indParams.V).toFixed(3);
+
+            // ── R² null guard ────────────────────────────────────────────────
+            // calculateAccuracyMetrics returns r2 = null when it cannot be computed
+            // (n=1, or zero observed variance). `null < 0.5` evaluates to TRUE in JS,
+            // which previously forced the "Severe Model Mismatch" banner onto every
+            // single-observation fit — even a numerically perfect one.
+            const misfit = (typeof indParams.r2 === 'number' && indParams.r2 < 0.5) || indParams.rmse > 2.5;
             div.innerHTML = `
             <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:11.5px;color:var(--col-muted);font-family:'Sora',sans-serif;font-weight:600;margin-bottom:4px;">
@@ -2721,11 +3237,11 @@
                     </div>
                 </div>
                 ${indParams.rmse !== null ? `
-                <div style="padding:10px;background:${indParams.r2 < 0.5 || indParams.rmse > 2.5 ? 'var(--col-danger-bg)' : indParams.rmse < 2 ? 'var(--col-success-bg)' : 'var(--col-warning-bg)'};border-radius:6px;text-align:left;border:1px solid ${indParams.r2 < 0.5 || indParams.rmse > 2.5 ? '#fecaca' : indParams.rmse < 2 ? '#a7f3d0' : '#fde68a'};">
-                    <div style="font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:${indParams.r2 < 0.5 || indParams.rmse > 2.5 ? 'var(--col-danger)' : indParams.rmse < 2 ? 'var(--col-success)' : 'var(--col-warning)'};">
-                        ${indParams.r2 < 0.5 || indParams.rmse > 2.5 ? '🚨 CRITICAL: Severe Model Mismatch' : indParams.rmse < 2 ? '✓ Reliable Pharmacokinetic Fit' : '⚠ Suboptimal Fit — Check dose timings'}
+                <div style="padding:10px;background:${misfit ? 'var(--col-danger-bg)' : indParams.rmse < 2 ? 'var(--col-success-bg)' : 'var(--col-warning-bg)'};border-radius:6px;text-align:left;border:1px solid ${misfit ? '#fecaca' : indParams.rmse < 2 ? '#a7f3d0' : '#fde68a'};">
+                    <div style="font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:${misfit ? 'var(--col-danger)' : indParams.rmse < 2 ? 'var(--col-success)' : 'var(--col-warning)'};">
+                        ${misfit ? '🚨 CRITICAL: Severe Model Mismatch' : indParams.rmse < 2 ? '✓ Reliable Pharmacokinetic Fit' : '⚠ Suboptimal Fit — Check dose timings'}
                     </div>
-                    ${indParams.r2 < 0.5 || indParams.rmse > 2.5 ? `<div style="font-size:11px;color:#7f1d1d;margin-top:4px;line-height:1.4;">RMSE is ${indParams.rmse.toFixed(2)}. Evidence of changing absorption, missed doses, or non-trough sampling. Do not trust single-parameter estimates.</div>` : ''}
+                    ${misfit ? `<div style="font-size:11px;color:#7f1d1d;margin-top:4px;line-height:1.4;">RMSE is ${indParams.rmse.toFixed(2)}. Evidence of changing absorption, missed doses, or non-trough sampling. Do not trust single-parameter estimates.</div>` : ''}
                 </div>` : ''}
             </div>`;
         }
@@ -2759,17 +3275,22 @@
             //   • was always wider/narrower than the actual MC band shown on chart
             let ciLow = null, ciHigh = null, ciSpan = 0;
             if (mcCiAtPred) {
-                ciLow  = Math.max(0, mcCiAtPred.p5);
+                ciLow = Math.max(0, mcCiAtPred.p5);
                 ciHigh = mcCiAtPred.p95;
                 ciSpan = ciHigh - ciLow;
             } else if (hasError) {
                 // Fallback (no MC passed): use RMSE heuristic, clearly labelled as approximate
                 const half = indParams.rmse * 1.645;
-                ciLow  = Math.max(0, predicted - half);
+                ciLow = Math.max(0, predicted - half);
                 ciHigh = predicted + half;
                 ciSpan = half * 2;
             }
-            let isUnreliable = hasError && (ciSpan > 6.0 || indParams.r2 < 0.5);
+            // R² is null when it cannot be computed (n=1, or zero observed variance).
+            // `null < 0.5` evaluates to true in JS, which previously flagged EVERY
+            // single-observation fit as "unreliable". Only apply the R² criterion
+            // when R² is an actual number.
+            const r2Bad = typeof indParams.r2 === 'number' && indParams.r2 < 0.5;
+            let isUnreliable = hasError && (ciSpan > 6.0 || r2Bad);
 
             let shiftWarning = '';
             if (measuredLevels && measuredLevels.length >= 3) {
@@ -2778,11 +3299,20 @@
                     const dailyDose = prior24h.reduce((s, d) => s + d.dose, 0);
                     return { daysPostTx: obs.time / 24, CDRatio: dailyDose > 0 ? obs.level / dailyDose : 0 };
                 }).filter(r => r.CDRatio > 0);
-                
+
                 if (ratios.length >= 3) {
                     const first = ratios[0], last = ratios[ratios.length - 1];
                     if (last.daysPostTx - first.daysPostTx > 0) {
-                        const slope = (last.CDRatio - first.CDRatio) / (last.daysPostTx - first.daysPostTx);
+                        // Ordinary least-squares slope over ALL C/D pairs.
+                        // The previous 2-point slope (last − first)/Δt discarded every
+                        // intermediate point, so a single outlier at either end could
+                        // trigger this banner and force isUnreliable = true.
+                        const nR = ratios.length;
+                        const mx = ratios.reduce((s, r) => s + r.daysPostTx, 0) / nR;
+                        const my = ratios.reduce((s, r) => s + r.CDRatio, 0) / nR;
+                        const sxy = ratios.reduce((s, r) => s + (r.daysPostTx - mx) * (r.CDRatio - my), 0);
+                        const sxx = ratios.reduce((s, r) => s + Math.pow(r.daysPostTx - mx, 2), 0);
+                        const slope = sxx > 1e-9 ? sxy / sxx : 0;
                         if (slope > 0.05) {
                             shiftWarning = `<div style="margin-top: 10px; padding: 12px; background: var(--col-warning-bg); border: 1.5px solid var(--col-warning); border-radius: 8px; text-align: left;">
                                 <div style="color: #92400e; font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 700;">⚠️ IMPROVING ABSORPTION / DECREASING EDEMA</div>
@@ -2829,9 +3359,9 @@
 
             // ── Imputed/Extrapolated Doses Transparency ──────────────────────
             const imputedCount = allDoses.filter(d => String(d.id).startsWith('inter-')).length;
-            const extraCount   = allDoses.filter(d => String(d.id).startsWith('ext-')).length;
+            const extraCount = allDoses.filter(d => String(d.id).startsWith('ext-')).length;
             let imputationWarning = '';
-            
+
             if (imputedCount > 0 || extraCount > 0) {
                 imputationWarning = `
                 <div style="margin-top:10px;padding:12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;text-align:left;">
@@ -2855,14 +3385,16 @@
             div.style.display = 'block';
         }
 
-        function updateChart(timePoints, popCurve, indCurve, ci, measuredLevels, txDate) {
+        // timePoints  — fine grid backing popCurve / indCurve
+        // ciTimes     — coarser grid backing the MC band (see runForecast)
+        function updateChart(timePoints, popCurve, indCurve, ci, ciTimes, measuredLevels, txDate) {
             const ctx = document.getElementById('concentration-chart').getContext('2d');
 
             const datasets = [
                 // 90% CI band (lower)
                 {
                     label: '90% CI Lower',
-                    data: ci.map((c, i) => ({ x: timePoints[i], y: c.p5 })),
+                    data: ci.map((c, i) => ({ x: ciTimes[i], y: c.p5 })),
                     borderColor: 'transparent',
                     backgroundColor: 'rgba(19,84,211,0.08)',
                     pointRadius: 0, fill: '+1', tension: 0.4, borderWidth: 0,
@@ -2871,7 +3403,7 @@
                 // 90% CI band (upper)
                 {
                     label: '90% CI Upper',
-                    data: ci.map((c, i) => ({ x: timePoints[i], y: c.p95 })),
+                    data: ci.map((c, i) => ({ x: ciTimes[i], y: c.p95 })),
                     borderColor: 'rgba(19,84,211,0.15)',
                     backgroundColor: 'rgba(19,84,211,0.08)',
                     pointRadius: 0, fill: '-1', tension: 0.4, borderWidth: 1,
@@ -2949,7 +3481,10 @@
                         const { ctx, chartArea: { left, right }, scales: { x, y } } = chart;
                         ctx.save();
                         let lastKey = '', ranges = [];
-                        timePoints.forEach(h => {
+                        // Coarse grid is ample here — the therapeutic range only steps
+                        // at month boundaries — and avoids thousands of dayjs diffs
+                        // per redraw now that timePoints is fine-grained.
+                        ciTimes.forEach(h => {
                             const r = getTherapeuticRange(txDate.add(h, 'hour'), txDate);
                             const k = `${r.low}-${r.high}`;
                             if (k !== lastKey) { ranges.push({ h, r }); lastKey = k; }
@@ -2981,12 +3516,13 @@
             if (!lastForecastParams.individual) { showAlert('Run forecast first', 'error'); return; }
 
             const target = parseFloat(document.getElementById('target-trough-input').value);
-            
+
             let tgtDateVal = document.getElementById('target-date-input')._flatpickr.input.value;
             let tgtDate;
             if (!tgtDateVal) {
                 const predVal = document.getElementById('prediction-datetime')._flatpickr.input.value;
-                tgtDate = predVal ? dayjs(predVal, "YYYY-MM-DD HH:mm") : dayjs().add(4, 'day').hour(7).minute(0);
+                tgtDate = predVal ? dayjs(predVal, "YYYY-MM-DD HH:mm")
+                    : nextC0Time(dayjs().add(4, 'day').startOf('day'));
                 const tgtFP = document.getElementById('target-date-input')._flatpickr;
                 if (tgtFP) {
                     tgtFP.setDate(tgtDate.toDate(), true);
@@ -2994,7 +3530,7 @@
             } else {
                 tgtDate = dayjs(tgtDateVal, "YYYY-MM-DD HH:mm");
             }
-            
+
             if (isNaN(target) || !tgtDate.isValid()) { showAlert('Enter valid target and date', 'error'); return; }
 
             const { individual: ind, allDoses, patientData } = lastForecastParams;
@@ -3002,19 +3538,53 @@
             if (logged.length === 0) { showAlert('No logged doses', 'error'); return; }
             const last = logged[logged.length - 1];
 
-            // ── Fix 1: Simulation start anchor ───────────────────────────────────
-            // The previous code started simulation from last.recordDate+12h.
-            // If dose logging is behind by several days, this creates a silent gap
-            // where no doses are assumed between the last log and "today".
-            // Fix: start from the LATER of (last logged dose + 12h) and NOW,
-            // rounded to the nearest 12-hour (AM=07:00, PM=19:00) boundary.
+            // ── Simulation start anchor + regimen bridge ─────────────────────────
+            //
+            // The candidate regimen can only start once the clinician can act on it,
+            // i.e. at the first dosing slot at or after NOW. But the patient did not
+            // stop taking tacrolimus while the dose log fell behind — they continued
+            // their existing regimen.
+            //
+            // A previous revision started the simulation at max(lastDose+12h, now)
+            // and modelled NOTHING in between, silently washing the patient out.
+            // Measured impact at steady state (3mg BID, target = next trough):
+            //   1-day logging lag → predicted trough −22%
+            //   3-day logging lag → −58%
+            //   5-day logging lag → −66%
+            // i.e. the optimizer recommended roughly double the correct dose.
+            //
+            // Correct behaviour: BRIDGE the interval [lastDose+12h, simStart) with
+            // the patient's existing regimen (same last-same-shift rule used by
+            // extrapolateDoses), then apply the candidate dose from simStart onward.
             const minStart = last.recordDate.add(12, 'hour');
             const now = dayjs();
-            let simStart = minStart.isAfter(now) ? minStart : now;
-            // Snap to nearest AM (07:00) or PM (19:00) slot
-            const snapHour = simStart.hour() < 13 ? 7 : 19;
-            simStart = simStart.hour(snapHour).minute(0).second(0);
-            if (simStart.isBefore(minStart)) simStart = simStart.add(12, 'hour');
+
+            // First AM (07:00) / PM (19:00) slot at or after max(minStart, now).
+            // Snap FORWARD only — the earlier snap-then-bump logic could land on a
+            // slot before minStart and then jump a full 12h, dropping a dose
+            // (e.g. last dose 20:30 → minStart 08:30 → snapped to 19:00, a 22.5h gap).
+            const notBefore = minStart.isAfter(now) ? minStart : now;
+            let simStart = notBefore.minute(0).second(0).millisecond(0)
+                .hour(notBefore.hour() < DOSE_SLOTS.AM ? DOSE_SLOTS.AM
+                    : notBefore.hour() < DOSE_SLOTS.PM ? DOSE_SLOTS.PM
+                        : DOSE_SLOTS.AM);
+            if (!simStart.isAfter(notBefore)) simStart = simStart.add(12, 'hour');
+
+            // Bridge doses: carry the existing regimen forward, shift by shift.
+            const bridge = [];
+            for (let t = minStart; t.isBefore(simStart); t = t.add(12, 'hour')) {
+                const isAm = t.hour() < 13;
+                const priorSameShift = [...logged, ...bridge].reverse()
+                    .find(d => (d.recordDate.hour() < 12) === isAm && d.dose > 0);
+                const doseToGive = priorSameShift ? priorSameShift.dose : last.dose;
+                bridge.push({
+                    id: 'bridge-' + bridge.length,
+                    recordDate: t,
+                    dose: doseToGive,
+                    level: null,
+                    time: t.diff(patientData.transplantDate, 'hour', true)
+                });
+            }
 
             // ── Protocol range target validation ─────────────────────────────────
             const protRange = getTherapeuticRange(tgtDate, patientData.transplantDate);
@@ -3023,14 +3593,14 @@
 
             // ── Simulate dose levels ─────────────────────────────────────────────
             // 35 levels from 1.0 to 18.0 mg/day in 0.5 mg steps
-            const dailyDoses = Array.from({length: 35}, (_, i) => 1.0 + (i * 0.5));
+            const dailyDoses = Array.from({ length: 35 }, (_, i) => 1.0 + (i * 0.5));
             const results = dailyDoses.map(tdd => {
                 // ── Fix 2: Standard tablet split ─────────────────────────────────
                 // Previous: ceil(tdd)/2 → e.g. 6.5mg gives AM=3.5, PM=3.0 (non-standard)
                 // Fix: round each half to nearest 0.5mg, with remainder going to AM.
-                const halfRaw  = tdd / 2;
-                const amDose   = Math.round(halfRaw * 2) / 2;   // round to 0.5mg
-                const pmDose   = Math.round((tdd - amDose) * 2) / 2;
+                const halfRaw = tdd / 2;
+                const amDose = Math.round(halfRaw * 2) / 2;   // round to 0.5mg
+                const pmDose = Math.round((tdd - amDose) * 2) / 2;
                 const isAsymmetric = Math.abs(amDose - pmDose) > 0.01;
 
                 const sim = [];
@@ -3045,7 +3615,7 @@
                     });
                     t = t.add(12, 'hour');
                 }
-                const full   = [...logged, ...sim];
+                const full = [...logged, ...bridge, ...sim];
                 const trough = generateCurve(
                     [tgtDate.diff(patientData.transplantDate, 'hour', true)],
                     full, ind, patientData.bioassay
@@ -3059,10 +3629,17 @@
             // ── Fix 4: Boundary-hit detection ─────────────────────────────────────
             const atLowerBound = best.tdd <= 1.0;
             const atUpperBound = best.tdd >= 18.0;
-            const boundaryHit  = atLowerBound || atUpperBound;
+            const boundaryHit = atLowerBound || atUpperBound;
 
             // ── Warning banners ─────────────────────────────────────────────────
             let warnings = '';
+            if (bridge.length > 0) {
+                warnings += `
+                <div style="padding:10px 14px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:12px;font-size:12px;">
+                    <span style="font-family:'Sora',sans-serif;font-weight:700;color:#475569;">ℹ Dose log is behind</span>
+                    <span style="color:#64748b;margin-left:8px;">${bridge.length} dose(s) between ${minStart.format('DD-MMM HH:mm')} and ${simStart.format('DD-MMM HH:mm')} were assumed to continue the current regimen. The new dose is applied from ${simStart.format('DD-MMM HH:mm')}. Log the actual doses for a more accurate recommendation.</span>
+                </div>`;
+            }
             if (targetOutOfRange) {
                 warnings += `
                 <div style="padding:10px 14px;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;margin-bottom:12px;font-size:12px;">
@@ -3084,9 +3661,9 @@
             html += '<div style="overflow-x:auto;"><table><thead><tr><th>Dose Regimen</th><th>Predicted Trough</th><th>vs Target</th><th></th></tr></thead><tbody>';
 
             visibleResults.forEach(r => {
-                const diff   = r.trough - target;
+                const diff = r.trough - target;
                 const isBest = r.tdd === best.tdd;
-                const close  = Math.abs(diff) < 0.5;
+                const close = Math.abs(diff) < 0.5;
                 // Flag non-standard tablet splits visually
                 const splitNote = r.isAsymmetric
                     ? `<span style="color:#6366f1">AM: ${r.amDose.toFixed(1)}</span> <span style="color:#8b5cf6">PM: ${r.pmDose.toFixed(1)}</span>`
@@ -3123,7 +3700,7 @@
         // this uncertainty to the clinician.
         // ============================================================
         let _lastHctCorrected = null;  // tracks most recent corrected value for 'use' button
-        
+
         function syncHbHct(source) {
             const hbIn = document.getElementById('quick-hct-hb');
             const hctIn = document.getElementById('quick-hct-initial');
@@ -3140,7 +3717,7 @@
 
         function runQuickHctAdjustment() {
             const out = document.getElementById('quick-hct-output');
-            const ci  = document.getElementById('quick-hct-ci');
+            const ci = document.getElementById('quick-hct-ci');
             const btn = document.getElementById('quick-hct-use-btn');
             const Cwb = parseFloat(document.getElementById('quick-hct-level').value);
             const hct = parseFloat(document.getElementById('quick-hct-initial').value);
@@ -3149,7 +3726,7 @@
             // (upper bound prevents near-zero denominator in quadratic solver)
             if (isNaN(Cwb) || isNaN(hct) || Cwb <= 0 || hct <= 0 || hct > 65) {
                 out.textContent = '--';
-                ci.textContent  = 'ng/mL';
+                ci.textContent = 'ng/mL';
                 btn.style.display = 'none';
                 _lastHctCorrected = null;
                 return;
@@ -3162,7 +3739,7 @@
             };
             const toWB = (cp, f) => cp * (1 - f) + f * (Bmax * cp) / (Kd + cp);
 
-            const cp       = toPlasma(Cwb, hct / 100);
+            const cp = toPlasma(Cwb, hct / 100);
             const corrected = toWB(cp, 0.35);
 
             // ±15% uncertainty range from population-level Bmax/Kd variability
@@ -3170,8 +3747,8 @@
             const ciHi = corrected * 1.15;
 
             _lastHctCorrected = corrected;
-            out.textContent   = corrected.toFixed(1);
-            ci.innerHTML      = `ng/mL &nbsp;<span style="font-size:10px;color:#6b7c93;">±15%: ${ciLo.toFixed(1)}–${ciHi.toFixed(1)}</span>`;
+            out.textContent = corrected.toFixed(1);
+            ci.innerHTML = `ng/mL &nbsp;<span style="font-size:10px;color:#6b7c93;">±15%: ${ciLo.toFixed(1)}–${ciHi.toFixed(1)}</span>`;
             btn.style.display = 'block';
         }
 
@@ -3193,4 +3770,5 @@
 
     </script>
 </body>
+
 </html>
