@@ -1,0 +1,15 @@
+{
+  "name": "tacrolimus-calc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tacrolimus MAP-Bayesian dosing calculator — PK engine tests",
+  "scripts": {
+    "test": "node test/pk-engine.test.js && node test/smoke.test.js",
+    "check": "node --check pk-engine.js && node test/check-html.js",
+    "verify": "npm run check && npm test",
+    "setup": "git config core.hooksPath .githooks && echo 'pre-commit hook enabled'"
+  },
+  "devDependencies": {
+    "dayjs": "^1.11.0"
+  }
+}

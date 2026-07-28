@@ -1,0 +1,33 @@
+#!/bin/sh
+# Blocks commits that break the app or the PK maths.
+#
+# The syntax check is the important one: everything in index.html lives in a
+# single <script> block, so one missing brace anywhere kills all 57 functions
+# and the page silently does nothing. That has happened. It takes ~50 ms to
+# rule out, so it runs on every commit.
+#
+# Enable once per clone:   npm run setup
+# Bypass in an emergency:  git commit --no-verify
+
+set -e
+
+# Only run when something we test actually changed.
+if ! git diff --cached --name-only | grep -qE '^(index\.html|pk-engine\.js|test/|package\.json)'; then
+    exit 0
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+    echo "pre-commit: node not found, skipping checks" >&2
+    exit 0
+fi
+
+if [ ! -d node_modules ]; then
+    echo "pre-commit: node_modules missing — run 'npm install' (skipping checks)" >&2
+    exit 0
+fi
+
+echo "pre-commit: checking syntax and PK engine..."
+node test/check-html.js   >/dev/null || { node test/check-html.js;   echo "\npre-commit: BLOCKED — syntax/wiring check failed" >&2; exit 1; }
+node test/pk-engine.test.js >/dev/null || { node test/pk-engine.test.js; echo "\npre-commit: BLOCKED — PK engine tests failed" >&2; exit 1; }
+node test/smoke.test.js   >/dev/null || { node test/smoke.test.js;   echo "\npre-commit: BLOCKED — smoke test failed" >&2; exit 1; }
+echo "pre-commit: OK"
