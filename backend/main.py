@@ -2,6 +2,7 @@ import sys
 import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -16,6 +17,33 @@ except ImportError:
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
+
+
+def _sync_missing_columns():
+    # create_all() only creates tables that don't exist yet — it never ALTERs
+    # a table that's already there. So a column added to a model after the
+    # table was first created (e.g. Patient.height) silently never reaches a
+    # live Postgres database, and every query touching that table then 500s
+    # with psycopg2.errors.UndefinedColumn. This adds any such missing
+    # columns on startup so model changes stay in sync with deployed DBs
+    # without needing a separate migration tool.
+    inspector = inspect(engine)
+    for table in models.Base.metadata.sorted_tables:
+        if not inspector.has_table(table.name):
+            continue
+        existing_cols = {c["name"] for c in inspector.get_columns(table.name)}
+        for col in table.columns:
+            if col.name in existing_cols:
+                continue
+            col_type = col.type.compile(dialect=engine.dialect)
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN "{col.name}" {col_type}'))
+            except Exception as e:
+                print(f"schema sync: failed to add {table.name}.{col.name}: {e}")
+
+
+_sync_missing_columns()
 
 app = FastAPI(title="Tacrolimus API")
 

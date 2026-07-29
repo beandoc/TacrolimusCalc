@@ -14,3 +14,5 @@ env/
 
 # Node
 node_modules/
+.vercel
+.env*.local
