@@ -605,7 +605,7 @@
 
             <div
                 style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid var(--col-border);">
-                <button onclick="loadPatientData()" class="btn btn-secondary">📁 Load Patient</button>
+                <button onclick="openLoadPatientModal()" class="btn btn-secondary">📁 Load Patient</button>
                 <button onclick="applyProtocol()" class="btn btn-accent">⚡ Apply Protocol</button>
                 <button onclick="savePatientData()" class="btn btn-success">💾 Save</button>
                 <input type="file" id="csv-upload" accept=".csv" style="display:none"
@@ -961,6 +961,46 @@
         </div>
     </div>
 
+    <!-- Load Patient Modal -->
+    <div id="loadPatientModal" class="modal-overlay">
+        <div class="modal" style="max-width:640px;width:95vw;max-height:85vh;overflow-y:auto;position:relative;">
+            <div
+                style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--col-border, #e2e8f0);">
+                <h3 style="font-family:'Sora',sans-serif;font-weight:700;font-size:18px;margin:0;">📁 Load Patient</h3>
+                <button onclick="closeLoadPatientModal()"
+                    style="background:none;border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--col-muted, #64748b);padding:4px 8px;border-radius:4px;"
+                    title="Close">&times;</button>
+            </div>
+            <p style="font-size:12px;color:var(--col-muted);margin-bottom:14px;">Search by name or narrow down by
+                transplant date — useful when the exact spelling of a name isn't certain.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Filter
+                        by Name</label>
+                    <input id="load-patient-filter-name" type="text" class="input-field"
+                        placeholder="Type any part of the name..." oninput="renderPatientDirectory()">
+                </div>
+                <div>
+                    <label
+                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Filter
+                        by Transplant Date</label>
+                    <div style="display:flex;gap:6px;">
+                        <input id="load-patient-filter-date" type="text" class="input-field"
+                            placeholder="dd-mmm-yy">
+                        <button onclick="clearLoadPatientDateFilter()" class="btn btn-secondary"
+                            style="padding:8px 12px;" title="Clear date filter">&times;</button>
+                    </div>
+                </div>
+            </div>
+            <div id="load-patient-results"
+                style="border:1px solid var(--col-border);border-radius:8px;max-height:340px;overflow-y:auto;"></div>
+            <div style="text-align:right;margin-top:16px;">
+                <button onclick="closeLoadPatientModal()" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Center Calibration Report Modal -->
     <div id="calibrationModal" class="modal-overlay">
         <div class="modal" style="max-width:720px;width:95vw;max-height:90vh;overflow-y:auto;position:relative;">
@@ -1163,6 +1203,7 @@
                 onReady: function (selectedDates) { autoUpdateTargetRange(selectedDates); }
             });
             flatpickr("#newDateTime", optsT);
+            flatpickr("#load-patient-filter-date", { ...opts, onChange: renderPatientDirectory });
         }
 
         function setupListeners() {
@@ -1294,6 +1335,120 @@
             if (dl) {
                 dl.innerHTML = list.map(p => `<option value="${p}">`).join('');
             }
+        }
+
+        // ============================================================
+        // LOAD PATIENT MODAL — search/pick by name and/or transplant date
+        // ============================================================
+        let patientDirectory = [];
+
+        async function openLoadPatientModal() {
+            document.getElementById('load-patient-filter-name').value = '';
+            const dateFilterEl = document.getElementById('load-patient-filter-date');
+            if (dateFilterEl._flatpickr) dateFilterEl._flatpickr.clear(); else dateFilterEl.value = '';
+            document.getElementById('load-patient-results').innerHTML =
+                '<p style="padding:16px;color:var(--col-muted);font-size:13px;">Loading patient directory...</p>';
+            document.getElementById('loadPatientModal').classList.add('open');
+            await loadPatientDirectory();
+            renderPatientDirectory();
+        }
+
+        function closeLoadPatientModal() {
+            document.getElementById('loadPatientModal').classList.remove('open');
+        }
+
+        async function loadPatientDirectory() {
+            const dir = new Map(); // mrn(lowercase) -> {mrn, transplant_date, weight, source}
+
+            // 1. Backend (source of truth when reachable)
+            try {
+                const res = await fetch(`${API_BASE}/patients?limit=1000`);
+                if (res.ok) {
+                    const apiList = await res.json();
+                    apiList.forEach(p => {
+                        dir.set(p.mrn.toLowerCase(), {
+                            mrn: p.mrn,
+                            transplant_date: p.transplant_date || '',
+                            weight: p.weight,
+                            source: 'Database'
+                        });
+                    });
+                }
+            } catch (err) {
+                console.warn("Backend offline while loading patient directory", err);
+            }
+
+            // 2. LocalStorage — adds offline-only patients, with their transplant date/weight
+            try {
+                const localList = JSON.parse(localStorage.getItem('tacrolimusPatientList') || '[]');
+                localList.forEach(item => {
+                    const nameStr = typeof item === 'string' ? item : (item.mrn || item.name);
+                    if (!nameStr) return;
+                    const key = nameStr.toLowerCase();
+                    if (dir.has(key)) return;
+                    let transplant_date = '', weight;
+                    try {
+                        const raw = localStorage.getItem(`tacrolimusDashboard_${key}`);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            const profile = parsed.profile || parsed;
+                            transplant_date = profile.transplant_date || '';
+                            weight = profile.weight;
+                        }
+                    } catch (e) { /* malformed local record — skip enrichment */ }
+                    dir.set(key, { mrn: nameStr, transplant_date, weight, source: 'Local Cache' });
+                });
+            } catch (e) {
+                console.error("Failed to parse local patient list:", e);
+            }
+
+            patientDirectory = Array.from(dir.values()).sort((a, b) => a.mrn.localeCompare(b.mrn));
+        }
+
+        function clearLoadPatientDateFilter() {
+            const el = document.getElementById('load-patient-filter-date');
+            if (el._flatpickr) el._flatpickr.clear(); else el.value = '';
+            renderPatientDirectory();
+        }
+
+        function renderPatientDirectory() {
+            const nameFilter = (document.getElementById('load-patient-filter-name').value || '').trim().toLowerCase();
+            const dateFilter = getFormattedDate('load-patient-filter-date', 'YYYY-MM-DD');
+
+            const container = document.getElementById('load-patient-results');
+            if (!patientDirectory.length) {
+                container.innerHTML = '<p style="padding:16px;color:var(--col-muted);font-size:13px;">No saved patients found.</p>';
+                return;
+            }
+
+            const rows = patientDirectory.filter(p => {
+                if (nameFilter && !p.mrn.toLowerCase().includes(nameFilter)) return false;
+                if (dateFilter && p.transplant_date !== dateFilter) return false;
+                return true;
+            });
+
+            if (!rows.length) {
+                container.innerHTML = '<p style="padding:16px;color:var(--col-muted);font-size:13px;">No patients match this name / transplant date.</p>';
+                return;
+            }
+
+            container.innerHTML = rows.map(p => `
+                <div onclick="selectPatientFromDirectory('${p.mrn.replace(/'/g, "\\'")}')"
+                     style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--col-border);cursor:pointer;"
+                     onmouseover="this.style.background='rgba(19,84,211,0.06)'" onmouseout="this.style.background=''">
+                    <div>
+                        <div style="font-family:'Sora',sans-serif;font-weight:600;font-size:13.5px;color:var(--col-text);">${p.mrn}</div>
+                        <div style="font-size:11.5px;color:var(--col-muted);margin-top:2px;">Transplant: ${p.transplant_date ? dayjs(p.transplant_date).format('DD-MMM-YY') : '—'}${(p.weight !== undefined && p.weight !== null) ? ` · ${p.weight} kg` : ''}</div>
+                    </div>
+                    <span style="font-size:10.5px;font-weight:600;color:var(--col-muted);background:rgba(100,116,139,0.12);padding:3px 8px;border-radius:20px;white-space:nowrap;">${p.source}</span>
+                </div>
+            `).join('');
+        }
+
+        function selectPatientFromDirectory(mrn) {
+            document.getElementById('patient-name').value = mrn;
+            closeLoadPatientModal();
+            loadPatientData();
         }
 
         function getFormattedDate(elementId, formatStr = 'YYYY-MM-DD') {
