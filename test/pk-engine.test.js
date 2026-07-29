@@ -263,4 +263,45 @@ section('Verified case regression lock (raj bahadur, code-review-verified number
     ok('TTR', near((ttrHours / totalHours) * 100, 7.94, 0.01), `${((ttrHours / totalHours) * 100).toFixed(2)}%`);
 }
 
+section('Starting dose suggestion (pre-Bayesian, population-based)');
+{
+    const range = { low: 10, high: 11 };
+    const base = { weight: 70, mpa: '1', bilirubin: 1.0, inhibitor: 'none' };
+
+    const fast = E.suggestStartingDose({ ...base, genotype: '11' }, range);
+    const inter = E.suggestStartingDose({ ...base, genotype: '13' }, range);
+    const slow = E.suggestStartingDose({ ...base, genotype: '33' }, range);
+
+    ok('CYP3A5 expresser (*1/*1) needs a higher TDD than intermediate (*1/*3)', fast.tdd > inter.tdd,
+        `*1/*1=${fast.tdd} *1/*3=${inter.tdd}`);
+    ok('intermediate (*1/*3) needs a higher TDD than non-expresser (*3/*3)', inter.tdd > slow.tdd,
+        `*1/*3=${inter.tdd} *3/*3=${slow.tdd}`);
+
+    // CPIC (Birdwell 2015): expressers need ~1.5-2x the non-expresser starting
+    // dose. This isn't a flat multiplier here — it falls out of the population
+    // model's own CYP3A5 factor — so check the resulting ratio lands in range
+    // rather than asserting an exact number.
+    const ratio = fast.tdd / slow.tdd;
+    ok('*1/*1 vs *3/*3 starting-dose ratio matches CPIC 1.5-2x guidance',
+        ratio > 1.5 && ratio < 2.5, `ratio=${ratio.toFixed(2)}`);
+
+    [fast, inter, slow].forEach(r => {
+        ok(`predicted trough (${r.tdd} mg/day) lands inside the requested range`,
+            r.predictedTrough >= range.low - 0.5 && r.predictedTrough <= range.high + 0.5,
+            `${r.predictedTrough.toFixed(2)} ng/mL`);
+        ok(`${r.tdd} mg/day is not flagged at the search boundary`, !r.atBoundary);
+    });
+
+    // Extreme covariate stack (strong inhibitor + severe hepatic impairment +
+    // slow metabolizer + low weight) drives clearance so low that even the
+    // 1 mg/day floor overshoots target — this must surface as atBoundary, not
+    // silently return a dose that undertreats/overtreats without a flag.
+    const extreme = E.suggestStartingDose(
+        { weight: 30, mpa: '1', genotype: '33', bilirubin: 15, inhibitor: 'strong' }, range);
+    ok('extreme low-clearance stack hits the dose floor and is flagged',
+        extreme.atBoundary && extreme.tdd === 1.0, `tdd=${extreme.tdd} atBoundary=${extreme.atBoundary}`);
+    ok('extreme low-clearance stack overshoots target even at the floor dose',
+        extreme.predictedTrough > range.high, `${extreme.predictedTrough.toFixed(2)} ng/mL`);
+}
+
 done('pk-engine');

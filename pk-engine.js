@@ -272,6 +272,72 @@
     }
 
     // ============================================================
+    // STARTING DOSE SUGGESTION — population-based, pre-Bayesian
+    //
+    // Before any level is drawn there is nothing for MAP to fit, so dosing has
+    // to come from the population model alone. CPIC (Birdwell 2015) recommends
+    // a flat 1.5-2x starting-dose increase for CYP3A5 expressers vs
+    // non-expressers; this reproduces that guidance quantitatively from the
+    // SAME population model used for the MAP Bayesian forecast (CYP3A5 factor,
+    // weight, MPA, bilirubin, CYP3A4 inhibitor already applied via
+    // getPopulationParameters), rather than a flat CPIC multiplier disconnected
+    // from those covariates.
+    //
+    // Grid-searches BID total daily dose and simulates enough 12h-spaced doses
+    // to reach steady state AT THIS PATIENT'S modelled half-life (not a fixed
+    // dose count) — a strong CYP3A4 inhibitor or severe hepatic impairment can
+    // quarter clearance and push steady state out by days, and a fixed count
+    // tuned for the typical case would silently under-simulate those patients.
+    // ============================================================
+    const STARTING_DOSE_MIN_TDD = 1.0;
+    const STARTING_DOSE_MAX_TDD = 18.0;
+    const STARTING_DOSE_STEP = 0.5;
+    const STARTING_DOSE_HALF_LIVES = 6; // 2^-6 = 1.6% from true steady state
+    const STARTING_DOSE_MAX_DOSES = 200; // 100-day safety cap on the simulation
+
+    function suggestStartingDose(patientData, targetRange) {
+        const popParams = getPopulationParameters(patientData);
+        const targetMid = (targetRange.low + targetRange.high) / 2;
+
+        const halfLifeHr = Math.LN2 / (popParams.CL / popParams.V);
+        const nDoses = Math.min(
+            STARTING_DOSE_MAX_DOSES,
+            Math.max(10, Math.ceil((STARTING_DOSE_HALF_LIVES * halfLifeHr) / 12) + 1)
+        );
+        const lastDoseTime = (nDoses - 1) * 12;
+
+        let best = null;
+        for (let tdd = STARTING_DOSE_MIN_TDD; tdd <= STARTING_DOSE_MAX_TDD + 1e-9; tdd += STARTING_DOSE_STEP) {
+            // Standard tablet split: round each half to 0.5mg, remainder to AM.
+            const amDose = Math.round((tdd / 2) * 2) / 2;
+            const pmDose = Math.round((tdd - amDose) * 2) / 2;
+
+            const doses = [];
+            for (let i = 0; i < nDoses; i++) {
+                doses.push({ time: i * 12, dose: i % 2 === 0 ? amDose : pmDose });
+            }
+            // Trough = concentration right before the final (nth) dose — the
+            // strict `d.time < t` in predictAtTime excludes that dose itself.
+            const trough = predictAtTime(lastDoseTime, doses, popParams);
+            const diff = Math.abs(trough - targetMid);
+            if (!best || diff < best.diff) {
+                best = { tdd, amDose, pmDose, trough, diff };
+            }
+        }
+
+        return {
+            tdd: best.tdd,
+            amDose: best.amDose,
+            pmDose: best.pmDose,
+            predictedTrough: best.trough,
+            targetRange,
+            halfLifeHr,
+            atBoundary: best.tdd <= STARTING_DOSE_MIN_TDD || best.tdd >= STARTING_DOSE_MAX_TDD,
+            popParams
+        };
+    }
+
+    // ============================================================
     // NELDER-MEAD SIMPLEX OPTIMIZER (2-dimensional, unconstrained)
     //
     // Used as a gradient-free refinement step after the coarse grid
@@ -789,7 +855,7 @@
         nextC0Time, getTherapeuticRange, getLevelStatus,
         // PK model
         getPopulationParameters, predictSingleDose, predictAtTime,
-        cmiaAdjust, generateCurve,
+        cmiaAdjust, generateCurve, suggestStartingDose,
         // estimation
         nelderMead2D, mapBayesian, calculateAccuracyMetrics,
         laplacePosterior, monteCarloCI,
