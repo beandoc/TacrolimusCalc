@@ -1117,6 +1117,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             initDatePickers();
             setupListeners();
+            syncCenterCalScalar();
             populatePatientList();
             setDefaults();
             renderDoseLog(); renderLevelLog();
@@ -1246,6 +1247,23 @@
             ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:")
                 ? "http://localhost:8000/api"
                 : "/api");
+
+        // Pull the centre-wide calibration scalar from the shared backend so
+        // every device uses the latest applied correction, not just whichever
+        // browser's localStorage last clicked "Apply" in Center Calibration.
+        // Silent on failure (offline / backend down) — PK_MODEL.INDIAN_CL_SCALAR
+        // already falls back to localStorage, then 1.18, per pk-engine.js.
+        async function syncCenterCalScalar() {
+            try {
+                const res = await fetch(`${API_BASE}/config/cl-scalar`);
+                if (!res.ok) return;
+                const cfg = await res.json();
+                if (cfg && typeof cfg.cl_scalar === 'number' && isFinite(cfg.cl_scalar)) {
+                    PK_MODEL.INDIAN_CL_SCALAR = cfg.cl_scalar;
+                    localStorage.setItem('tacro_cl_scalar', cfg.cl_scalar.toFixed(4));
+                }
+            } catch (_) { /* offline or backend unreachable — keep local/default value */ }
+        }
 
         async function populatePatientList() {
             let list = [];
@@ -1947,17 +1965,31 @@
             return `<span style="background:#fee2e2;color:#991b1b;font-size:11px;padding:2px 7px;border-radius:12px;font-weight:600;">High Bias</span>`;
         }
 
-        function applyCalibrationScalar() {
+        async function applyCalibrationScalar() {
             const btn = document.getElementById('calib-apply-btn');
             const newScalar = parseFloat(btn.dataset.suggested);
             if (!newScalar || isNaN(newScalar)) return;
-            if (!confirm(`Apply new CL scalar ${newScalar.toFixed(3)}? This will update the population prior for all future patients in this browser. You can re-run calibration at any time to adjust further.`)) return;
+            if (!confirm(`Apply new CL scalar ${newScalar.toFixed(3)}? This updates the population prior center-wide — every device that loads this app will pick it up. You can re-run calibration at any time to adjust further.`)) return;
+
+            // Always update the local copy first so this device reflects the
+            // change immediately even if the centre-wide save below fails.
             localStorage.setItem('tacro_cl_scalar', newScalar.toFixed(4));
             PK_MODEL.INDIAN_CL_SCALAR = newScalar;
             btn.disabled = true;
             btn.textContent = '✓ Applied';
             document.getElementById('calib-scalar-current').textContent = newScalar.toFixed(3);
-            showAlert(`Scalar updated to ${newScalar.toFixed(3)}. Re-run any open patient forecast to use the new prior.`, 'success');
+
+            try {
+                const res = await fetch(`${API_BASE}/config/cl-scalar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cl_scalar: newScalar })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                showAlert(`Scalar updated to ${newScalar.toFixed(3)} for all devices. Re-run any open patient forecast to use the new prior.`, 'success');
+            } catch (err) {
+                showAlert(`Scalar updated to ${newScalar.toFixed(3)} on this device only — centre-wide save failed (${err.message}). Other devices will keep using the old value until this succeeds.`, 'warning');
+            }
         }
 
         function exportCalibrationCSV() {

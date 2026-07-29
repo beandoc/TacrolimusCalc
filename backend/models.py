@@ -70,3 +70,14 @@ class ClinicalOutcome(Base):
     notes = Column(String, nullable=True)
 
     patient = relationship("Patient", back_populates="outcomes")
+
+class CenterConfig(Base):
+    # Single-row table (id is always 1) holding the centre-wide calibration
+    # scalar produced by the Center Calibration Report, so it applies to
+    # every device that loads the app instead of being stuck in whichever
+    # browser's localStorage clicked "Apply".
+    __tablename__ = "center_config"
+
+    id = Column(Integer, primary_key=True)
+    cl_scalar = Column(Float, nullable=False, default=1.18)
+    updated_at = Column(DateTime, nullable=True)

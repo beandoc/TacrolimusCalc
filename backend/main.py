@@ -1,5 +1,6 @@
 import sys
 import os
+from datetime import datetime, timezone
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
@@ -138,3 +139,26 @@ def create_outcomes(mrn: str, outcomes: List[schemas.ClinicalOutcomeCreate], db:
 def read_outcomes(mrn: str, db: Session = Depends(get_db)):
     outcomes = db.query(models.ClinicalOutcome).filter(models.ClinicalOutcome.patient_mrn == mrn).all()
     return outcomes
+
+# Centre-wide calibration scalar (Center Calibration Report). Single row,
+# id=1, so it applies to every device that loads the app rather than being
+# stuck in whichever browser's localStorage clicked "Apply".
+@app.get("/api/config/cl-scalar", response_model=schemas.CenterConfig)
+def get_cl_scalar(db: Session = Depends(get_db)):
+    cfg = db.query(models.CenterConfig).filter(models.CenterConfig.id == 1).first()
+    if not cfg:
+        return schemas.CenterConfig(cl_scalar=1.18, updated_at=None)
+    return cfg
+
+@app.post("/api/config/cl-scalar", response_model=schemas.CenterConfig)
+def set_cl_scalar(payload: schemas.CenterConfigUpdate, db: Session = Depends(get_db)):
+    cfg = db.query(models.CenterConfig).filter(models.CenterConfig.id == 1).first()
+    if not cfg:
+        cfg = models.CenterConfig(id=1, cl_scalar=payload.cl_scalar, updated_at=datetime.now(timezone.utc))
+        db.add(cfg)
+    else:
+        cfg.cl_scalar = payload.cl_scalar
+        cfg.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(cfg)
+    return cfg

@@ -72,3 +72,12 @@ class Patient(PatientBase):
 
     class Config:
         from_attributes = True
+
+class CenterConfigUpdate(BaseModel):
+    cl_scalar: float
+
+class CenterConfig(CenterConfigUpdate):
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
