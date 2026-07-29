@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m ' *)",
+      "Bash(grep -n \"getElementById\\('model-params\\\\|Individualized PK Parameters\\\\|div.innerHTML = \\\\`\" index.html)"
+    ]
+  }
+}
