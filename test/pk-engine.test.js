@@ -7,7 +7,7 @@
 //   * an outlier threshold of 1.26 described as 3 SD, when 3 SD is 1.154.
 // Both look reasonable in a diff. Neither survives an assertion.
 
-const { E, ok, near, section, done, TX, POP, steadyStateDoses, c0Hour, referencePosterior } = require('./helpers');
+const { E, dayjs, ok, near, section, done, TX, POP, steadyStateDoses, c0Hour, referencePosterior } = require('./helpers');
 
 const doses = steadyStateDoses(40);
 
@@ -192,6 +192,75 @@ section('Therapeutic range schedule');
     ok('month 1-3 targets 7-9', r(2).low === 7 && r(2).high === 9);
     ok('month 3-6 targets 5-7', r(5).low === 5 && r(5).high === 7);
     ok('beyond 6 months targets 4-6', r(12).low === 4 && r(12).high === 6);
+}
+
+section('Covariate edge cases');
+{
+    // An unrecognized inhibitor string used to make CL silently NaN with no
+    // guard — reachable via CSV import or the /api/patients payload, even
+    // though the UI itself only ever emits none|moderate|strong.
+    const garbage = E.getPopulationParameters({ weight: 60, mpa: '0', genotype: '33', bilirubin: 1.0, inhibitor: 'not-a-real-value' });
+    ok('unrecognized inhibitor falls back to no effect, not NaN',
+        isFinite(garbage.CL) && near(garbage.CL, E.PK_MODEL.TVCL * E.PK_MODEL.INDIAN_CL_SCALAR, 1e-6));
+
+    // Locks the corrected bilirubin doc-comment values (the code's exponent
+    // is 0.30; a previous comment quoted numbers implying ~0.277).
+    const bilF = (bil) => E.getPopulationParameters({ weight: 60, mpa: '0', genotype: '33', bilirubin: bil, inhibitor: 'none' }).CL
+        / (E.PK_MODEL.TVCL * E.PK_MODEL.INDIAN_CL_SCALAR);
+    ok('Bil=2 -> 0.8123', near(bilF(2), 0.8123, 1e-4));
+    ok('Bil=5 -> 0.6170', near(bilF(5), 0.6170, 1e-4));
+    ok('Bil=10 -> 0.5012', near(bilF(10), 0.5012, 1e-4));
+}
+
+section('Verified case regression lock (raj bahadur, code-review-verified numbers)');
+{
+    // This locks the exact scenario independently hand-verified during a code
+    // review: tx date 09-Jul-26, 70.5 kg, CYP3A5 *1/*3, MPA yes, LC-MS/MS,
+    // 6 logged BID doses across 22 days (04-Jul .. 25-Jul), 3 measured troughs.
+    // Every one of these numbers reproduced the app's displayed output exactly
+    // when this test was written — any future drift here means the verified
+    // math was touched.
+    const patTx = dayjs('2026-07-09T00:00');
+    const pat = { weight: 70.5, mpa: '1', genotype: '13', bilirubin: 1.0, inhibitor: 'none' };
+    const pop = E.getPopulationParameters(pat);
+    ok('population CL/F', near(pop.CL, 30.031, 0.01));
+    ok('population V/F', near(pop.V, 815.45, 0.01));
+
+    // Reconstruct the historyLog exactly as gatherData() would build it:
+    // 6 logged dose rows, integer ids (user-entered rows), dayjs recordDate.
+    const loggedDoseHours = { '-113': 1.5, '-101': 1.5, '127': 4.5, '139': 4.5, '391': 4.0, '403': 4.0 };
+    const historyLog = Object.entries(loggedDoseHours).map(([t, dose], i) => ({
+        id: i, recordDate: patTx.add(Number(t), 'hour'), dose, level: null, time: Number(t)
+    }));
+    const measuredLevels = [
+        { time: 126.75, level: 4.5 },
+        { time: 270.75, level: 12.9 },
+        { time: 342.75, level: 11.1 }
+    ];
+
+    const filled = E.fillHistoricalGaps(historyLog, patTx);
+    const imputed = filled.filter(d => String(d.id).startsWith('inter-'));
+    ok('imputes exactly 38 missing BID doses across the logging gaps', imputed.length === 38, `${imputed.length}`);
+
+    const ind = E.mapBayesian(pop, measuredLevels, filled, 1);
+    ok('individual CL/F', near(ind.CL, 25.223, 0.01), `${ind.CL.toFixed(3)}`);
+    ok('individual V/F', near(ind.V, 826.00, 0.01), `${ind.V.toFixed(2)}`);
+    ok('RMSE', near(ind.rmse, 0.8709, 1e-3), `${ind.rmse.toFixed(4)}`);
+    ok('MPE%', near(ind.mpe, -0.2846, 1e-3), `${ind.mpe.toFixed(4)}`);
+    ok('MAPE%', near(ind.mape, 7.9828, 1e-3), `${ind.mape.toFixed(4)}`);
+
+    const trough = E.predictAtTime(patTx.add(414.75, 'hour').diff(patTx, 'hour', true), filled, ind);
+    ok('forecast trough at 26-Jul-26 06:45', near(trough, 11.766, 0.01), `${trough.toFixed(3)}`);
+
+    // TTR: duration-weighted Rosendaal fraction across the 3 troughs against
+    // the month 0-1 band (10-11 ng/mL).
+    let ttrHours = 0, totalHours = 0;
+    for (let i = 0; i < measuredLevels.length - 1; i++) {
+        const dt = measuredLevels[i + 1].time - measuredLevels[i].time;
+        totalHours += dt;
+        ttrHours += E.rosendaalFraction(measuredLevels[i].level, measuredLevels[i + 1].level, 10, 11) * dt;
+    }
+    ok('TTR', near((ttrHours / totalHours) * 100, 7.94, 0.01), `${((ttrHours / totalHours) * 100).toFixed(2)}%`);
 }
 
 done('pk-engine');

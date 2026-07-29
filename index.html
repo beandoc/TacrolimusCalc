@@ -559,15 +559,6 @@
                 </div>
                 <div>
                     <label
-                        style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Forecast
-                        Date & Time</label>
-                    <input id="prediction-datetime" type="text" class="input-field" placeholder="dd-mmm-yy HH:mm">
-                    <div id="forecast-helper"
-                        style="font-size:10.5px;color:var(--col-primary, #2563eb);margin-top:4px;font-weight:500;">⚡
-                        Auto-synced to next trough after latest dose (editable)</div>
-                </div>
-                <div>
-                    <label
                         style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Type
                         of Transplant</label>
                     <select id="transplant-type" class="input-field">
@@ -687,6 +678,17 @@
             </div>
         </div>
 
+        <!-- Forecast Timing -->
+        <div class="card" style="padding:24px;margin-bottom:20px;">
+            <div class="section-title">Forecast Date & Time</div>
+            <div style="max-width:260px;">
+                <input id="prediction-datetime" type="text" class="input-field" placeholder="dd-mmm-yy HH:mm">
+                <div id="forecast-helper"
+                    style="font-size:10.5px;color:var(--col-primary, #2563eb);margin-top:4px;font-weight:500;">⚡
+                    Auto-synced to next trough after latest dose (editable)</div>
+            </div>
+        </div>
+
         <!-- Run Analysis -->
         <div style="text-align:center;margin-bottom:24px;">
             <button id="run-all-btn" class="btn btn-primary btn-xl">
@@ -729,6 +731,7 @@
                 <!-- Per-observation PE table -->
                 <div id="pe-table-section" style="display:none;">
                     <div class="section-title" style="margin-top:4px;">Per-Observation Prediction Errors</div>
+                    <div style="font-size:11px;color:var(--col-muted);margin:-6px 0 10px;">In-sample residuals — these are the same points MAP fit to, so "Quality" here reflects fit, not forecast accuracy.</div>
                     <div style="overflow-x:auto;">
                         <table>
                             <thead>
@@ -1493,6 +1496,7 @@
             if (p.inhibitor !== undefined) document.getElementById('inhibitor').value = p.inhibitor;
 
             clinicalData = loadedData.events || [];
+            clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
 
             renderDoseLog();
             renderLevelLog();
@@ -1614,6 +1618,7 @@
                         }
                     }
 
+                    newClinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
                     clinicalData = newClinicalData;
                     renderDoseLog();
                     renderLevelLog();
@@ -2130,15 +2135,23 @@
 
         function renderLevelLog() {
             const tbody = document.getElementById('levelLogTable');
-            const txDate = dayjs(document.getElementById('transplant-date')._flatpickr.input.value);
+            // No transplant date yet → dayjs('') would be invalid, making every
+            // getTherapeuticRange() comparison false and silently falling through
+            // to the >6-month range (grading an early post-transplant level as
+            // "High" against a chronic-phase target). Render N/A instead.
+            const txDateStr = getFormattedDate('transplant-date', 'YYYY-MM-DD');
+            const txDate = txDateStr ? dayjs(txDateStr) : null;
             const rows = clinicalData
                 .map((r, i) => {
                     if (r.level === null) return '';
-                    const status = getLevelStatus(r.level, dayjs(r.datetime), txDate);
+                    const status = txDate ? getLevelStatus(r.level, dayjs(r.datetime), txDate) : { text: 'N/A' };
                     const badgeCls = status.text === 'Target' ? 'badge-success' : status.text === 'High' ? 'badge-danger' : 'badge-warning';
                     // C/D ratio: sum doses in prior 24h
                     const rTime = dayjs(r.datetime);
-                    const priorDoses = clinicalData.filter(d => d.dose !== null && dayjs(d.datetime).isBefore(rTime) && dayjs(d.datetime).isAfter(rTime.subtract(24, 'hour')));
+                    // Inclusive at exactly -24h to match runIPV's `d.time >= lev.time - 24`
+                    // boundary — previously this used a strict isAfter(), so a dose at
+                    // precisely -24h counted in one panel and not the other.
+                    const priorDoses = clinicalData.filter(d => d.dose !== null && dayjs(d.datetime).isBefore(rTime) && !dayjs(d.datetime).isBefore(rTime.subtract(24, 'hour')));
                     const dailyDose = priorDoses.reduce((s, d) => s + d.dose, 0);
                     const cdRatio = dailyDose > 0 ? (r.level / dailyDose).toFixed(2) : '—';
                     return `<tr>
@@ -2381,7 +2394,7 @@
                         <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12.5px;color:#c2410c;margin-bottom:3px;">POSSIBLE POST-DOSE SAMPLE${postDose.length > 1 ? 'S' : ''}</div>
                         <div style="font-size:12px;color:#9a3412;line-height:1.5;">
                             ${postDose.map(p => `Level #${p.n} is timestamped <strong>${p.minutesAfter} min after</strong> a dose`).join('; ')}.
-                            C0 should be drawn ${SAMPLING_LEAD_MIN} min <em>before</em> the dose (${String(DOSE_SLOTS.AM).padStart(2, '0')}:${String(60 - SAMPLING_LEAD_MIN).padStart(2, '0')} / ${DOSE_SLOTS.PM - 1}:${String(60 - SAMPLING_LEAD_MIN).padStart(2, '0')}).
+                            C0 should be drawn ${SAMPLING_LEAD_MIN} min <em>before</em> the dose (${String(DOSE_SLOTS.AM - 1).padStart(2, '0')}:${String(60 - SAMPLING_LEAD_MIN).padStart(2, '0')} / ${DOSE_SLOTS.PM - 1}:${String(60 - SAMPLING_LEAD_MIN).padStart(2, '0')}).
                             A sample taken during absorption reads high — 15 min post-dose is roughly +30% at steady state — which drives the MAP fit toward slower clearance and an under-dose recommendation.
                             These levels were fitted exactly as entered; correct the timestamps if they are wrong.
                         </div>
@@ -2400,7 +2413,7 @@
             label.textContent = intelText;
             label.style.color = intelColor;
 
-            if (nObs === 0 || !indParams.rmse) {
+            if (nObs === 0 || indParams.rmse === null) {
                 grid.innerHTML = `
                 <div class="metric-card" style="grid-column:1/-1;background:var(--col-warning-bg);border-color:#fde68a;">
                     <div style="font-size:13px;color:var(--col-warning);font-family:'Sora',sans-serif;font-weight:600;">Population estimate — add measured trough levels to personalize</div>
@@ -2425,6 +2438,7 @@
             <div class="metric-card" style="grid-column:1/-1;background:#f8fafc;border-color:var(--col-border);padding:8px 14px;">
                 <span style="font-size:11px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);">IN-SAMPLE FIT METRICS</span>
                 <span style="font-size:11px;color:var(--col-muted);margin-left:6px;">· computed on the same observations used for MAP estimation (optimistic); not cross-validated</span>
+                <div style="font-size:10.5px;color:var(--col-muted);margin-top:3px;">With ${nObs} observation${nObs === 1 ? '' : 's'} and 2 fitted parameters, a low in-sample MAPE here is expected even for a poorly-calibrated patient. External validation (Sangha 2024, n=103 Indian patients) reported <strong>~40% MAPE</strong> — treat that as the more realistic guide to real-world accuracy.</div>
             </div>
             <div class="metric-card">
                 <div class="metric-label">RMSE</div>
@@ -2497,6 +2511,18 @@
             // which previously forced the "Severe Model Mismatch" banner onto every
             // single-observation fit — even a numerically perfect one.
             const misfit = (typeof indParams.r2 === 'number' && indParams.r2 < 0.5) || indParams.rmse > 2.5;
+            // ── Don't call a low-N fit "Reliable" ─────────────────────────────
+            // At n=1-2 observations with 2 free parameters, MAP can fit the
+            // points almost exactly — a low RMSE there says little about
+            // predictive validity. Reuse the same N>=5 bar the R² tile already
+            // applies (updateAccuracyPanel) so "Reliable" only appears once
+            // there's enough data to mean it.
+            const nObsForFit = indParams.pe ? indParams.pe.length : 0;
+            const fitGood = !misfit && indParams.rmse < 2;
+            const fitReliable = fitGood && nObsForFit >= 5;
+            const fitBoxBg = misfit ? 'var(--col-danger-bg)' : fitReliable ? 'var(--col-success-bg)' : 'var(--col-warning-bg)';
+            const fitBoxBorder = misfit ? '#fecaca' : fitReliable ? '#a7f3d0' : '#fde68a';
+            const fitBoxColor = misfit ? 'var(--col-danger)' : fitReliable ? 'var(--col-success)' : 'var(--col-warning)';
             div.innerHTML = `
             <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:11.5px;color:var(--col-muted);font-family:'Sora',sans-serif;font-weight:600;margin-bottom:4px;">
@@ -2528,11 +2554,12 @@
                     </div>
                 </div>
                 ${indParams.rmse !== null ? `
-                <div style="padding:10px;background:${misfit ? 'var(--col-danger-bg)' : indParams.rmse < 2 ? 'var(--col-success-bg)' : 'var(--col-warning-bg)'};border-radius:6px;text-align:left;border:1px solid ${misfit ? '#fecaca' : indParams.rmse < 2 ? '#a7f3d0' : '#fde68a'};">
-                    <div style="font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:${misfit ? 'var(--col-danger)' : indParams.rmse < 2 ? 'var(--col-success)' : 'var(--col-warning)'};">
-                        ${misfit ? '🚨 CRITICAL: Severe Model Mismatch' : indParams.rmse < 2 ? '✓ Reliable Pharmacokinetic Fit' : '⚠ Suboptimal Fit — Check dose timings'}
+                <div style="padding:10px;background:${fitBoxBg};border-radius:6px;text-align:left;border:1px solid ${fitBoxBorder};">
+                    <div style="font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:${fitBoxColor};">
+                        ${misfit ? '🚨 CRITICAL: Severe Model Mismatch' : fitReliable ? '✓ Reliable Pharmacokinetic Fit' : fitGood ? `⚠ Good In-Sample Fit — N=${nObsForFit} &lt;5, not yet validated` : '⚠ Suboptimal Fit — Check dose timings'}
                     </div>
                     ${misfit ? `<div style="font-size:11px;color:#7f1d1d;margin-top:4px;line-height:1.4;">RMSE is ${indParams.rmse.toFixed(2)}. Evidence of changing absorption, missed doses, or non-trough sampling. Do not trust single-parameter estimates.</div>` : ''}
+                    ${fitGood && !fitReliable ? `<div style="font-size:11px;color:#78350f;margin-top:4px;line-height:1.4;">A near-perfect fit is expected with this few observations and free parameters — it does not yet demonstrate predictive validity. Add more trough levels before treating this as individually validated.</div>` : ''}
                 </div>` : ''}
             </div>`;
         }
@@ -2564,11 +2591,27 @@
             //   • conflated in-sample fit error with forecast uncertainty
             //   • assumed Gaussian symmetric error (not true for log-normal PK)
             //   • was always wider/narrower than the actual MC band shown on chart
+            // Both this CI and the wider prediction interval below reuse the
+            // same untouched MC posterior numbers — only the display layer
+            // adds the residual-error widening; no PK math is changed here.
             let ciLow = null, ciHigh = null, ciSpan = 0;
+            let piLow = null, piHigh = null;
             if (mcCiAtPred) {
                 ciLow = Math.max(0, mcCiAtPred.p5);
                 ciHigh = mcCiAtPred.p95;
                 ciSpan = ciHigh - ciLow;
+                // ── Approximate 90% PREDICTION interval ──────────────────────
+                // monteCarloCI propagates parameter (posterior) uncertainty only —
+                // it deliberately excludes the σ=18% proportional residual/assay
+                // error (see pk-engine.js SIGMA), so it answers "how uncertain is
+                // the individual CL/V estimate", not "where will the next measured
+                // level actually fall". Widen the parameter CI by ±1.645·σ (in
+                // proportional terms) to approximate that wider, more clinically
+                // relevant range. This is a display-layer approximation, not a
+                // second Monte Carlo run — it does not touch the verified engine.
+                const sigmaHalfWidth = 1.645 * PK_MODEL.SIGMA;
+                piLow = Math.max(0, ciLow * (1 - sigmaHalfWidth));
+                piHigh = ciHigh * (1 + sigmaHalfWidth);
             } else if (hasError) {
                 // Fallback (no MC passed): use RMSE heuristic, clearly labelled as approximate
                 const half = indParams.rmse * 1.645;
@@ -2638,7 +2681,7 @@
                         🚨 DO NOT TRUST FORECAST (Unreliable Fit)
                     </div>
                     <div style="font-size: 12px; color: #7f1d1d; margin-bottom: 8px;">
-                        Model fit guarantees violated (R²=${indParams.r2 ? indParams.r2.toFixed(2) : '?'}, CI span=${ciSpan.toFixed(1)}).
+                        Model fit guarantees violated (R²=${indParams.r2 != null ? indParams.r2.toFixed(2) : '?'}, CI span=${ciSpan.toFixed(1)}).
                     </div>
                     <ul style="margin-left: 20px; font-size: 11.5px; color: #7f1d1d; line-height: 1.5;">
                         <li><strong>Verify Times:</strong> Ensure all measurements are true pre-dose (trough) samples.</li>
@@ -2649,18 +2692,42 @@
             }
 
             // ── Imputed/Extrapolated Doses Transparency ──────────────────────
-            const imputedCount = allDoses.filter(d => String(d.id).startsWith('inter-')).length;
-            const extraCount = allDoses.filter(d => String(d.id).startsWith('ext-')).length;
+            // extraCount (future doses out to predictionDate+14d) is almost always
+            // large and mostly irrelevant to the displayed number — it exists to
+            // give the curve somewhere to go, not because the fit depends on it.
+            // imputedCount is the one that matters: those doses enter the MAP
+            // objective and every per-observation prediction. Surface how many of
+            // the *measured levels* actually rest on an imputed (not logged) dose,
+            // and the longest run of consecutive imputed doses, so "38 imputed"
+            // reads as a data-sparsity signal rather than a footnote.
+            const sortedDoses = [...allDoses].sort((a, b) => a.time - b.time);
+            const imputedCount = sortedDoses.filter(d => String(d.id).startsWith('inter-')).length;
+            const extraCount = sortedDoses.filter(d => String(d.id).startsWith('ext-')).length;
             let imputationWarning = '';
 
             if (imputedCount > 0 || extraCount > 0) {
+                let maxImputedRunHours = 0, runLen = 0;
+                for (const d of sortedDoses) {
+                    if (String(d.id).startsWith('inter-')) {
+                        runLen++;
+                        maxImputedRunHours = Math.max(maxImputedRunHours, runLen * 12);
+                    } else {
+                        runLen = 0;
+                    }
+                }
+                const obsOnImputed = (measuredLevels || []).filter(obs => {
+                    const priorDoses = sortedDoses.filter(d => d.time < obs.time && d.dose > 0);
+                    if (priorDoses.length === 0) return false;
+                    return String(priorDoses[priorDoses.length - 1].id).startsWith('inter-');
+                }).length;
+
                 imputationWarning = `
                 <div style="margin-top:10px;padding:12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;text-align:left;">
                     <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:11.5px;color:#475569;margin-bottom:3px;">ℹ️ DOSE ASSUMPTIONS IN FORECAST</div>
                     <div style="font-size:11px;color:#64748b;line-height:1.4;">
-                        ${imputedCount > 0 ? `<strong>${imputedCount} missing dose(s)</strong> were automatically imputed to fill historical gaps.<br>` : ''}
-                        ${extraCount > 0 ? `<strong>${extraCount} future dose(s)</strong> were extrapolated assuming the current regimen continues unchanged.` : ''}
+                        ${imputedCount > 0 ? `<strong>${imputedCount} missing dose(s)</strong> were automatically imputed to fill historical gaps (largest gap ≈ ${maxImputedRunHours}h).${obsOnImputed > 0 ? ` <strong>${obsOnImputed} of ${measuredLevels.length}</strong> measured level(s) fall right after an imputed dose, not a dose you actually logged.` : ''}` : ''}
                     </div>
+                    ${extraCount > 0 ? `<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Also extrapolated ${extraCount} future dose(s) to draw the forecast curve — this is scaffolding for the chart, not evidence the fit depends on.</div>` : ''}
                 </div>`;
             }
 
@@ -2670,7 +2737,8 @@
             Predicted trough at <strong>${predDate.format('DD-MMM-YY HH:mm')}</strong>:
             <span style="font-family:'DM Mono',monospace;font-size:32px;font-weight:500;color:${isUnreliable || predicted > 20 ? 'var(--col-danger)' : 'var(--col-primary)'};"> ${predicted.toFixed(1)}</span>
             <span style="font-size:18px;color:var(--col-muted);"> ng/mL</span>
-            ${ciLow !== null ? `<div style="font-size:12px;color:var(--col-muted);margin-top:6px;">90% CI (Monte Carlo): <strong>${ciLow.toFixed(1)}</strong> – <strong>${ciHigh.toFixed(1)}</strong> ng/mL<span style="margin-left:8px;font-size:11px;color:var(--col-muted);">· posterior p5–p95</span></div>` : ''}
+            ${ciLow !== null ? `<div style="font-size:12px;color:var(--col-muted);margin-top:6px;">90% parameter CI (Monte Carlo): <strong>${ciLow.toFixed(1)}</strong> – <strong>${ciHigh.toFixed(1)}</strong> ng/mL<span style="margin-left:8px;font-size:11px;color:var(--col-muted);">· posterior p5–p95, CL/V uncertainty only</span></div>` : ''}
+            ${piLow !== null ? `<div style="font-size:11.5px;color:var(--col-muted);margin-top:3px;">≈90% prediction interval (adds ±18% residual/assay error): <strong>${piLow.toFixed(1)}</strong> – <strong>${piHigh.toFixed(1)}</strong> ng/mL<span style="margin-left:8px;font-size:10.5px;">— the range a future measured trough is more likely to fall in</span></div>` : ''}
             ${earlyPostTxWarning}
             ${warningHtml}`;
             div.style.display = 'block';

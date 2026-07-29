@@ -87,11 +87,7 @@
         // MPA co-administration: inhibits CYP3A → reduces apparent CL by ~13%
         MPA_CL: 0.87,
 
-        // v5.1 HCT Covariate Effect
-        HCT_CL: -0.9,
-
         // v5.2 Advanced Clinical Weights
-        ALB_REF: 3.5,
         BIL_REF: 1.0,
         INHIBITOR: {
             'none': 1.0,
@@ -104,8 +100,13 @@
         HCT_KD: 3.8,
 
         // Reference values
-        WT_REF: 60,
-        HCT_REF: 35
+        WT_REF: 60
+
+        // NOTE: HCT_CL, ALB_REF and HCT_REF were removed here — they were dead
+        // (referenced nowhere) and misleadingly implied HCT/albumin are
+        // structural CL covariates in this whole-blood model. They are not:
+        // HCT variability is already inside ωCL/ωV (see below), and albumin
+        // has no fitted exponent in the source model.
     };
 
     // ============================================================
@@ -186,13 +187,16 @@
 
         // ── BILIRUBIN: continuous power-law hepatic impairment model ─────────
         // bilF = (BIL_REF / Bil)^0.30  when Bil > BIL_REF, else 1.0
-        // Representative values: Bil=1→1.00 | Bil=2→0.81 | Bil=5→0.64 | Bil=10→0.53
+        // Representative values: Bil=1→1.00 | Bil=2→0.81 | Bil=5→0.62 | Bil=10→0.50
         // Avoids the step-function discontinuity at Bil=2 and Bil=5.
         const bilVal = parseFloat(bilirubin) || m.BIL_REF;
         const bilF = bilVal > m.BIL_REF ? Math.pow(m.BIL_REF / bilVal, 0.30) : 1.0;
 
-        // CYP3A4 Inhibitors
-        const inhibitorF = m.INHIBITOR[inhibitor || 'none'];
+        // CYP3A4 Inhibitors. Falls back to 1.0 (no effect) for any value outside
+        // none|moderate|strong instead of silently producing NaN — reachable via
+        // CSV import or the /api/patients payload, even though the UI itself
+        // only ever emits one of the three known keys.
+        const inhibitorF = m.INHIBITOR[inhibitor || 'none'] ?? 1.0;
 
         return {
             CL: m.TVCL * m.INDIAN_CL_SCALAR * cyp * wtCL * mpaF * bilF * inhibitorF,
