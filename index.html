@@ -471,7 +471,8 @@
     <main style="max-width:1200px;margin:0 auto;padding:24px;">
 
         <!-- Alert Container -->
-        <div id="alert-container" style="margin-bottom:16px;"></div>
+        <div id="alert-container"
+            style="position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:1000;width:min(480px,92vw);"></div>
 
         <!-- Model Info Banner -->
         <div class="card"
@@ -1685,6 +1686,7 @@
             savePatientData();
         }
 
+        function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('open'); }
         function openSettingsModal() {
             const defaultUrl = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:")
                 ? "http://localhost:8000/api"
@@ -2023,22 +2025,9 @@
 
             const datetime = dayjs(datetimeStr).format("YYYY-MM-DD HH:mm");
 
-            // Check transplant date validation safely without blocking
-            const txEl = document.getElementById('transplant-date');
-            let txDateStr = '';
-            if (txEl && txEl._flatpickr && txEl._flatpickr.selectedDates && txEl._flatpickr.selectedDates.length > 0) {
-                txDateStr = dayjs(txEl._flatpickr.selectedDates[0]).format('YYYY-MM-DD');
-            } else if (txEl && txEl.value) {
-                txDateStr = txEl.value;
-            }
-
-            if (txDateStr) {
-                const txDate = dayjs(txDateStr);
-                if (txDate.isValid() && dayjs(datetime).isBefore(txDate.startOf('day'))) {
-                    showAlert('Record date cannot be before transplant date', 'error');
-                    return;
-                }
-            }
+            // Desensitization / ABO-incompatible protocols (and Live Related loading
+            // doses) routinely start tacrolimus days before the transplant date
+            // itself, so records are never rejected purely for predating it.
 
             if (indexStr !== '') {
                 const idx = parseInt(indexStr);
