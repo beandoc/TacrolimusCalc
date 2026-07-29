@@ -693,6 +693,11 @@
                         </tbody>
                     </table>
                 </div>
+                <p style="font-size:11.5px;color:var(--col-muted);margin-top:10px;">C/D ratio = level ÷ total mg given
+                    in the preceding 24 h. The dose log is a change-point log, so the denominator uses the
+                    <strong>reconstructed regimen</strong> — the last entered dose is carried forward until a revised
+                    dose is entered, on the assumption that there is never a drug-free day. Enter a 0 mg dose to record
+                    a genuinely held dose.</p>
             </div>
         </div>
 
@@ -1158,7 +1163,8 @@
         // predictSingleDose, predictAtTime, cmiaAdjust, generateCurve,
         // nelderMead2D, mapBayesian, calculateAccuracyMetrics,
         // laplacePosterior, monteCarloCI, fillHistoricalGaps,
-        // extrapolateDoses, buildBridgeDoses, rosendaalFraction,
+        // extrapolateDoses, buildBridgeDoses, regimenDoseAt,
+        // buildEffectiveDoses, dailyDoseBefore, rosendaalFraction,
         // findPostDoseSamples  — all loaded as globals by that script.
         // Unit tests: test/pk-engine.test.js
 
@@ -2346,18 +2352,29 @@
             // "High" against a chronic-phase target). Render N/A instead.
             const txDateStr = getFormattedDate('transplant-date', 'YYYY-MM-DD');
             const txDate = txDateStr ? dayjs(txDateStr) : null;
+
+            // C/D denominator comes from the RECONSTRUCTED regimen (the same
+            // one the MAP forecast uses), not the raw rows: the dose log is a
+            // change-point log, so a level drawn days after the last entered
+            // dose still has a full 24 h of drug behind it. Reading raw rows
+            // made every window empty and printed '—' for every level.
+            //
+            // The epoch only sets the origin of the `time` axis and C/D is a
+            // difference over that axis, so with no transplant date the
+            // earliest record serves just as well.
+            const allDates = clinicalData.map(r => dayjs(r.datetime));
+            const epoch = txDate || (allDates.length ? allDates.reduce((a, b) => (b.isBefore(a) ? b : a)) : null);
+            const effectiveDoses = epoch ? buildEffectiveDoses(clinicalData.map((r, i) => ({
+                id: i, recordDate: dayjs(r.datetime), dose: r.dose, level: r.level,
+                time: dayjs(r.datetime).diff(epoch, 'hour', true)
+            })), epoch) : [];
+
             const rows = clinicalData
                 .map((r, i) => {
                     if (r.level === null) return '';
                     const status = txDate ? getLevelStatus(r.level, dayjs(r.datetime), txDate) : { text: 'N/A' };
                     const badgeCls = status.text === 'Target' ? 'badge-success' : status.text === 'High' ? 'badge-danger' : 'badge-warning';
-                    // C/D ratio: sum doses in prior 24h
-                    const rTime = dayjs(r.datetime);
-                    // Inclusive at exactly -24h to match runIPV's `d.time >= lev.time - 24`
-                    // boundary — previously this used a strict isAfter(), so a dose at
-                    // precisely -24h counted in one panel and not the other.
-                    const priorDoses = clinicalData.filter(d => d.dose !== null && dayjs(d.datetime).isBefore(rTime) && !dayjs(d.datetime).isBefore(rTime.subtract(24, 'hour')));
-                    const dailyDose = priorDoses.reduce((s, d) => s + d.dose, 0);
+                    const dailyDose = dailyDoseBefore(effectiveDoses, dayjs(r.datetime).diff(epoch, 'hour', true));
                     const cdRatio = dailyDose > 0 ? (r.level / dailyDose).toFixed(2) : '—';
                     return `<tr>
                     <td>${dayjs(r.datetime).format('DD-MMM-YY HH:mm')}</td>
@@ -2403,15 +2420,18 @@
         // ============================================================
         // IPV CALCULATION
         // ============================================================
-        function runIPV(historyLog) {
+        function runIPV(historyLog, txDate) {
             const div = document.getElementById('ipv-output');
             const levels = historyLog.filter(e => e.level !== null && e.level > 0).sort((a, b) => a.time - b.time);
-            const doses = historyLog.filter(e => e.dose !== null && e.dose > 0);
             if (levels.length < 3) { div.innerHTML = '<p style="color:var(--col-muted);font-size:13px;">Need ≥3 measured levels</p>'; return; }
 
+            // Reconstructed regimen, same rule as the forecast and the C/D
+            // column: the last entered dose continues until a revised dose is
+            // entered. Reading only entered rows reported "insufficient dose
+            // data" for a patient who never missed a dose.
+            const doses = buildEffectiveDoses(historyLog, txDate);
             const cdPairs = levels.map(lev => {
-                const prior24h = doses.filter(d => d.time < lev.time && d.time >= lev.time - 24);
-                const daily = prior24h.reduce((s, d) => s + d.dose, 0);
+                const daily = dailyDoseBefore(doses, lev.time);
                 return daily > 0 ? lev.level / daily : null;
             }).filter(Boolean);
 
@@ -2437,7 +2457,7 @@
                 </div>
             </div>
             <div style="margin-top:10px;padding:8px;background:#f7f9fc;border-radius:6px;font-size:12px;color:var(--col-muted);">
-                Based on ${cdPairs.length} C/D pairs · IPV &gt;40% associated with ↑rejection risk (Sapir-Pichhadze 2014)
+                Based on ${cdPairs.length} C/D pairs · denominator is the reconstructed regimen (last entered dose carried forward until revised) · IPV &gt;40% associated with ↑rejection risk (Sapir-Pichhadze 2014)
                 ${cdPairs.length < 5 ? `<span style="display:block;margin-top:5px;padding:5px 8px;background:var(--col-warning-bg);border-left:3px solid var(--col-warning);border-radius:4px;color:#78350f;font-size:11px;">⚠ N=${cdPairs.length} &lt;5 — IPV and C/D ratio are <strong>statistically unstable</strong> at this sample size (95% CI for CV% spans nearly 0–100%). Collect ≥5 trough levels before using IPV to guide clinical decisions.</span>` : ''}</div>`;
         }
 
@@ -2451,7 +2471,7 @@
             try {
                 const { patientData, historyLog, predictionDate } = gatherData();
                 document.getElementById('output-section').style.display = 'block';
-                runIPV(historyLog);
+                runIPV(historyLog, patientData.transplantDate);
                 runTTRCalculation(historyLog, patientData.transplantDate);
                 await runForecast(patientData, historyLog, predictionDate);
             } catch (err) {

@@ -263,6 +263,91 @@ section('Verified case regression lock (raj bahadur, code-review-verified number
     ok('TTR', near((ttrHours / totalHours) * 100, 7.94, 0.01), `${((ttrHours / totalHours) * 100).toFixed(2)}%`);
 }
 
+section('Change-point dose log: regimen carry-forward (never a drug-free day)');
+{
+    const mk = (d, h, dose, level = null) => {
+        const rd = TX.add(d, 'day').hour(h).minute(0);
+        return { id: `e${d}-${h}`, recordDate: rd, dose, level, time: rd.diff(TX, 'hour', true) };
+    };
+    const at = (filled, d, h) => filled.find(x => x.recordDate.isSame(TX.add(d, 'day').hour(h).minute(0)));
+
+    // The real raj bahadur log: 1.5 mg BID entered on day 0, then ONLY the
+    // 07:00 slot re-entered at 4.5 mg on day 10. The old rule carried the
+    // 10-day-stale 1.5 mg into every PM slot, modelling 6 mg/day for a patient
+    // on 9 mg/day.
+    const oneShift = E.fillHistoricalGaps(
+        [mk(0, 7, 1.5), mk(0, 19, 1.5), mk(10, 7, 4.5), mk(16, 7, 4.5)], TX);
+    ok('a single revised entry replaces the stale opposite shift',
+        at(oneShift, 10, 19).dose === 4.5, `day-10 19:00 = ${at(oneShift, 10, 19).dose} mg`);
+    ok('the replaced regimen holds for every later imputed slot',
+        oneShift.filter(d => d.recordDate.isAfter(TX.add(10, 'day').hour(7)))
+            .every(d => d.dose === 4.5));
+    ok('slots BEFORE the revision keep the original regimen',
+        oneShift.filter(d => d.recordDate.isBefore(TX.add(10, 'day').hour(7)))
+            .every(d => d.dose === 1.5));
+
+    // ...but a deliberate asymmetric split entered for both shifts must survive
+    // untouched, which is what the same-shift rule was there for originally.
+    const split = E.fillHistoricalGaps([mk(0, 7, 5), mk(0, 19, 4.5), mk(6, 7, 5)], TX);
+    ok('a deliberate AM/PM split is preserved, not flattened',
+        split.filter(d => d.recordDate.hour() === 7).every(d => d.dose === 5) &&
+        split.filter(d => d.recordDate.hour() === 19).every(d => d.dose === 4.5));
+
+    // A 0 mg entry marks ONE held slot and never becomes the ongoing regimen.
+    const heldRun = E.fillHistoricalGaps([mk(0, 7, 3), mk(0, 19, 3), mk(2, 7, 0), mk(6, 7, 3)], TX);
+    ok('a held dose marks its own slot only', at(heldRun, 2, 7).dose === 0);
+    ok('a held dose never defines the regimen for later slots',
+        heldRun.filter(d => d.recordDate.isAfter(TX.add(2, 'day').hour(7))).every(d => d.dose === 3));
+
+    // Extrapolation past the end of the log obeys the same rule.
+    const tail = E.fillHistoricalGaps([mk(0, 7, 1.5), mk(0, 19, 1.5), mk(4, 7, 4.5)], TX);
+    const ext = E.extrapolateDoses(tail, TX.add(7, 'day'), TX);
+    ok('extrapolation carries the revised regimen, not the stale shift',
+        ext.length > 0 && ext.every(d => d.dose === 4.5), `${ext.map(d => d.dose).join(',')}`);
+
+    // Bridging a lagging log, same rule again.
+    const bridged = E.buildBridgeDoses(
+        [mk(0, 7, 1.5), mk(0, 19, 1.5), mk(4, 7, 4.5)],
+        TX.add(4, 'day').hour(19), TX.add(6, 'day').hour(7), TX);
+    ok('bridge carries the revised regimen across both shifts',
+        bridged.length === 3 && bridged.every(d => d.dose === 4.5),
+        `${bridged.map(d => d.dose).join(',')}`);
+}
+
+section('C/D ratio uses the reconstructed regimen');
+{
+    const mk = (d, h, dose, level = null) => {
+        const rd = TX.add(d, 'day').hour(h).minute(0);
+        return { id: `c${d}-${h}`, recordDate: rd, dose, level, time: rd.diff(TX, 'hour', true) };
+    };
+
+    // Levels drawn long after the last ENTERED dose row. Reading raw rows gave
+    // a 0 mg denominator and printed '—'; the patient was on 4 mg BID
+    // throughout.
+    const log = [mk(0, 7, 4), mk(0, 19, 4), mk(9, 7, null, 8.0), mk(14, 7, null, 8.8)];
+    const eff = E.buildEffectiveDoses(log, TX);
+
+    const d9 = E.dailyDoseBefore(eff, mk(9, 7, null).time);
+    const d14 = E.dailyDoseBefore(eff, mk(14, 7, null).time);
+    ok('a level after the last entered dose still gets a full 24 h denominator',
+        d9 === 8 && d14 === 8, `day 9 = ${d9} mg, day 14 = ${d14} mg`);
+    ok('C/D is computed, not suppressed', near(8.0 / d9, 1.0, 1e-9) && near(8.8 / d14, 1.1, 1e-9));
+
+    // Window boundaries: inclusive at exactly -24 h, exclusive at the sample
+    // itself (a trough precedes its dose).
+    const t = mk(9, 7, null).time;
+    ok('the dose at exactly -24 h counts',
+        eff.some(d => near(d.time, t - 24, 1e-9) && d.dose > 0) && d9 === 8);
+    ok('the dose at the sample time itself does not count',
+        E.dailyDoseBefore([{ time: t, dose: 4 }], t) === 0);
+
+    // A genuinely held dose must lower the denominator.
+    const withHold = E.buildEffectiveDoses(
+        [mk(0, 7, 4), mk(0, 19, 4), mk(8, 19, 0), mk(9, 7, null, 8.0)], TX);
+    ok('a held dose reduces the 24 h denominator',
+        E.dailyDoseBefore(withHold, t) === 4, `${E.dailyDoseBefore(withHold, t)} mg`);
+}
+
 section('Starting dose suggestion (pre-Bayesian, population-based)');
 {
     const range = { low: 10, high: 11 };

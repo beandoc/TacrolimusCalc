@@ -743,7 +743,65 @@
 
     // ============================================================
     // DOSE INTERPOLATION & EXTRAPOLATION
+    //
+    // Site rule: THERE IS NEVER A DRUG-FREE DAY. The dose log is a CHANGE-POINT
+    // log — a row is entered when the regimen changes, not for every tablet —
+    // so every 12-hourly slot between two entries is reconstructed by carrying
+    // the entered regimen forward until a revised dose is entered.
     // ============================================================
+
+    // How far back a same-shift entry may sit and still count as part of the
+    // CURRENT regimen. 24 h covers an AM and a PM entry made for the same
+    // regimen change, even when they are entered a day apart.
+    const REGIMEN_WINDOW_HR = 24;
+
+    // Reconstructed slots must never be mistaken for clinician-entered ones.
+    const isImputedDose = d => /^(inter|ext|bridge)-/.test(String(d.id));
+
+    // ── Dose in force at `slotDate` ───────────────────────────────────────
+    // The previous rule was "carry the last same-shift POSITIVE dose". That is
+    // right when both shifts of a regimen are entered, but wrong when a change
+    // is entered for ONE shift only: the other shift then kept a value that
+    // could be arbitrarily old.
+    //
+    // Real case (raj bahadur): 1.5 mg pre-transplant desensitisation doses
+    // entered at 04-Jul 07:00 and 19:00, then only the 07:00 slot entered at
+    // 4.5 mg on 14-Jul. Every PM slot from 14-Jul to 23-Jul inherited the
+    // 10-day-old pre-transplant 1.5 mg, so the engine modelled 4.5/1.5 =
+    // 6 mg/day for a patient on 4.5 BID = 9 mg/day. MAP absorbed the missing
+    // drug as slow clearance (CL 18.7 vs 25.9 L/h, 28% low), and the modelled
+    // daily dose then jumped 33% the moment both shifts were entered again on
+    // 24-Jul — pushing the 28-Jul forecast to 15.2 ng/mL against an observed
+    // 7.4.
+    //
+    // New rule: a same-shift entry is carried only while it is still part of
+    // the current regimen — i.e. not more than REGIMEN_WINDOW_HR older than the
+    // most recent entry on ANY shift. Otherwise the most recent entry wins,
+    // whichever shift it came from. A deliberate asymmetric split (5 mg AM /
+    // 4.5 mg PM entered together) is preserved; a single revised entry replaces
+    // a stale regimen outright.
+    //
+    // Only clinician-ENTERED doses may define the regimen. Letting imputed
+    // slots define it re-seeds the stale value at every step, so the staleness
+    // test could never fire.
+    function regimenDoseAt(entered, slotDate, fallback) {
+        // 0 mg is a deliberate "dose held" marker for that one slot. It never
+        // defines the ongoing regimen, so it is excluded from both candidates.
+        const prior = entered
+            .filter(d => d.dose > 0 && d.recordDate.isBefore(slotDate))
+            .sort((a, b) => a.recordDate.valueOf() - b.recordDate.valueOf());
+        if (prior.length === 0) return fallback;
+
+        const lastAny = prior[prior.length - 1];
+        const isAm = slotDate.hour() < 12;
+        const lastSame = [...prior].reverse()
+            .find(d => (d.recordDate.hour() < 12) === isAm);
+
+        const stillCurrent = lastSame && !lastSame.recordDate
+            .isBefore(lastAny.recordDate.subtract(REGIMEN_WINDOW_HR, 'hour'));
+        return stillCurrent ? lastSame.dose : lastAny.dose;
+    }
+
     function fillHistoricalGaps(historyLog, txDate) {
         const filled = [];
         // Anchor on dose >= 0, NOT dose > 0. A recorded 0 mg is a deliberate
@@ -761,13 +819,9 @@
             let nextTime = logged[i].recordDate.add(12, 'hour');
             // Fill 12-hour steps until we hit the next logged dose (with a 4hr buffer to avoid overlapping)
             while (nextTime.isBefore(logged[i + 1].recordDate.subtract(4, 'hour'))) {
-                const isAm = nextTime.hour() < 12;
-                // Carry the last same-shift POSITIVE dose. A single held dose
-                // marks that one slot only; it must not zero the rest of the
-                // regimen for every subsequent imputed slot.
-                const priorSameShift = [...filled].reverse()
-                    .find(d => (d.recordDate.hour() < 12) === isAm && d.dose > 0);
-                const doseToGive = priorSameShift ? priorSameShift.dose : logged[i].dose;
+                // Carry the regimen in force at this slot. Reads `logged`, not
+                // `filled`: only entered doses define the regimen.
+                const doseToGive = regimenDoseAt(logged, nextTime, logged[i].dose);
                 filled.push({ id: 'inter-' + i + '-' + nextTime.valueOf(), recordDate: nextTime, dose: doseToGive, level: null, time: nextTime.diff(txDate, 'hour', true) });
                 nextTime = nextTime.add(12, 'hour');
             }
@@ -778,16 +832,14 @@
     function extrapolateDoses(filledHistory, untilDate, txDate) {
         if (filledHistory.length === 0) return [];
         const last = filledHistory[filledHistory.length - 1];
+        // Same regimen rule as fillHistoricalGaps, driven off the entered doses
+        // only — filledHistory already carries imputed slots by this point.
+        const entered = filledHistory.filter(d => !isImputedDose(d));
+        const source = entered.length ? entered : filledHistory;
         const extra = [];
         let nextTime = last.recordDate.add(12, 'hour');
         while (nextTime.isBefore(untilDate)) {
-            const isAm = nextTime.hour() < 12;
-            // Same rule as fillHistoricalGaps: carry the last same-shift
-            // POSITIVE dose, so a held dose at the end of the log does not
-            // extrapolate a zero regimen indefinitely into the future.
-            const priorSameShift = [...filledHistory].reverse()
-                .find(d => (d.recordDate.hour() < 12) === isAm && d.dose > 0);
-            const doseToGive = priorSameShift ? priorSameShift.dose : last.dose;
+            const doseToGive = regimenDoseAt(source, nextTime, last.dose);
             extra.push({ id: 'ext-' + extra.length, recordDate: nextTime, dose: doseToGive, level: null, time: nextTime.diff(txDate, 'hour', true) });
             nextTime = nextTime.add(12, 'hour');
         }
@@ -807,26 +859,68 @@
     // state, target = next trough: -22% predicted trough at a 1-day logging
     // lag, -58% at 3 days, -66% at 5 days.
     //
-    // Same last-same-shift-POSITIVE-dose rule as fillHistoricalGaps, so a held
+    // Same regimen rule as fillHistoricalGaps (see regimenDoseAt), so a held
     // dose does not propagate a zero regimen across the whole bridge.
     // ============================================================
     function buildBridgeDoses(logged, fromDate, toDate, txDate) {
         const bridge = [];
         if (!logged || logged.length === 0) return bridge;
         const fallback = logged[logged.length - 1].dose;
+        // Callers pass the forecast's dose array, which mixes entered and
+        // imputed slots; only the entered ones may define the regimen.
+        const entered = logged.filter(d => !isImputedDose(d));
+        const source = entered.length ? entered : logged;
         for (let t = fromDate; t.isBefore(toDate); t = t.add(12, 'hour')) {
-            const isAm = t.hour() < 12;
-            const priorSameShift = [...logged, ...bridge].reverse()
-                .find(d => (d.recordDate.hour() < 12) === isAm && d.dose > 0);
             bridge.push({
                 id: 'bridge-' + bridge.length,
                 recordDate: t,
-                dose: priorSameShift ? priorSameShift.dose : fallback,
+                dose: regimenDoseAt(source, t, fallback),
                 level: null,
                 time: t.diff(txDate, 'hour', true)
             });
         }
         return bridge;
+    }
+
+    // ============================================================
+    // C/D RATIO SUPPORT
+    //
+    // The concentration/dose ratio needs the drug the patient ACTUALLY took in
+    // the 24 h before the sample. For a change-point log that means the
+    // RECONSTRUCTED regimen, not the rows that happen to be entered.
+    //
+    // Using raw entries made the C/D column and the IPV panel see a drug-free
+    // patient — with only regimen-change rows entered, every 24 h window came
+    // back empty, so the column printed '—' and IPV reported "insufficient dose
+    // data" — while the MAP forecast, which already gap-fills, saw a continuous
+    // BID regimen. Two halves of the app disagreeing about the dose history.
+    // ============================================================
+
+    // Logged doses + the 12-hourly doses implied between them, extended past
+    // the last entered dose so a level drawn days later still has its
+    // preceding 24 h covered. There is never a drug-free day.
+    function buildEffectiveDoses(historyLog, txDate) {
+        const filled = fillHistoricalGaps(historyLog, txDate);
+        if (filled.length === 0) return [];
+
+        const lastEvent = historyLog.reduce((m, e) => Math.max(m, e.time), -Infinity);
+        const lastDose = filled[filled.length - 1];
+        if (!(lastEvent > lastDose.time)) return filled;
+
+        // extrapolateDoses stops strictly BEFORE untilDate, so a trough drawn
+        // exactly on a dosing slot does not get that slot counted against it —
+        // which is correct: a pre-dose sample precedes the dose.
+        return filled.concat(
+            extrapolateDoses(filled, txDate.add(lastEvent, 'hour'), txDate));
+    }
+
+    // Total mg given in the 24 h ending at `timeHr` (hours since transplant).
+    // Inclusive at exactly −24 h, exclusive at timeHr itself, matching the
+    // pre-dose sampling convention.
+    function dailyDoseBefore(doses, timeHr) {
+        return doses
+            .filter(d => d.dose > 0 && d.time < timeHr && d.time >= timeHr - 24)
+            .reduce((s, d) => s + d.dose, 0);
     }
 
     // ============================================================
@@ -861,6 +955,7 @@
         laplacePosterior, monteCarloCI,
         // dose series
         fillHistoricalGaps, extrapolateDoses, buildBridgeDoses,
+        regimenDoseAt, buildEffectiveDoses, dailyDoseBefore, REGIMEN_WINDOW_HR,
         // analytics / QC
         rosendaalFraction, findPostDoseSamples
     };
