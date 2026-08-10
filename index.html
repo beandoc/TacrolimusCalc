@@ -5,19 +5,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TacroSmart v5 — Individualized Dosing</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
+    <!-- ── VENDORED DEPENDENCIES ──────────────────────────────────────────────
+         Served from vendor/, not a CDN, for three reasons:
+
+         1. This tool is designed to run straight off disk over file:// (see the
+            protocol === "file:" branches below and in pk-engine.js). CDN scripts
+            silently defeat that — the page opened offline lost its charts, its
+            date pickers and dayjs, which pk-engine.js requires.
+         2. It is a dosing tool. A compromised or hijacked CDN could alter what
+            it recommends, and unpinned tags (`npm/flatpickr` = whatever is
+            latest today) meant the shipped behaviour could change without a
+            commit here.
+         3. Hospital networks routinely block or MITM public CDNs.
+
+         The Tailwind CDN was removed outright: it is the dev-only in-browser JIT
+         build (~400 KB, and its own docs say not to use it in production), and
+         the entire page used exactly ONE Tailwind class — `text-white` on the
+         header, now a plain rule in the stylesheet below. Everything else was
+         already inline styles or the local classes in <style>.
+
+         Refresh with the pinned URLs recorded in vendor/README.md.
+    ────────────────────────────────────────────────────────────────────────── -->
+    <script src="vendor/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="vendor/flatpickr.min.css">
+    <script src="vendor/flatpickr.min.js"></script>
+    <script src="vendor/dayjs.min.js"></script>
+    <script src="vendor/dayjs-customParseFormat.js"></script>
     <script>dayjs.extend(dayjs_plugin_customParseFormat);</script>
     <!-- PK / MAP-Bayesian numerical core. Classic script (not a module) so the
          page still works when opened directly over file:// with no server. -->
     <script src="pk-engine.js"></script>
+    <!-- Webfonts are the one remaining external request, and the only purely
+         cosmetic one: they cannot change a number on this page. Loaded
+         non-blockingly so an offline or firewalled machine renders immediately
+         in the fallback stack instead of waiting on a timeout. Every
+         font-family below names concrete fallbacks. -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
+        rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap"
+            rel="stylesheet">
+    </noscript>
 
     <style>
         :root {
@@ -347,6 +378,20 @@
             background: linear-gradient(135deg, #0e2d6b 0%, #1354d3 60%, #0ea5a0 100%);
         }
 
+        /* The only Tailwind utility the page ever used. Defined here so the
+           dev-only Tailwind CDN (~400 KB in-browser JIT) could be dropped —
+           see the vendoring note in <head>. */
+        .text-white {
+            color: #fff;
+        }
+
+        /* Tailwind also supplied `.hidden`, which switchTab() toggles on the tab
+           panels. `.tab-content.hidden` below covers the tabs themselves; this
+           general rule keeps the utility working anywhere else it is applied. */
+        .hidden {
+            display: none;
+        }
+
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -468,6 +513,23 @@
         </div>
     </header>
 
+    <!-- Clinical-use disclaimer. The app produces specific dose recommendations
+         from a population model with ~40% MAPE on external validation, so the
+         limits of what it is need to be on the page itself, not only in the
+         README — a reader who scrolls straight to the recommended regimen should
+         still meet them. -->
+    <div style="background:#fffbeb;border-bottom:1px solid #fcd34d;">
+        <div style="max-width:1200px;margin:0 auto;padding:10px 24px;font-size:11.5px;color:#78350f;line-height:1.5;">
+            <strong style="font-family:'Sora',sans-serif;">Clinical decision support — not a substitute for clinical judgement.</strong>
+            Output is a model estimate, not a prescription. External validation
+            (Sangha 2024, n=103) reported ~40% MAPE, so individual predictions can be
+            substantially wrong. Verify dose timings, sample times and assay type before
+            acting, and confirm every regimen change against the patient, local protocol
+            and a second clinician where required. Not a regulated medical device; not
+            validated for autonomous dosing.
+        </div>
+    </div>
+
     <main style="max-width:1200px;margin:0 auto;padding:24px;">
 
         <!-- Alert Container -->
@@ -521,8 +583,10 @@
                 <div>
                     <label
                         style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Hematocrit
-                        (%)</label>
+                        (%) <span style="font-weight:400;font-size:11px;">· recorded only</span></label>
                     <input type="number" id="hematocrit" value="35" min="15" max="60" class="input-field">
+                    <div style="font-size:10.5px;color:var(--col-muted);margin-top:3px;line-height:1.4;">Not a CL covariate in this
+                        whole-blood model — HCT variability is already inside &omega;CL/&omega;V. Use the HCT Correction Tool below.</div>
                 </div>
             </div>
             <div
@@ -532,8 +596,8 @@
                         style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">CYP3A5
                         Genotype</label>
                     <select id="genotype" class="input-field">
-                        <option value="unknown">Unknown · ×1.30 (Indian pop CYP3A5*1 freq ≈45%; midpoint between *1/*3
-                            and *1/*1)</option>
+                        <option value="unknown">Unknown · ×1.30 (allele-frequency-weighted population mean, not a
+                            midpoint — sits just below *1/*3)</option>
                         <option value="33">*3/*3 · Slow Metabolizer</option>
                         <option value="13">*1/*3 · Intermediate</option>
                         <option value="11">*1/*1 · Fast Metabolizer</option>
@@ -554,7 +618,7 @@
                         Type</label>
                     <select id="bioassay" class="input-field">
                         <option value="1" selected>LC-MS/MS (reference standard)</option>
-                        <option value="2">Abbott CMIA / MEIA immunoassay (+8% offset vs LC-MS/MS)</option>
+                        <option value="2">Abbott CMIA / MEIA immunoassay (reads 1.08×c + 0.55 — ≈+13% at 10 ng/mL)</option>
                     </select>
                 </div>
                 <div>
@@ -577,8 +641,10 @@
                     <div>
                         <label
                             style="display:block;font-size:12px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:5px;">Albumin
-                            (g/dL)</label>
+                            (g/dL) <span style="font-weight:400;font-size:11px;">· recorded only</span></label>
                         <input id="albumin" type="number" step="0.1" class="input-field" value="3.5">
+                        <div style="font-size:10.5px;color:var(--col-muted);margin-top:3px;line-height:1.4;">Not applied to V/F — tacrolimus is
+                            ~75&ndash;80% RBC-bound and Størset 2014 fits no albumin exponent.</div>
                     </div>
                     <div>
                         <label
@@ -681,13 +747,14 @@
                                 <th>Date & Time</th>
                                 <th>Level (ng/mL)</th>
                                 <th>C/D Ratio</th>
+                                <th>Vitals (Wt / Hct)</th>
                                 <th>Status</th>
                                 <th style="text-align:right">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="levelLogTable">
                             <tr>
-                                <td colspan="5" style="text-align:center;padding:32px;color:var(--col-muted);">No levels
+                                <td colspan="6" style="text-align:center;padding:32px;color:var(--col-muted);">No levels
                                     logged</td>
                             </tr>
                         </tbody>
@@ -933,6 +1000,28 @@
                         (ng/mL)</label>
                     <input type="number" step="0.1" id="newLevel" class="input-field">
                 </div>
+                <!-- Optional Date-Specific Vitals -->
+                <div style="padding-top:10px;border-top:1px dashed var(--col-border, #e2e8f0);">
+                    <div style="font-size:11px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:8px;">
+                        Optional Date-Specific Vitals (Overrides baseline on this date)
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div>
+                            <label style="display:block;font-size:11px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:4px;">Weight (kg) <span style="color:var(--col-primary);font-weight:700;">· affects forecast</span></label>
+                            <input type="number" step="0.1" id="newWeight" class="input-field" placeholder="Optional">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:11px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:4px;">Hematocrit (%) <span style="font-weight:400;">· recorded only</span></label>
+                            <input type="number" step="0.5" id="newHct" class="input-field" placeholder="Optional">
+                        </div>
+                    </div>
+                    <div style="font-size:10.5px;color:var(--col-muted);margin-top:7px;line-height:1.45;">
+                        Weight rescales CL/F and V/F allometrically from this date onward.
+                        Haematocrit is stored for the record but does <strong>not</strong> change the
+                        forecast — this is a whole-blood model, where HCT variability is already
+                        inside the population IIV. Use the HCT Correction Tool for assay-level adjustment.
+                    </div>
+                </div>
             </div>
             <input type="hidden" id="editIndex">
             <input type="hidden" id="recordType">
@@ -973,6 +1062,22 @@
                             style="margin-bottom:0;flex:1;padding:8px 12px;font-size:13px;"
                             placeholder="http://localhost:8000/api">
                         <button onclick="saveApiBase()" class="btn btn-primary" style="padding:8px 16px;">Save</button>
+                    </div>
+                </div>
+                <div style="text-align:left;">
+                    <label
+                        style="font-size:12px;font-weight:600;margin-bottom:6px;display:block;color:var(--col-text);">API
+                        Access Token</label>
+                    <div style="display:flex;gap:8px;">
+                        <input id="settings-api-token" type="password" class="input-field"
+                            style="margin-bottom:0;flex:1;padding:8px 12px;font-size:13px;"
+                            placeholder="Shared token issued by your unit" autocomplete="off">
+                        <button onclick="saveApiToken()" class="btn btn-primary" style="padding:8px 16px;">Save</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--col-muted);margin-top:5px;line-height:1.45;">
+                        Required by the shared database (matches <code>TACRO_API_TOKEN</code> on the server).
+                        Stored in this browser only. Without it the app still works offline against
+                        the local cache, but cannot read or write the central record.
                     </div>
                 </div>
                 <hr style="border-color:var(--col-border);">
@@ -1219,11 +1324,20 @@
                     if (tgtFP && tgtFP.selectedDates) autoUpdateTargetRange(tgtFP.selectedDates);
                 }
             });
-            flatpickr("#prediction-datetime", optsT);
+            // flatpickr fires onChange for programmatic setDate(d, true) as well as
+            // for real user input, so updateForecastDateAuto would pin the field it
+            // just set. Suppress the flag for the duration of its own writes.
+            flatpickr("#prediction-datetime", {
+                ...optsT,
+                onChange: function () { if (!settingDatesProgrammatically) forecastDatePinned = true; }
+            });
             flatpickr("#target-date-input", {
                 ...optsT,
                 defaultDate: dayjs().add(4, 'day').hour(7).minute(0).toDate(),
-                onChange: autoUpdateTargetRange,
+                onChange: function (selectedDates) {
+                    if (!settingDatesProgrammatically) forecastDatePinned = true;
+                    autoUpdateTargetRange(selectedDates);
+                },
                 onReady: function (selectedDates) { autoUpdateTargetRange(selectedDates); }
             });
             flatpickr("#newDateTime", optsT);
@@ -1253,10 +1367,24 @@
             );
         }
 
-        function updateForecastDateAuto() {
+        // Set once the clinician edits either date field by hand, after which
+        // updateForecastDateAuto() stops touching them.
+        //
+        // renderDoseLog() calls updateForecastDateAuto(), and renderDoseLog runs on
+        // every add / edit / delete / load / CSV import — so a deliberately chosen
+        // forecast date was silently reset to "next C0 after the last dose" the
+        // moment any record changed. Picking a date, then adding the level you
+        // picked it for, threw the date away.
+        let forecastDatePinned = false;
+        // Guards the pin against updateForecastDateAuto's own setDate() calls.
+        let settingDatesProgrammatically = false;
+
+        function updateForecastDateAuto(force = false) {
+            if (forecastDatePinned && !force) return;
             // Forecast target is the next scheduled C0 — 15 min before the next
-            // 07:00/19:00 dose, per the sampling protocol. Landing exactly on the
-            // dose time would sit on the absorption discontinuity (see nextC0Time).
+            // 07:00 morning dose, per the sampling protocol (draws are morning
+            // only). Landing exactly on the dose time would sit on the absorption
+            // discontinuity (see nextC0Time).
             let nextTrough;
             const doses = clinicalData.filter(d => d.dose !== null && d.dose > 0);
             if (doses.length > 0) {
@@ -1271,8 +1399,13 @@
 
             const predFP = document.getElementById('prediction-datetime') ? document.getElementById('prediction-datetime')._flatpickr : null;
             const tgtFP = document.getElementById('target-date-input') ? document.getElementById('target-date-input')._flatpickr : null;
-            if (predFP) predFP.setDate(nextTrough.toDate(), true);
-            if (tgtFP) tgtFP.setDate(nextTrough.toDate(), true);
+            settingDatesProgrammatically = true;
+            try {
+                if (predFP) predFP.setDate(nextTrough.toDate(), true);
+                if (tgtFP) tgtFP.setDate(nextTrough.toDate(), true);
+            } finally {
+                settingDatesProgrammatically = false;
+            }
         }
 
         function setDefaults() {
@@ -1284,11 +1417,32 @@
         // ============================================================
         // ALERTS
         // ============================================================
+        // Escape text before it goes anywhere near innerHTML. Patient names and
+        // backend error strings both reach the DOM, and both are attacker- or
+        // accident-controlled: names come from a shared multi-user database, and
+        // error `detail` is echoed straight from the server. A name containing
+        // `<` or `"` would otherwise break out of the markup around it.
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
         function showAlert(msg, type = 'info') {
             const c = document.getElementById('alert-container');
             const d = document.createElement('div');
             d.className = `alert alert-${type}`;
-            d.innerHTML = `<span style="flex:1">${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:16px;opacity:0.6;">×</button>`;
+            const span = document.createElement('span');
+            span.style.flex = '1';
+            // textContent, not innerHTML: several callers interpolate a backend
+            // error message or a patient name straight into `msg`.
+            span.textContent = msg;
+            const btn = document.createElement('button');
+            btn.textContent = '×';
+            btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;opacity:0.6;';
+            btn.addEventListener('click', () => d.remove());
+            d.appendChild(span);
+            d.appendChild(btn);
             c.appendChild(d);
             setTimeout(() => d.remove(), 6000);
         }
@@ -1313,6 +1467,35 @@
                 ? "http://localhost:8000/api"
                 : "/api");
 
+        // ── API AUTH ────────────────────────────────────────────────────────
+        // The backend holds patient-identifiable data and now requires a shared
+        // token (TACRO_API_TOKEN server-side). It is sent as a header rather than
+        // a cookie so no credentialed CORS request is ever needed.
+        //
+        // apiFetch wraps every backend call: it attaches the token and turns a
+        // 401 into a clear message, instead of the generic "backend offline"
+        // fallback that would otherwise send the user to a silently stale local
+        // cache while believing they were talking to the database.
+        function apiToken() {
+            return localStorage.getItem('tacro_api_token') || '';
+        }
+
+        function apiFetch(url, options = {}) {
+            const token = apiToken();
+            const headers = Object.assign({}, options.headers || {});
+            if (token) headers['X-Tacro-Token'] = token;
+            return fetch(url, Object.assign({}, options, { headers }));
+        }
+
+        let _authAlertShown = false;
+        function noteAuthFailure(res) {
+            if (res && res.status === 401 && !_authAlertShown) {
+                _authAlertShown = true;
+                showAlert('Backend rejected the API token — set it under ⚙ Settings. Working from local cache until then.', 'error');
+            }
+            return res;
+        }
+
         // Pull the centre-wide calibration scalar from the shared backend so
         // every device uses the latest applied correction, not just whichever
         // browser's localStorage last clicked "Apply" in Center Calibration.
@@ -1320,7 +1503,7 @@
         // already falls back to localStorage, then 1.18, per pk-engine.js.
         async function syncCenterCalScalar() {
             try {
-                const res = await fetch(`${API_BASE}/config/cl-scalar`);
+                const res = await apiFetch(`${API_BASE}/config/cl-scalar`);
                 if (!res.ok) return;
                 const cfg = await res.json();
                 if (cfg && typeof cfg.cl_scalar === 'number' && isFinite(cfg.cl_scalar)) {
@@ -1333,7 +1516,7 @@
         async function populatePatientList() {
             let list = [];
             try {
-                const res = await fetch(`${API_BASE}/patients`);
+                const res = noteAuthFailure(await apiFetch(`${API_BASE}/patients`));
                 if (res.ok) {
                     const apiList = await res.json();
                     list = apiList.map(p => p.mrn);
@@ -1357,7 +1540,7 @@
 
             const dl = document.getElementById('patient-list');
             if (dl) {
-                dl.innerHTML = list.map(p => `<option value="${p}">`).join('');
+                dl.innerHTML = list.map(p => `<option value="${escapeHtml(p)}">`).join('');
             }
         }
 
@@ -1386,7 +1569,7 @@
 
             // 1. Backend (source of truth when reachable)
             try {
-                const res = await fetch(`${API_BASE}/patients?limit=1000`);
+                const res = noteAuthFailure(await apiFetch(`${API_BASE}/patients?limit=1000`));
                 if (res.ok) {
                     const apiList = await res.json();
                     apiList.forEach(p => {
@@ -1456,17 +1639,28 @@
                 return;
             }
 
-            container.innerHTML = rows.map(p => `
-                <div onclick="selectPatientFromDirectory('${p.mrn.replace(/'/g, "\\'")}')"
+            // The MRN goes into a data- attribute read by a delegated listener,
+            // not into an inline onclick string. The old form escaped only `'`,
+            // so a name containing `"` or `<` — arriving from a shared database
+            // any colleague can write to — broke out of the attribute.
+            container.innerHTML = rows.map((p, i) => `
+                <div data-dir-index="${i}"
                      style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--col-border);cursor:pointer;"
                      onmouseover="this.style.background='rgba(19,84,211,0.06)'" onmouseout="this.style.background=''">
                     <div>
-                        <div style="font-family:'Sora',sans-serif;font-weight:600;font-size:13.5px;color:var(--col-text);">${p.mrn}</div>
-                        <div style="font-size:11.5px;color:var(--col-muted);margin-top:2px;">Transplant: ${p.transplant_date ? dayjs(p.transplant_date).format('DD-MMM-YY') : '—'}${(p.weight !== undefined && p.weight !== null) ? ` · ${p.weight} kg` : ''}</div>
+                        <div style="font-family:'Sora',sans-serif;font-weight:600;font-size:13.5px;color:var(--col-text);">${escapeHtml(p.mrn)}</div>
+                        <div style="font-size:11.5px;color:var(--col-muted);margin-top:2px;">Transplant: ${p.transplant_date ? escapeHtml(dayjs(p.transplant_date).format('DD-MMM-YY')) : '—'}${(p.weight !== undefined && p.weight !== null) ? ` · ${escapeHtml(p.weight)} kg` : ''}</div>
                     </div>
-                    <span style="font-size:10.5px;font-weight:600;color:var(--col-muted);background:rgba(100,116,139,0.12);padding:3px 8px;border-radius:20px;white-space:nowrap;">${p.source}</span>
+                    <span style="font-size:10.5px;font-weight:600;color:var(--col-muted);background:rgba(100,116,139,0.12);padding:3px 8px;border-radius:20px;white-space:nowrap;">${escapeHtml(p.source)}</span>
                 </div>
             `).join('');
+
+            container.querySelectorAll('[data-dir-index]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const row = rows[parseInt(el.dataset.dirIndex, 10)];
+                    if (row) selectPatientFromDirectory(row.mrn);
+                });
+            });
         }
 
         function selectPatientFromDirectory(mrn) {
@@ -1517,7 +1711,33 @@
             return '';
         }
 
-        async function savePatientData() {
+        // ── Numeric field readers ────────────────────────────────────────────
+        // `parseFloat(el.value) || fallback` is wrong for any field where 0 is a
+        // legitimate value, because 0 is falsy and silently becomes the fallback.
+        //
+        // Real case: the MPA select emits value="0" for "No". savePatientData used
+        // `parseInt(...) || 1`, so every patient NOT on mycophenolate was persisted
+        // as mpa=1. On reload the UI read back "Yes" and getPopulationParameters
+        // applied MPA_CL = 0.87 — CL 13% low, trough over-predicted, recommended
+        // dose ~13% low. It also fed the wrong covariate to the Center Calibration
+        // Report, which reads profiles straight from the database.
+        //
+        // These read the value and fall back ONLY when it is absent or unparseable.
+        function numField(id, fallback) {
+            const el = document.getElementById(id);
+            const v = el ? parseFloat(el.value) : NaN;
+            return Number.isFinite(v) ? v : fallback;
+        }
+        function intField(id, fallback) {
+            const el = document.getElementById(id);
+            const v = el ? parseInt(el.value, 10) : NaN;
+            return Number.isFinite(v) ? v : fallback;
+        }
+
+        // allowShrink: pass true ONLY from a genuine deletion. It authorises the
+        // backend to accept an event list shorter than the one it already holds —
+        // the guard that otherwise stops a stale local cache from wiping history.
+        async function savePatientData(allowShrink = false) {
             const nameInput = document.getElementById('patient-name');
             const name = nameInput ? nameInput.value.trim() : '';
             if (!name) {
@@ -1539,14 +1759,14 @@
             const pData = {
                 mrn: name.toLowerCase(),
                 transplant_date: txDateStr,
-                weight: parseFloat(document.getElementById('weight').value) || 60,
-                hematocrit: parseFloat(document.getElementById('hematocrit').value) || 35,
-                mpa: parseInt(document.getElementById('mpa').value) || 1,
-                bioassay: parseInt(document.getElementById('bioassay').value) || 1,
+                weight: numField('weight', 60),
+                hematocrit: numField('hematocrit', 35),
+                mpa: intField('mpa', 1),
+                bioassay: intField('bioassay', 1),
                 genotype: document.getElementById('genotype').value || 'unknown',
                 transplant_type: document.getElementById('transplant-type').value || 'Live Related',
-                albumin: parseFloat(document.getElementById('albumin').value) || 3.5,
-                bilirubin: parseFloat(document.getElementById('bilirubin').value) || 1.0,
+                albumin: numField('albumin', 3.5),
+                bilirubin: numField('bilirubin', 1.0),
                 inhibitor: document.getElementById('inhibitor').value || 'none'
             };
 
@@ -1572,7 +1792,7 @@
             let backendSaved = false;
             let backendErr = null;
             try {
-                let res = await fetch(`${API_BASE}/patients`, {
+                let res = await apiFetch(`${API_BASE}/patients`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(pData)
@@ -1586,14 +1806,28 @@
                 const events = clinicalData.map(c => ({
                     datetime: c.datetime ? c.datetime.replace(' ', 'T') : new Date().toISOString(),
                     dose: c.dose !== undefined ? c.dose : null,
-                    level: c.level !== undefined ? c.level : null
+                    level: c.level !== undefined ? c.level : null,
+                    weight: c.weight !== undefined ? c.weight : null,
+                    hematocrit: c.hematocrit !== undefined ? c.hematocrit : null
                 }));
 
-                res = await fetch(`${API_BASE}/patients/${pData.mrn}/events`, {
+                // `allowShrink` is set only by an explicit deletion. The events
+                // endpoint 409s on any other write that would reduce the stored
+                // count, which is what stops a stale local copy from silently
+                // replacing a fuller server-side history.
+                const shrinkQS = allowShrink ? '?allow_shrink=true' : '';
+                res = await apiFetch(`${API_BASE}/patients/${pData.mrn}/events${shrinkQS}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(events)
                 });
+                if (res.status === 409) {
+                    const errData = await res.json().catch(() => ({}));
+                    showAlert(
+                        `Save blocked: ${typeof errData.detail === 'string' ? errData.detail : 'the server holds more records than this browser.'} Your changes are saved locally.`,
+                        'error');
+                    throw new Error('Refused: fewer events than the server holds');
+                }
                 if (!res.ok) {
                     const errData = await res.json().catch(() => ({}));
                     throw new Error(errData.detail ? (typeof errData.detail === 'string' ? errData.detail : JSON.stringify(errData.detail)) : `HTTP ${res.status}`);
@@ -1625,13 +1859,20 @@
 
             let loadedData = null;
             let loadedFrom = '';
+            // Distinguishes "backend said this patient does not exist" (404 — the
+            // local cache is a fine answer) from "backend was unreachable or
+            // refused us" (offline / 401 / 500 — the local cache may be stale or
+            // empty, and saving over the top of it would replace the real history
+            // with a fragment). See the guard before renderDoseLog below.
+            let backendReachable = false;
 
             // 1. Try Backend API first
             try {
-                const res = await fetch(`${API_BASE}/patients/${name}`);
+                const res = noteAuthFailure(await apiFetch(`${API_BASE}/patients/${name}`));
+                backendReachable = res.ok || res.status === 404;
                 if (res.ok) {
                     const p = await res.json();
-                    const eventsRes = await fetch(`${API_BASE}/patients/${name}/events`);
+                    const eventsRes = await apiFetch(`${API_BASE}/patients/${name}/events`);
                     const events = eventsRes.ok ? await eventsRes.json() : [];
 
                     loadedData = {
@@ -1640,7 +1881,9 @@
                             id: e.id,
                             datetime: e.datetime ? e.datetime.replace('T', ' ').substring(0, 16) : '',
                             dose: e.dose,
-                            level: e.level
+                            level: e.level,
+                            weight: e.weight != null ? e.weight : null,
+                            hematocrit: e.hematocrit != null ? e.hematocrit : null
                         }))
                     };
                     loadedFrom = 'Database';
@@ -1660,11 +1903,18 @@
                         } else {
                             loadedData = { profile: parsed, events: [] };
                         }
-                        loadedFrom = 'Local Cache';
+                        loadedFrom = backendReachable ? 'Local Cache' : 'Local Cache (backend unreachable)';
                     } catch (e) {
                         console.error("Local record parsing error:", e);
                     }
                 }
+            }
+
+            // Loading a cached copy while the backend is unreachable is fine to
+            // VIEW, but the autosave that fires on the next edit would push this
+            // possibly-partial copy over the authoritative record. Warn plainly.
+            if (loadedData && !backendReachable) {
+                showAlert('Loaded from local cache — the database could not be reached, so this may be incomplete. Avoid editing until the connection is restored.', 'warning');
             }
 
             if (!loadedData) {
@@ -1695,6 +1945,9 @@
             clinicalData = loadedData.events || [];
             clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
 
+            // A forecast date pinned for the PREVIOUS patient means nothing for
+            // this one — release the pin and recompute from their own dose history.
+            forecastDatePinned = false;
             renderDoseLog();
             renderLevelLog();
             hideOutput();
@@ -1714,6 +1967,7 @@
             document.getElementById('bilirubin').value = 1.0;
             document.getElementById('inhibitor').value = 'none';
             clinicalData = [];
+            forecastDatePinned = false;
             renderDoseLog(); renderLevelLog(); hideOutput();
             showAlert('Cleared', 'success');
         }
@@ -1759,8 +2013,12 @@
             if (!name) { showAlert('Load a patient first', 'error'); return; }
             let csv = 'Patient,TransplantDate,TransplantType,Weight_kg,HCT_pct,Genotype,MPA\n';
             csv += `"${name}","${document.getElementById('transplant-date')._flatpickr.input.value}","${document.getElementById('transplant-type').value}",${document.getElementById('weight').value},${document.getElementById('hematocrit').value},"${document.getElementById('genotype').value}","${document.getElementById('mpa').value}"\n\n`;
-            csv += 'DateTime,Dose_mg,Level_ng_mL\n';
-            clinicalData.forEach(r => { csv += `"${r.datetime}",${r.dose !== null ? r.dose : ''},${r.level !== null ? r.level : ''}\n`; });
+            csv += 'DateTime,Dose_mg,Level_ng_mL,Weight_kg,HCT_pct\n';
+            clinicalData.forEach(r => {
+                const wt = (r.weight !== null && r.weight !== undefined) ? r.weight : '';
+                const hct = (r.hematocrit !== null && r.hematocrit !== undefined) ? r.hematocrit : '';
+                csv += `"${r.datetime}",${r.dose !== null ? r.dose : ''},${r.level !== null ? r.level : ''},${wt},${hct}\n`;
+            });
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `${name}_tacrolimus.csv`; a.click(); URL.revokeObjectURL(url);
@@ -1804,12 +2062,16 @@
                             const dt = cols[0];
                             const d = cols[1] ? parseFloat(cols[1]) : null;
                             const l = cols[2] ? parseFloat(cols[2]) : null;
-                            if (d !== null || l !== null) {
+                            const wt = cols[3] ? parseFloat(cols[3]) : null;
+                            const hct = cols[4] ? parseFloat(cols[4]) : null;
+                            if (d !== null || l !== null || wt !== null || hct !== null) {
                                 newClinicalData.push({
                                     id: 'import_' + Math.random().toString(36).substr(2, 9),
                                     datetime: dt,
-                                    dose: d,
-                                    level: l
+                                    dose: isNaN(d) ? null : d,
+                                    level: isNaN(l) ? null : l,
+                                    weight: isNaN(wt) ? null : wt,
+                                    hematocrit: isNaN(hct) ? null : hct
                                 });
                             }
                         }
@@ -1885,7 +2147,10 @@
             clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
             renderDoseLog();
             renderLevelLog();
-            savePatientData();
+            // Applying a protocol deliberately clears the existing doses (the user
+            // confirmed that above), so it may legitimately send fewer events than
+            // the server holds — opt out of the shrink guard.
+            savePatientData(true);
         }
 
         function closeSettingsModal() { document.getElementById('settingsModal').classList.remove('open'); }
@@ -1894,7 +2159,22 @@
                 ? "http://localhost:8000/api"
                 : "/api";
             document.getElementById('settings-api-base').value = localStorage.getItem('tacro_api_base') || defaultUrl;
+            document.getElementById('settings-api-token').value = apiToken();
             document.getElementById('settingsModal').classList.add('open');
+        }
+        function saveApiToken() {
+            const token = document.getElementById('settings-api-token').value.trim();
+            if (!token) {
+                localStorage.removeItem('tacro_api_token');
+                showAlert('API token cleared — central database access disabled', 'warning');
+            } else {
+                localStorage.setItem('tacro_api_token', token);
+                showAlert('API token saved for this browser', 'success');
+            }
+            // A new token deserves a fresh chance to warn if it is also wrong.
+            _authAlertShown = false;
+            populatePatientList();
+            syncCenterCalScalar();
         }
         function saveApiBase() {
             const url = document.getElementById('settings-api-base').value.trim();
@@ -1937,7 +2217,7 @@
             document.getElementById('calib-error').style.display = 'none';
 
             try {
-                const patientsRes = await fetch(`${API_BASE}/patients`);
+                const patientsRes = noteAuthFailure(await apiFetch(`${API_BASE}/patients`));
                 if (!patientsRes.ok) throw new Error('Could not reach backend. Make sure the server is running.');
                 const patientList = await patientsRes.json();
 
@@ -1950,8 +2230,8 @@
                 for (const p of patientList) {
                     try {
                         const [patRes, eventsRes] = await Promise.all([
-                            fetch(`${API_BASE}/patients/${p.mrn}`),
-                            fetch(`${API_BASE}/patients/${p.mrn}/events`)
+                            apiFetch(`${API_BASE}/patients/${p.mrn}`),
+                            apiFetch(`${API_BASE}/patients/${p.mrn}/events`)
                         ]);
                         if (!patRes.ok || !eventsRes.ok) continue;
                         const patData = await patRes.json();
@@ -1960,6 +2240,19 @@
                         const txDate = dayjs(patData.transplant_date);
                         if (!txDate.isValid()) continue;
 
+                        // Must mirror gatherData() exactly. Two ways this drifted:
+                        //
+                        //  1. A `.filter(r => r.time >= 0)` here dropped pre-transplant
+                        //     desensitisation / loading doses that the forecast keeps
+                        //     (ABO-incompatible and highly-sensitized protocols start
+                        //     tacrolimus days before transplant). The calibration engine
+                        //     then saw less drug than the forecast did.
+                        //  2. Only the per-event weight was missing, so the time-varying
+                        //     allometric scaling the forecast applies was absent here.
+                        //
+                        // Both biased the number that gets written back into
+                        // INDIAN_CL_SCALAR for the whole centre, so they matter more
+                        // than an ordinary inconsistency.
                         const historyLog = events.map((e, i) => {
                             const rd = dayjs(e.datetime.replace('T', ' '));
                             return {
@@ -1967,9 +2260,11 @@
                                 recordDate: rd,
                                 dose: e.dose,
                                 level: e.level,
+                                weight: e.weight != null ? e.weight : null,
+                                hematocrit: e.hematocrit != null ? e.hematocrit : null,
                                 time: rd.diff(txDate, 'hour', true)
                             };
-                        }).filter(r => r.time >= 0);
+                        });
 
                         const measuredLevels = historyLog.filter(e => e.level !== null && e.level > 0);
                         if (measuredLevels.length < 3) continue;
@@ -1977,8 +2272,13 @@
                         const loggedDoses = historyLog.filter(e => e.dose !== null && e.dose > 0);
                         if (loggedDoses.length === 0) continue;
 
-                        const filledHistory = fillHistoricalGaps(historyLog, txDate);
-                        const allDoses = filledHistory;
+                        // buildEffectiveDoses, not bare fillHistoricalGaps: it also
+                        // extends the regimen past the last ENTERED dose, so a level
+                        // drawn days later is scored against a patient who was still
+                        // taking tacrolimus. The C/D column and IPV already use it;
+                        // scoring levels against a partially drug-free history was the
+                        // same bug those two were fixed for.
+                        const allDoses = buildEffectiveDoses(historyLog, txDate);
 
                         const pkPatientData = {
                             weight: parseFloat(patData.weight) || 60,
@@ -2109,7 +2409,7 @@
             tbody.innerHTML = results.map(r => {
                 const badge = mpeStatusBadge(r.popMPE);
                 return `<tr style="border-bottom:1px solid var(--col-border);">
-                    <td style="padding:7px 8px;font-weight:600;">${r.mrn}</td>
+                    <td style="padding:7px 8px;font-weight:600;">${escapeHtml(r.mrn)}</td>
                     <td style="padding:7px 8px;text-align:center;">${r.nObs}</td>
                     <td style="padding:7px 8px;text-align:center;${mpeColor(r.popMPE)}">${r.popMPE.toFixed(1)}%</td>
                     <td style="padding:7px 8px;text-align:center;">${r.popMAPE.toFixed(1)}%</td>
@@ -2159,7 +2459,7 @@
             document.getElementById('calib-scalar-current').textContent = newScalar.toFixed(3);
 
             try {
-                const res = await fetch(`${API_BASE}/config/cl-scalar`, {
+                const res = await apiFetch(`${API_BASE}/config/cl-scalar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ cl_scalar: newScalar })
@@ -2198,19 +2498,30 @@
             if (editIndex !== null) {
                 const r = clinicalData[editIndex];
                 defaultDate = r.datetime;
-                document.getElementById('newDose').value = r.dose || '';
-                document.getElementById('newLevel').value = r.level || '';
+                // `?? ''`, not `|| ''`. A 0 mg row is a deliberate "dose held"
+                // marker, and 0 is falsy: `r.dose || ''` opened the editor with an
+                // empty dose field, so saving wrote dose = null and — for a row
+                // with no level — deleted the record outright. fillHistoricalGaps
+                // then spanned the gap and re-inserted a full dose in that slot,
+                // the exact failure its `dose >= 0` anchor exists to prevent.
+                document.getElementById('newDose').value = r.dose ?? '';
+                document.getElementById('newLevel').value = r.level ?? '';
+                document.getElementById('newWeight').value = r.weight ?? '';
+                document.getElementById('newHct').value = r.hematocrit ?? '';
             } else {
                 const last = clinicalData.length > 0 ? dayjs(clinicalData[clinicalData.length - 1].datetime) : dayjs();
                 // Doses go on the 07:00/19:00 slot; levels are C0 samples, drawn
-                // SAMPLING_LEAD_MIN before the dose (06:45/18:45). Defaulting a
-                // level to the dose time itself puts it on the discontinuity where
-                // being 15 min late inflates the reading ~30%.
+                // SAMPLING_LEAD_MIN before the MORNING dose only (06:45) — never
+                // 18:45, since the evening trough is not assayed here. Defaulting
+                // a level to the dose time itself would put it on the absorption
+                // discontinuity where being 15 min late inflates the reading ~30%.
                 defaultDate = type === 'level'
                     ? nextC0Time(last.add(1, 'day').startOf('day')).toDate()
                     : last.add(1, 'day').hour(DOSE_SLOTS.AM).minute(0).toDate();
                 document.getElementById('newDose').value = '';
                 document.getElementById('newLevel').value = '';
+                document.getElementById('newWeight').value = '';
+                document.getElementById('newHct').value = '';
             }
             const fp = document.getElementById('newDateTime')._flatpickr;
             if (fp) { fp.destroy(); }
@@ -2231,6 +2542,10 @@
 
             const dose = document.getElementById('newDose').value;
             const level = document.getElementById('newLevel').value;
+            const weightVal = document.getElementById('newWeight').value;
+            const hctVal = document.getElementById('newHct').value;
+            const weight = (weightVal !== '' && !isNaN(parseFloat(weightVal))) ? parseFloat(weightVal) : null;
+            const hematocrit = (hctVal !== '' && !isNaN(parseFloat(hctVal))) ? parseFloat(hctVal) : null;
             const indexStr = document.getElementById('editIndex').value;
             const type = document.getElementById('recordType').value;
 
@@ -2251,17 +2566,31 @@
                     clinicalData[idx].datetime = datetime;
                     if (type === 'dose') clinicalData[idx].dose = (dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null;
                     if (type === 'level') clinicalData[idx].level = (level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null;
+                    // Assign unconditionally, including null. Guarding on
+                    // `!== null` made a date-specific weight write-once: blanking
+                    // the field was a no-op, so an erroneous value could only be
+                    // removed by deleting the whole record. A cleared field means
+                    // "no measurement here", which is exactly what null encodes —
+                    // getCovariatesAtTime then carries the previous value forward.
+                    clinicalData[idx].weight = weight;
+                    clinicalData[idx].hematocrit = hematocrit;
                 }
             } else {
                 const existing = clinicalData.find(r => r.datetime === datetime);
                 if (existing) {
                     if (type === 'dose') existing.dose = (dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null;
                     if (type === 'level') existing.level = (level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null;
+                    // Unconditional, so a cleared field clears the stored value —
+                    // see the note in the edit branch above.
+                    existing.weight = weight;
+                    existing.hematocrit = hematocrit;
                 } else {
                     clinicalData.push({
                         datetime,
                         dose: type === 'dose' ? ((dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null) : null,
-                        level: type === 'level' ? ((level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null) : null
+                        level: type === 'level' ? ((level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null) : null,
+                        weight: weight,
+                        hematocrit: hematocrit
                     });
                 }
             }
@@ -2286,7 +2615,9 @@
             if (type === 'dose') r.dose = null;
             if (type === 'level') r.level = null;
             if (r.dose === null && r.level === null) clinicalData.splice(index, 1);
-            renderDoseLog(); renderLevelLog(); savePatientData(); showAlert('Deleted', 'success');
+            // A deletion is the one case where sending fewer events than the server
+            // holds is intended, so it opts out of the shrink guard explicitly.
+            renderDoseLog(); renderLevelLog(); savePatientData(true); showAlert('Deleted', 'success');
         }
 
         // ============================================================
@@ -2376,10 +2707,17 @@
                     const badgeCls = status.text === 'Target' ? 'badge-success' : status.text === 'High' ? 'badge-danger' : 'badge-warning';
                     const dailyDose = dailyDoseBefore(effectiveDoses, dayjs(r.datetime).diff(epoch, 'hour', true));
                     const cdRatio = dailyDose > 0 ? (r.level / dailyDose).toFixed(2) : '—';
+                    const vitalsParts = [];
+                    if (r.weight != null) vitalsParts.push(`${r.weight} kg`);
+                    if (r.hematocrit != null) vitalsParts.push(`${r.hematocrit}% Hct`);
+                    const vitalsCell = vitalsParts.length > 0
+                        ? `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;font-weight:600;">${vitalsParts.join(' · ')}</span>`
+                        : `<span style="color:var(--col-muted);font-size:11px;">—</span>`;
                     return `<tr>
                     <td>${dayjs(r.datetime).format('DD-MMM-YY HH:mm')}</td>
                     <td style="font-family:'DM Mono',monospace;font-weight:500;">${r.level.toFixed(1)}</td>
                     <td style="font-family:'DM Mono',monospace;">${cdRatio}</td>
+                    <td>${vitalsCell}</td>
                     <td><span class="badge ${badgeCls}">${status.text}</span></td>
                     <td style="text-align:right">
                         <button onclick="showAddRecordModal('level',${i})" style="background:none;border:none;cursor:pointer;color:var(--col-primary);font-size:12.5px;font-family:'Sora',sans-serif;font-weight:600;margin-right:8px;">Edit</button>
@@ -2387,7 +2725,7 @@
                     </td>
                 </tr>`;
                 }).join('');
-            tbody.innerHTML = rows || '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--col-muted);">No levels logged</td></tr>';
+            tbody.innerHTML = rows || '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--col-muted);">No levels logged</td></tr>';
         }
 
         function runTTRCalculation(historyLog, txDate) {
@@ -2491,16 +2829,20 @@
                 if (!txDateStr) throw new Error('Please select a transplant date first');
                 const txDate = dayjs(txDateStr);
 
+                const bioassay = intField('bioassay', 1);
                 const patientData = {
-                    weight: parseFloat(document.getElementById('weight').value) || 60,
+                    weight: numField('weight', 60),
                     genotype: document.getElementById('genotype').value,
                     mpa: document.getElementById('mpa').value,
-                    bilirubin: parseFloat(document.getElementById('bilirubin').value) || 1.0,
-                    inhibitor: document.getElementById('inhibitor').value || 'none'
+                    bilirubin: numField('bilirubin', 1.0),
+                    inhibitor: document.getElementById('inhibitor').value || 'none',
+                    bioassay
                 };
 
                 const targetRange = getTherapeuticRange(txDate, txDate);
-                const result = suggestStartingDose(patientData, targetRange);
+                // Pass the assay: the target band is in REPORTED units, so the
+                // simulated trough must be put on the same scale before matching.
+                const result = suggestStartingDose(patientData, targetRange, bioassay);
 
                 const splitNote = result.amDose === result.pmDose
                     ? `${result.amDose} mg BID`
@@ -2517,7 +2859,8 @@
                             <div style="font-size:11px;color:var(--col-muted);margin-top:2px;">Total ${result.tdd.toFixed(1)} mg/day &middot; Genotype ${GENOTYPE_LABELS[patientData.genotype] || patientData.genotype}</div>
                         </div>
                         <div style="font-size:12px;color:var(--col-muted);">
-                            Predicted steady-state trough: <b style="color:var(--col-text);">${result.predictedTrough.toFixed(1)} ng/mL</b><br>
+                            Predicted steady-state morning trough: <b style="color:var(--col-text);">${result.predictedTrough.toFixed(1)} ng/mL</b>
+                            <span style="font-size:10.5px;">(as your lab reports it &mdash; ${bioassay === 2 ? 'Abbott CMIA' : 'LC-MS/MS'})</span><br>
                             Target range (Day 0): ${targetRange.low}&ndash;${targetRange.high} ng/mL
                         </div>
                     </div>
@@ -2562,21 +2905,30 @@
             }
 
             const patientData = {
-                weight: parseFloat(document.getElementById('weight').value) || 60,
-                hct: parseFloat(document.getElementById('hematocrit').value) || 35,
+                weight: numField('weight', 60),
+                hct: numField('hematocrit', 35),
                 mpa: document.getElementById('mpa').value,
-                bioassay: parseInt(document.getElementById('bioassay').value),
+                bioassay: intField('bioassay', 1),
                 genotype: document.getElementById('genotype').value,
                 // Advanced PK covariates — now wired through to getPopulationParameters
-                bilirubin: parseFloat(document.getElementById('bilirubin').value) || 1.0,
+                bilirubin: numField('bilirubin', 1.0),
                 inhibitor: document.getElementById('inhibitor').value || 'none',
                 transplantDate: txDate
             };
 
             const historyLog = clinicalData.map((r, i) => {
                 const rd = dayjs(r.datetime);
-                // Pre-transplant desensitization doses (ABO-incompatible, highly sensitized) are fully supported!
-                return { id: i, recordDate: rd, dose: r.dose, level: r.level, time: rd.diff(txDate, 'hour', true) };
+                // Pre-transplant desensitization doses (ABO-incompatible, highly
+                // sensitized) are fully supported — `time` is simply negative.
+                return {
+                    id: i,
+                    recordDate: rd,
+                    dose: r.dose,
+                    level: r.level,
+                    weight: r.weight != null ? r.weight : null,
+                    hematocrit: r.hematocrit != null ? r.hematocrit : null,
+                    time: rd.diff(txDate, 'hour', true)
+                };
             });
 
             return { patientData, historyLog, predictionDate: predDate };
@@ -2665,7 +3017,7 @@
                         <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12.5px;color:#c2410c;margin-bottom:3px;">POSSIBLE POST-DOSE SAMPLE${postDose.length > 1 ? 'S' : ''}</div>
                         <div style="font-size:12px;color:#9a3412;line-height:1.5;">
                             ${postDose.map(p => `Level #${p.n} is timestamped <strong>${p.minutesAfter} min after</strong> a dose`).join('; ')}.
-                            C0 should be drawn ${SAMPLING_LEAD_MIN} min <em>before</em> the dose (${String(DOSE_SLOTS.AM - 1).padStart(2, '0')}:${String(60 - SAMPLING_LEAD_MIN).padStart(2, '0')} / ${DOSE_SLOTS.PM - 1}:${String(60 - SAMPLING_LEAD_MIN).padStart(2, '0')}).
+                            C0 is a <em>morning</em> draw, ${SAMPLING_LEAD_MIN} min <em>before</em> the ${String(DOSE_SLOTS.AM).padStart(2, '0')}:00 dose (${String(DOSE_SLOTS.AM - 1).padStart(2, '0')}:${String(60 - SAMPLING_LEAD_MIN).padStart(2, '0')}).
                             A sample taken during absorption reads high — 15 min post-dose is roughly +30% at steady state — which drives the MAP fit toward slower clearance and an under-dose recommendation.
                             These levels were fitted exactly as entered; correct the timestamps if they are wrong.
                         </div>
@@ -2673,23 +3025,47 @@
                 </div>
             </div>`;
 
-            // Intelligence level based on nObs
-            const intelPct = Math.min(100, 10 + nObs * 18);  // 0 obs → 10%, 5 obs → 100%
+            // ── Levels the fit could not use ─────────────────────────────────
+            // A level drawn before any dose the model knows about predicts ~0.
+            // The MAP objective already ignores it (flat +1000 penalty, constant
+            // in the etas), so it must not count toward "how individualized is
+            // this fit" either — nor toward the metrics, which now exclude it.
+            const nExcluded = indParams.nExcluded || 0;
+            const nUsed = Math.max(0, nObs - nExcluded);
+            const excludedWarning = nExcluded === 0 ? '' : `
+            <div class="metric-card" style="grid-column:1/-1;background:#f8fafc;border-color:#cbd5e1;">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <span style="font-size:18px;line-height:1;">➖</span>
+                    <div>
+                        <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12.5px;color:#475569;margin-bottom:3px;">${nExcluded} LEVEL${nExcluded > 1 ? 'S' : ''} NOT USED BY THE FIT</div>
+                        <div style="font-size:12px;color:#64748b;line-height:1.5;">
+                            ${(indParams.pe || []).filter(p => p.excluded).map(p => `Level #${p.n}`).join(', ')}
+                            ${nExcluded > 1 ? 'were' : 'was'} drawn before any dose in the log, so the model predicts no drug on board and
+                            the level cannot inform the estimate. ${nExcluded > 1 ? 'They are' : 'It is'} excluded from RMSE, MPE, MAPE and R²
+                            rather than scored as a 100% error. <strong>Add the doses that preceded ${nExcluded > 1 ? 'these levels' : 'this level'}</strong>
+                            — or the earlier regimen — to bring ${nExcluded > 1 ? 'them' : 'it'} into the fit.
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            // Intelligence level based on the levels actually used
+            const intelPct = Math.min(100, 10 + nUsed * 18);  // 0 obs → 10%, 5 obs → 100%
             const intelColor = intelPct < 35 ? 'var(--col-warning)' : intelPct < 65 ? '#d97706' : 'var(--col-success)';
             // Tightened from N=4 to N=5: 3-4 is sufficient for chronic stable states, but early 
             // post-transplant time-varying PK requires more observations to overcome structural uncertainty.
-            const intelText = nObs === 0 ? 'Population Estimate' : nObs < 3 ? 'Weakly Individualized' : nObs < 5 ? 'Moderately Individualized' : 'Well Individualized';
+            const intelText = nUsed === 0 ? 'Population Estimate' : nUsed < 3 ? 'Weakly Individualized' : nUsed < 5 ? 'Moderately Individualized' : 'Well Individualized';
             bar.style.width = intelPct + '%';
             bar.style.background = intelColor;
             label.textContent = intelText;
             label.style.color = intelColor;
 
-            if (nObs === 0 || indParams.rmse === null) {
+            if (nUsed === 0 || indParams.rmse === null) {
                 grid.innerHTML = `
                 <div class="metric-card" style="grid-column:1/-1;background:var(--col-warning-bg);border-color:#fde68a;">
                     <div style="font-size:13px;color:var(--col-warning);font-family:'Sora',sans-serif;font-weight:600;">Population estimate — add measured trough levels to personalize</div>
                     <div style="font-size:12px;color:var(--col-muted);margin-top:6px;">The first trough level narrows the clearance posterior from 40% CV to about 15%; later levels add progressively less.</div>
-                </div>${postDoseWarning}`;
+                </div>${excludedWarning}${postDoseWarning}`;
                 document.getElementById('pe-table-section').style.display = 'none';
                 return;
             }
@@ -2700,16 +3076,16 @@
 
             // R² is unreliable below N=5 (95% CI spans ~0–1).
             // Suppress the numeric value and threshold when N is too low.
-            const r2Reliable = nObs >= 5 && indParams.r2 !== null;
+            const r2Reliable = nUsed >= 5 && indParams.r2 !== null;
             const r2Color = !r2Reliable ? 'var(--col-muted)' : indParams.r2 > 0.8 ? 'var(--col-success)' : indParams.r2 > 0.6 ? 'var(--col-warning)' : 'var(--col-danger)';
             const r2Display = r2Reliable ? indParams.r2.toFixed(3) : '—';
-            const r2Sub = r2Reliable ? 'model fit · target &gt;0.80' : `N=${nObs} &lt;5 · unreliable`;
+            const r2Sub = r2Reliable ? 'model fit · target &gt;0.80' : `N=${nUsed} &lt;5 · unreliable`;
 
             grid.innerHTML = `
             <div class="metric-card" style="grid-column:1/-1;background:#f8fafc;border-color:var(--col-border);padding:8px 14px;">
                 <span style="font-size:11px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);">IN-SAMPLE FIT METRICS</span>
                 <span style="font-size:11px;color:var(--col-muted);margin-left:6px;">· computed on the same observations used for MAP estimation (optimistic); not cross-validated</span>
-                <div style="font-size:10.5px;color:var(--col-muted);margin-top:3px;">With ${nObs} observation${nObs === 1 ? '' : 's'} and 2 fitted parameters, a low in-sample MAPE here is expected even for a poorly-calibrated patient. External validation (Sangha 2024, n=103 Indian patients) reported <strong>~40% MAPE</strong> — treat that as the more realistic guide to real-world accuracy.</div>
+                <div style="font-size:10.5px;color:var(--col-muted);margin-top:3px;">With ${nUsed} usable observation${nUsed === 1 ? '' : 's'} and 2 fitted parameters, a low in-sample MAPE here is expected even for a poorly-calibrated patient. External validation (Sangha 2024, n=103 Indian patients) reported <strong>~40% MAPE</strong> — treat that as the more realistic guide to real-world accuracy.</div>
             </div>
             <div class="metric-card">
                 <div class="metric-label">RMSE</div>
@@ -2733,8 +3109,8 @@
             </div>
             <div class="metric-card">
                 <div class="metric-label">Observations</div>
-                <div class="metric-value" style="color:var(--col-primary);">${nObs}</div>
-                <div class="metric-sub">${nObs < 5 ? 'add more for tighter CI' : 'well characterized'}</div>
+                <div class="metric-value" style="color:var(--col-primary);">${nUsed}${nExcluded > 0 ? `<span style="font-size:13px;color:var(--col-muted);"> of ${nObs}</span>` : ''}</div>
+                <div class="metric-sub">${nExcluded > 0 ? `${nExcluded} not usable by the fit` : (nUsed < 5 ? 'add more for tighter CI' : 'well characterized')}</div>
             </div>
             ${(indParams.outlierHit || indParams.boundaryHit) ? `
             <div class="metric-card" style="grid-column:1/-1;background:#fff7ed;border-color:#fed7aa;">
@@ -2745,12 +3121,25 @@
                         <div style="font-size:12px;color:#9a3412;line-height:1.5;">${indParams.boundaryMsg}<br>This fit lies beyond ±${PK_MODEL.OUTLIER_SD} SD of the population distribution (ηCL ±${(PK_MODEL.OUTLIER_SD * Math.sqrt(PK_MODEL.OMEGA_CL)).toFixed(2)}, ηV ±${(PK_MODEL.OUTLIER_SD * Math.sqrt(PK_MODEL.OMEGA_V)).toFixed(2)}). The patient may be a genuine PK outlier — consider verifying dose timings, assay method, or significant drug interactions beyond those modelled.</div>
                     </div>
                 </div>
-            </div>` : ''}${postDoseWarning}`;
+            </div>` : ''}${excludedWarning}${postDoseWarning}`;
 
             // PE table
             if (indParams.pe && indParams.pe.length > 0) {
                 document.getElementById('pe-table-section').style.display = 'block';
                 const rows = indParams.pe.map(p => {
+                    // An excluded row is shown greyed with its reason instead of a
+                    // percentage error — the fit never used it, so grading it
+                    // "✗ Poor" would blame the model for a gap in the dose log.
+                    if (p.excluded) {
+                        return `<tr style="opacity:0.65;">
+                    <td style="font-weight:600;">#${p.n}</td>
+                    <td style="font-family:'DM Mono',monospace;">${p.time.toFixed(1)}</td>
+                    <td style="font-family:'DM Mono',monospace;">${p.observed.toFixed(1)}</td>
+                    <td style="font-family:'DM Mono',monospace;">${p.predicted.toFixed(1)}</td>
+                    <td colspan="2" style="font-size:11.5px;color:var(--col-muted);">drawn before any logged dose — not used by the fit</td>
+                    <td><span class="badge" style="background:#e2e8f0;color:#475569;">— Excluded</span></td>
+                </tr>`;
+                    }
                     const cls = Math.abs(p.pct) < 15 ? 'pe-good' : Math.abs(p.pct) < 25 ? 'pe-ok' : 'pe-bad';
                     const quality = Math.abs(p.pct) < 15 ? '✓ Good' : Math.abs(p.pct) < 25 ? '⚠ Acceptable' : '✗ Poor';
                     return `<tr>
