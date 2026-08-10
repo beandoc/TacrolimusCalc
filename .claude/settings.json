@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(git commit -m ' *)",
-      "Bash(grep -n \"getElementById\\('model-params\\\\|Individualized PK Parameters\\\\|div.innerHTML = \\\\`\" index.html)"
+      "Bash(grep -n \"getElementById\\('model-params\\\\|Individualized PK Parameters\\\\|div.innerHTML = \\\\`\" index.html)",
+      "Bash(python3 -)",
+      "Bash(python3 __TRACKED_VAR__/browser_test.py)"
     ]
   }
 }
