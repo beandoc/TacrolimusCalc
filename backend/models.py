@@ -52,7 +52,9 @@ class ClinicalEvent(Base):
     dose = Column(Float, nullable=True)
     level = Column(Float, nullable=True)
     
-    # ML Foundation: Biomarkers
+    # ML Foundation & Time-Varying Covariates: Biomarkers & Vitals
+    weight = Column(Float, nullable=True)
+    hematocrit = Column(Float, nullable=True)
     creatinine = Column(Float, nullable=True)
     wbc = Column(Float, nullable=True)
     crp = Column(Float, nullable=True)

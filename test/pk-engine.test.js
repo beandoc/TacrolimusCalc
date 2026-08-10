@@ -141,14 +141,26 @@ section('Dose series: held doses and bridging');
         `${withoutBridge.toFixed(2)} vs ${withBridge.toFixed(2)} ng/mL (${(100 * (withoutBridge / withBridge - 1)).toFixed(0)}%)`);
 }
 
-section('C0 sampling convention (15 min pre-dose)');
+section('C0 sampling convention (morning draw, 15 min pre-dose)');
 {
+    // Site protocol: TDM levels are drawn in the MORNING only, 15 min before the
+    // 07:00 dose. The evening trough is never assayed, so nextC0Time must never
+    // return 18:45 — an earlier revision did, which offered clinicians a default
+    // timestamp for a draw that does not happen.
     const afterAm = E.nextC0Time(TX.add(20, 'day').hour(7).minute(0));
-    ok('next C0 after an AM dose is 18:45', afterAm.hour() === 18 && afterAm.minute() === 45, afterAm.format('DD-MMM HH:mm'));
+    ok('next C0 after an AM dose is 06:45 the NEXT day, not 18:45',
+        afterAm.hour() === 6 && afterAm.minute() === 45 && afterAm.date() === 22, afterAm.format('DD-MMM HH:mm'));
     const afterPm = E.nextC0Time(TX.add(20, 'day').hour(19).minute(0));
     ok('next C0 after a PM dose is 06:45 the next day',
         afterPm.hour() === 6 && afterPm.minute() === 45 && afterPm.date() === 22, afterPm.format('DD-MMM HH:mm'));
     ok('nextC0Time always moves forward', E.nextC0Time(TX.add(20, 'day').hour(6).minute(50)).isAfter(TX.add(20, 'day').hour(6).minute(50)));
+    // Sweep the whole day: every answer must be a 06:45 morning slot.
+    let allMorning = true;
+    for (let h = 0; h < 24; h++) {
+        const c0 = E.nextC0Time(TX.add(20, 'day').hour(h).minute(30));
+        if (c0.hour() !== 6 || c0.minute() !== 45) allMorning = false;
+    }
+    ok('every hour of the day resolves to a 06:45 morning draw', allMorning);
 
     // Why the timing warning exists.
     const trueC0 = E.predictAtTime(c0Hour(20), doses, POP);
@@ -387,6 +399,132 @@ section('Starting dose suggestion (pre-Bayesian, population-based)');
         extreme.atBoundary && extreme.tdd === 1.0, `tdd=${extreme.tdd} atBoundary=${extreme.atBoundary}`);
     ok('extreme low-clearance stack overshoots target even at the floor dose',
         extreme.predictedTrough > range.high, `${extreme.predictedTrough.toFixed(2)} ng/mL`);
+
+    // The target band is in REPORTED units. A CMIA lab reads 1.08c + 0.55 higher
+    // than LC-MS/MS, so the same band needs a LOWER dose. Omitting the assay
+    // targeted the LC-MS/MS value and overshot at every CMIA centre: 6 mg/day
+    // predicted 10.58 on the LC-MS/MS scale but 11.98 as actually reported.
+    const band = { low: 10, high: 11 };
+    const pdA = { weight: 60, genotype: '33', mpa: '1', bilirubin: 1.0, inhibitor: 'none' };
+    const lcms = E.suggestStartingDose(pdA, band, 1);
+    const cmia = E.suggestStartingDose(pdA, band, 2);
+    ok('CMIA needs a lower starting dose than LC-MS/MS for the same band',
+        cmia.tdd < lcms.tdd, `LC-MS/MS=${lcms.tdd} mg/day vs CMIA=${cmia.tdd} mg/day`);
+    ok('CMIA predicted trough lands inside the band ON THE REPORTED SCALE',
+        cmia.predictedTrough >= band.low && cmia.predictedTrough <= band.high,
+        `${cmia.predictedTrough.toFixed(2)} ng/mL as reported`);
+    ok('the LC-MS/MS dose would have been reported above the band by a CMIA lab',
+        E.cmiaAdjust(lcms.predictedTrough) > band.high,
+        `${lcms.predictedTrough.toFixed(2)} -> ${E.cmiaAdjust(lcms.predictedTrough).toFixed(2)} reported`);
+    ok('bioassay falls back to the patient profile when the argument is omitted',
+        E.suggestStartingDose({ ...pdA, bioassay: 2 }, band).tdd === cmia.tdd);
+}
+
+section('Time-varying covariates (Weight & Hematocrit)');
+{
+    const historyLog = [
+        { id: 0, recordDate: dayjs('2026-07-11 07:00'), dose: 3, level: null, weight: 60, hematocrit: 35, time: 0 },
+        { id: 1, recordDate: dayjs('2026-07-11 19:00'), dose: 3, level: null, time: 12 },
+        { id: 2, recordDate: dayjs('2026-07-13 07:00'), dose: 3, level: 8.5, weight: 52, hematocrit: 28, time: 48 },
+        { id: 3, recordDate: dayjs('2026-07-14 07:00'), dose: 3, level: null, time: 72 }
+    ];
+
+    const filled = E.fillHistoricalGaps(historyLog, dayjs('2026-07-11'));
+    ok('fillHistoricalGaps carries forward initial weight=60', filled.find(d => d.time === 12).weight === 60);
+    ok('fillHistoricalGaps updates to weight=52 after time=48', filled.find(d => d.time === 72).weight === 52);
+    ok('fillHistoricalGaps updates to hematocrit=28 after time=48', filled.find(d => d.time === 72).hematocrit === 28);
+
+    // Verify predictAtTime with time-varying weight
+    const pop60 = E.getPopulationParameters({ weight: 60, genotype: 'unknown', mpa: '1', bilirubin: 1.0, inhibitor: 'none', transplantDate: dayjs('2026-07-11') });
+    const predBaseline = E.predictAtTime(71, filled, pop60);
+    
+    // Constant 60kg filled doses
+    const filledConstant60 = filled.map(d => ({ ...d, weight: 60 }));
+    const predConstant60 = E.predictAtTime(71, filledConstant60, pop60);
+
+    ok('weight reduction (60kg -> 52kg) lowers clearance, resulting in higher predicted trough concentration',
+        predBaseline > predConstant60, `time-varying pred=${predBaseline.toFixed(2)} vs constant pred=${predConstant60.toFixed(2)}`);
+}
+
+section('Levels the fit cannot use are excluded, not scored');
+{
+    // A level drawn before any logged dose predicts ~0. The OFV already ignores
+    // it (flat +1000, constant in the etas), so scoring it as a 100% error made
+    // the same point simultaneously ignored by the fit and counted against it —
+    // RMSE 5.0 on an otherwise exact fit, which tripped the "Severe Model
+    // Mismatch" banner with nothing on screen explaining why.
+    const TX3 = dayjs('2026-01-01 00:00');
+    const hist = [{ id: 0, recordDate: TX3.add(6, 'hour'), dose: null, level: 5.0, time: 6 }];
+    for (let i = 0; i < 20; i++) {
+        const rd = TX3.add(1, 'day').add(i * 12, 'hour');
+        hist.push({ id: i + 1, recordDate: rd, dose: 3, level: null, time: rd.diff(TX3, 'hour', true) });
+    }
+    const pp = E.getPopulationParameters({ weight: 60, genotype: '33', mpa: '1', bilirubin: 1.0, inhibitor: 'none' });
+    const doses = E.fillHistoricalGaps(hist, TX3);
+    const tGood = TX3.add(9, 'day').hour(7).minute(0).subtract(E.SAMPLING_LEAD_MIN, 'minute').diff(TX3, 'hour', true);
+    const exact = E.predictAtTime(tGood, doses, pp);
+
+    const fit = E.mapBayesian(pp, [hist[0], { time: tGood, level: exact }], doses, 1);
+    ok('the pre-dose-log level is flagged excluded', fit.nExcluded === 1 && fit.pe[0].excluded === true);
+    ok('the usable level is still scored', fit.pe[1].excluded === false);
+    ok('RMSE reflects only the usable levels', near(fit.rmse, 0, 1e-6), `rmse=${fit.rmse.toFixed(4)} (was 5.00)`);
+    ok('MAPE reflects only the usable levels', near(fit.mape, 0, 1e-6), `mape=${fit.mape.toFixed(2)}%`);
+    ok('an exact fit is no longer condemned as a model mismatch', !(fit.rmse > 2.5));
+
+    // Every level unfittable -> no fit to describe, rather than a fake one.
+    const allBad = E.mapBayesian(pp, [hist[0]], doses, 1);
+    ok('all-unfittable returns null metrics, not a fabricated RMSE',
+        allBad.rmse === null && allBad.nExcluded === 1);
+}
+
+section('Time-varying weight survives every params rebuild');
+{
+    // predictAtTime applies the per-dose weight ratio only when params.weight is
+    // present. Four functions rebuild a params object from CL/V/KA, and each one
+    // that enumerates the fields instead of spreading silently drops the
+    // covariate — so the fit, the posterior and the CI band would model a
+    // constant-weight patient while the plotted population curve modelled a
+    // varying one. These assertions fail if any of them regresses.
+    const TX2 = dayjs('2026-07-11 00:00');
+    const pd = { weight: 60, genotype: '33', mpa: '1', bilirubin: 1.0, inhibitor: 'none' };
+    const pop = E.getPopulationParameters(pd);
+
+    // 60 kg oedematous at transplant, down to 45 kg by day 10, 3 mg BID.
+    const hist = [];
+    for (let i = 0; i < 44; i++) {
+        const rd = TX2.add(i * 12, 'hour');
+        const e = { id: i, recordDate: rd, dose: 3, level: null, time: i * 12 };
+        if (i === 0) e.weight = 60;
+        if (i === 20) e.weight = 45;
+        hist.push(e);
+    }
+    const doses = E.fillHistoricalGaps(hist, TX2);
+    const tObs = 21 * 24 - 0.25;
+
+    // The strongest available check: feed the model an observation it generated
+    // itself. Any covariate the fit cannot see shows up as a non-zero eta.
+    const truth = E.predictAtTime(tObs, doses, pop);
+    const fit = E.mapBayesian(pop, [{ time: tObs, level: truth }], doses, 1);
+    ok('MAP recovers etaCL = 0 on self-generated data (weight reaches the OFV)',
+        near(fit.etaCL, 0, 1e-3), `etaCL=${fit.etaCL.toFixed(4)} (was -0.1508, CL 14% low)`);
+    ok('indParams carries weight through to the individual curve',
+        fit.weight === pop.weight, `indParams.weight=${fit.weight}`);
+
+    // The n=0 branch spreads popParams, so n=0 and a perfectly-fitting n=1 must
+    // put the individual curve in the same place.
+    const tLate = 43 * 12 - 0.25;
+    const curve0 = E.generateCurve([tLate], doses, E.mapBayesian(pop, [], doses, 1), 1)[0];
+    const curve1 = E.generateCurve([tLate], doses, fit, 1)[0];
+    ok('individual curve does not jump when the first level is added',
+        near(curve0, curve1, 0.01), `n=0: ${curve0.toFixed(3)} vs n=1: ${curve1.toFixed(3)}`);
+
+    // Laplace posterior and MC band must be built on the same patient as the fit.
+    const post = E.laplacePosterior([{ time: tObs, level: truth }], doses, fit, 1);
+    ok('posterior sd(etaCL) is tighter than the prior', post.sdCL < Math.sqrt(E.PK_MODEL.OMEGA_CL));
+    const band = E.monteCarloCI([tLate], doses, fit, [{ time: tObs, level: truth }], 1, 400)[0];
+    ok('MC band brackets the weight-aware individual curve',
+        band.p5 <= curve1 && curve1 <= band.p95,
+        `p5=${band.p5.toFixed(2)} curve=${curve1.toFixed(3)} p95=${band.p95.toFixed(2)}`);
 }
 
 done('pk-engine');
