@@ -76,8 +76,20 @@
         OUTLIER_SD: 3,
 
         // CYP3A5 covariate on CL/F
-        // NOTE: Indian population has ~45% *1 allele frequency
-        //       'unknown' defaults to intermediate-high (conservative for safety)
+        //
+        // 'unknown' = 1.30 is the ALLELE-FREQUENCY-WEIGHTED POPULATION MEAN, not
+        // a midpoint and not a safety margin. At p(*1) = 0.45 in the Indian
+        // population, Hardy-Weinberg gives *1/*1 0.2025, *1/*3 0.4950, *3/*3
+        // 0.3025, so the expected factor is
+        //     0.2025(1.79) + 0.4950(1.35) + 0.3025(1.00) = 1.33.
+        //
+        // Note where that lands: 1.30 is BELOW the *1/*3 value of 1.35 — the
+        // second-lowest CL on this list, not an "intermediate-high, conservative"
+        // default as an earlier comment claimed. Lower assumed CL means a higher
+        // predicted trough and therefore a LOWER recommended dose, so for an
+        // ungenotyped patient in a population where ~70% carry a *1 allele this
+        // errs toward under-exposure (rejection), not toxicity. Genotype the
+        // patient rather than relying on this default where that matters.
         CYP3A5: { '11': 1.79, '13': 1.35, '33': 1.00, 'unknown': 1.30 },
 
         // Weight allometric exponents
@@ -113,32 +125,37 @@
     // DOSING & SAMPLING CONVENTION
     //
     // Standard BD schedule: 07:00 and 19:00.
-    // C0 (pre-dose trough) is drawn SAMPLING_LEAD_MIN minutes BEFORE the dose,
-    // i.e. 06:45 and 18:45.
     //
-    // Why this matters numerically: predictAtTime() includes a dose only when
-    // dose.time < t (strict), so evaluating at exactly 07:00 happens to give a
-    // pre-dose value — but it sits precisely on a discontinuity. At 3mg BID
-    // steady state:
+    // TDM sampling is MORNING ONLY. C0 is drawn SAMPLING_LEAD_MIN minutes before
+    // the 07:00 dose — 06:45 — and never before the evening dose. This is site
+    // protocol, not a modelling simplification: the evening trough is never
+    // assayed, so offering 18:45 as a default sample time invited timestamps for
+    // draws that do not happen. (Levels ARE still fitted at whatever time they
+    // are entered — see findPostDoseSamples — this governs defaults only.)
+    //
+    // Why the 15 min matters numerically: predictAtTime() includes a dose only
+    // when dose.time < t (strict), so evaluating at exactly 07:00 happens to
+    // give a pre-dose value — but it sits precisely on a discontinuity. At 3mg
+    // BID steady state:
     //     06:45 (true C0)          →  9.15 ng/mL
     //     07:00 (on the boundary)  →  9.08 ng/mL   (−0.8%, harmless)
     //     07:01 (one minute late)  →  9.39 ng/mL   (+2.6%)
     //     07:15 (15 min late)      → 11.92 ng/mL   (+30.2%)
-    // Defaulting every timestamp to 06:45/18:45 both matches the protocol and
-    // keeps every evaluation a safe 15 minutes clear of that cliff.
+    // Defaulting every timestamp to 06:45 both matches the protocol and keeps
+    // every evaluation a safe 15 minutes clear of that cliff.
     // ============================================================
     const DOSE_SLOTS = { AM: 7, PM: 19 };   // hour-of-day for BD dosing
     const SAMPLING_LEAD_MIN = 15;           // C0 drawn this many minutes pre-dose
 
     // Next scheduled C0 sample time strictly after `after` (a dayjs instance).
+    // Always a MORNING draw (06:45) — today's if it is still ahead, else
+    // tomorrow's. See the protocol note above.
     function nextC0Time(after) {
         const base = dayjs(after);
-        const candidates = [
-            base.hour(DOSE_SLOTS.AM).minute(0),
-            base.hour(DOSE_SLOTS.PM).minute(0),
-            base.add(1, 'day').hour(DOSE_SLOTS.AM).minute(0)
-        ].map(d => d.second(0).millisecond(0).subtract(SAMPLING_LEAD_MIN, 'minute'));
-        return candidates.find(c => c.isAfter(base)) || candidates[candidates.length - 1];
+        const morning = d => d.hour(DOSE_SLOTS.AM).minute(0).second(0).millisecond(0)
+            .subtract(SAMPLING_LEAD_MIN, 'minute');
+        const today = morning(base);
+        return today.isAfter(base) ? today : morning(base.add(1, 'day'));
     }
 
     // ============================================================
@@ -203,7 +220,8 @@
             V: m.TVV * wtV,
             // KA is population-fixed (4.53 hr⁻¹). Absorption variability (~30% CV)
             // is not individualised by MAP — negligible for trough-only TDM.
-            KA: m.TVKA
+            KA: m.TVKA,
+            weight: parseFloat(weight) || m.WT_REF
         };
     }
 
@@ -247,7 +265,16 @@
     function predictAtTime(t, allDoses, params) {
         return allDoses.reduce((sum, d) => {
             if (d.time < t && d.dose > 0) {
-                return sum + predictSingleDose(t - d.time, d.dose, params, d.time);
+                let doseParams = params;
+                if (d.weight != null && params.weight != null && d.weight !== params.weight) {
+                    const wtRatio = d.weight / params.weight;
+                    doseParams = {
+                        ...params,
+                        CL: params.CL * Math.pow(wtRatio, PK_MODEL.WT_CL),
+                        V: params.V * Math.pow(wtRatio, PK_MODEL.WT_V)
+                    };
+                }
+                return sum + predictSingleDose(t - d.time, d.dose, doseParams, d.time);
             }
             return sum;
         }, 0);
@@ -288,6 +315,14 @@
     // dose count) — a strong CYP3A4 inhibitor or severe hepatic impairment can
     // quarter clearance and push steady state out by days, and a fixed count
     // tuned for the typical case would silently under-simulate those patients.
+    //
+    // `bioassay` matters and must be passed. The target range is expressed in
+    // whatever the lab REPORTS, so the simulated trough has to be put on the same
+    // scale before it is compared — exactly as mapBayesian and the dose optimizer
+    // already do. Omitting it targeted the LC-MS/MS value: for a *3/*3 60 kg
+    // patient aiming at the 10-11 band this returned 3 mg BID for a predicted
+    // 10.58, which a CMIA lab reports as 1.08 x 10.58 + 0.55 = 11.98 — above the
+    // band it was aiming for, at every CMIA centre.
     // ============================================================
     const STARTING_DOSE_MIN_TDD = 1.0;
     const STARTING_DOSE_MAX_TDD = 18.0;
@@ -295,15 +330,29 @@
     const STARTING_DOSE_HALF_LIVES = 6; // 2^-6 = 1.6% from true steady state
     const STARTING_DOSE_MAX_DOSES = 200; // 100-day safety cap on the simulation
 
-    function suggestStartingDose(patientData, targetRange) {
+    function suggestStartingDose(patientData, targetRange, bioassay) {
         const popParams = getPopulationParameters(patientData);
         const targetMid = (targetRange.low + targetRange.high) / 2;
+        // Fall back to the profile's own setting so a caller that forgets the
+        // argument still gets the patient's assay rather than silently LC-MS/MS.
+        const assay = bioassay != null ? bioassay : patientData.bioassay;
 
         const halfLifeHr = Math.LN2 / (popParams.CL / popParams.V);
-        const nDoses = Math.min(
+        // Dose index 0 is an AM dose, so even indices are AM and odd are PM.
+        // The trough is evaluated immediately before dose `nDoses - 1`, which
+        // must therefore be an AM dose for that trough to be the MORNING C0 the
+        // patient is actually sampled at (site protocol: draws are 06:45 only,
+        // never 18:45 — see the DOSING & SAMPLING CONVENTION note above).
+        //
+        // Rounding nDoses up to an odd count makes `nDoses - 1` even. Without
+        // this the parity fell out of the patient's half-life, so an asymmetric
+        // split was targeted at the pre-PM trough for some patients and the
+        // pre-AM trough for others — 2.6% apart at 3.5 mg AM / 3.0 mg PM.
+        let nDoses = Math.min(
             STARTING_DOSE_MAX_DOSES,
             Math.max(10, Math.ceil((STARTING_DOSE_HALF_LIVES * halfLifeHr) / 12) + 1)
         );
+        if (nDoses % 2 === 0) nDoses += 1;
         const lastDoseTime = (nDoses - 1) * 12;
 
         let best = null;
@@ -316,9 +365,12 @@
             for (let i = 0; i < nDoses; i++) {
                 doses.push({ time: i * 12, dose: i % 2 === 0 ? amDose : pmDose });
             }
-            // Trough = concentration right before the final (nth) dose — the
-            // strict `d.time < t` in predictAtTime excludes that dose itself.
-            const trough = predictAtTime(lastDoseTime, doses, popParams);
+            // Trough = concentration right before the final dose, which nDoses'
+            // odd count guarantees is an AM dose — i.e. the 06:45 morning C0.
+            // The strict `d.time < t` in predictAtTime excludes that dose itself.
+            // Put it on the REPORTED assay scale before comparing with the target.
+            const raw = predictAtTime(lastDoseTime, doses, popParams);
+            const trough = assay === 2 ? cmiaAdjust(raw) : raw;
             const diff = Math.abs(trough - targetMid);
             if (!best || diff < best.diff) {
                 best = { tdd, amDose, pmDose, trough, diff };
@@ -450,10 +502,18 @@
         // ── MAP objective function ────────────────────────────────────────
         // OFV = ηCL²/ωCL + ηV²/ωV  +  Σ[(Cobs − Cpred)² / (Cpred·σ)²]
         const ofv = (eCL, eV) => {
+            // SPREAD popParams — do not enumerate {CL, V, KA}. predictAtTime
+            // rescales each dose by (d.weight / params.weight) for time-varying
+            // body weight, and that gate is silently skipped when `weight` is
+            // absent. Enumerating the three fields dropped it here, so the fit
+            // saw a constant-weight patient while the plotted population curve
+            // saw a varying one: MAP then absorbed the missing correction as
+            // slow clearance (ηCL = −0.151, CL 14% low, on data this very model
+            // generated). Same reason applies at every other rebuild below.
             const p = {
+                ...popParams,
                 CL: popParams.CL * Math.exp(eCL),
-                V: popParams.V * Math.exp(eV),
-                KA: popParams.KA
+                V: popParams.V * Math.exp(eV)
             };
             const prior = (eCL * eCL) / OMEGA_CL + (eV * eV) / OMEGA_V;
             const lik = measuredLevels.reduce((s, obs) => {
@@ -522,10 +582,16 @@
         let boundaryMsg = outlierMsg;
         if (boundaryHit) boundaryMsg += 'Estimate was truncated at the search boundary — treat the parameter values themselves as unreliable. ';
 
+        // Spread popParams so covariates predictAtTime needs (currently
+        // `weight`, for time-varying allometric scaling) reach every consumer of
+        // indParams: the plotted individual curve, the dose optimizer, and the
+        // accuracy metrics. Dropping it made the individual curve jump 30% the
+        // moment the first level was entered — the n=0 branch above already
+        // spreads, so the two disagreed.
         const indParams = {
+            ...popParams,
             CL: popParams.CL * Math.exp(bestCL),
             V: popParams.V * Math.exp(bestV),
-            KA: popParams.KA,
             etaCL: bestCL,
             etaV: bestV,
             outlierHit,
@@ -539,27 +605,53 @@
     // ============================================================
     // ACCURACY METRICS
     // RMSE, MPE (bias), MAPE (imprecision), R²
+    //
+    // UNFITTABLE OBSERVATIONS ARE EXCLUDED. A level drawn before any dose the
+    // model knows about predicts ~0, and the MAP objective already ignores it:
+    // its `predAdj <= 0.1` branch returns a FLAT +1000 penalty, constant in
+    // (ηCL, ηV), so the point cannot move the estimate in any direction.
+    //
+    // Scoring it anyway was incoherent — the same observation was simultaneously
+    // ignored by the fit and counted as a 100% error against it. One trough
+    // entered before the dose log starts (routine: the log often begins at
+    // admission, the level came from the referring unit) produced RMSE 5.0,
+    // which tripped `rmse > 2.5` and put "🚨 CRITICAL: Severe Model Mismatch" on
+    // an otherwise perfect fit, with nothing on screen explaining why.
+    //
+    // Such points are still RETURNED in `pe` with excluded: true so the UI can
+    // list them and say what happened — they are just kept out of the summary
+    // statistics. `nExcluded` gives the UI its count without re-filtering.
     // ============================================================
+    const MIN_FITTABLE_PRED = 0.1;   // matches the OFV's degenerate-prediction guard
+
     function calculateAccuracyMetrics(measuredLevels, allDoses, params, bioassay) {
-        if (measuredLevels.length === 0) return { rmse: null, mpe: null, mape: null, r2: null, pe: [] };
-        const pe = measuredLevels.map((obs, i) => {
+        if (measuredLevels.length === 0) return { rmse: null, mpe: null, mape: null, r2: null, pe: [], nExcluded: 0 };
+        const all = measuredLevels.map((obs, i) => {
             const pred = (() => {
                 const p = predictAtTime(obs.time, allDoses, params);
                 return bioassay === 2 ? cmiaAdjust(p) : p;
             })();
             const error = obs.level - pred;
             const pct = obs.level > 0 ? (error / obs.level) * 100 : 0;
-            return { n: i + 1, time: obs.time, observed: obs.level, predicted: pred, error, pct };
+            // Excluded on the PREDICTION, not the observation: the question is
+            // whether the model had any drug on board to predict with.
+            const excluded = !(pred > MIN_FITTABLE_PRED);
+            return { n: i + 1, time: obs.time, observed: obs.level, predicted: pred, error, pct, excluded };
         });
-        const n = pe.length;
-        const rmse = Math.sqrt(pe.reduce((s, p) => s + p.error * p.error, 0) / n);
-        const mpe = pe.reduce((s, p) => s + p.pct, 0) / n;
-        const mape = pe.reduce((s, p) => s + Math.abs(p.pct), 0) / n;
-        const meanObs = measuredLevels.reduce((s, o) => s + o.level, 0) / n;
-        const ssTot = measuredLevels.reduce((s, o) => s + Math.pow(o.level - meanObs, 2), 0);
-        const ssRes = pe.reduce((s, p) => s + p.error * p.error, 0);
+        const pe = all;
+        const scored = all.filter(p => !p.excluded);
+        const nExcluded = all.length - scored.length;
+        // Every observation unfittable — there is no fit to describe.
+        if (scored.length === 0) return { rmse: null, mpe: null, mape: null, r2: null, pe, nExcluded };
+        const n = scored.length;
+        const rmse = Math.sqrt(scored.reduce((s, p) => s + p.error * p.error, 0) / n);
+        const mpe = scored.reduce((s, p) => s + p.pct, 0) / n;
+        const mape = scored.reduce((s, p) => s + Math.abs(p.pct), 0) / n;
+        const meanObs = scored.reduce((s, p) => s + p.observed, 0) / n;
+        const ssTot = scored.reduce((s, p) => s + Math.pow(p.observed - meanObs, 2), 0);
+        const ssRes = scored.reduce((s, p) => s + p.error * p.error, 0);
         const r2 = ssTot > 1e-6 ? Math.max(0, 1 - ssRes / ssTot) : null;
-        return { rmse, mpe, mape, r2, pe };
+        return { rmse, mpe, mape, r2, pe, nExcluded };
     }
 
     // ============================================================
@@ -613,10 +705,13 @@
         // Predicted (bioassay-adjusted) concentration at time t for an
         // (ηCL, ηV) perturbation of the individual estimate.
         const predAt = (t, eCL, eV) => {
+            // Spread indParams — see the note in mapBayesian's ofv. Enumerating
+            // {CL, V, KA} here dropped the time-varying weight covariate, so the
+            // sensitivities J were computed on a different patient than the fit.
             const p = {
+                ...indParams,
                 CL: indParams.CL * Math.exp(eCL),
-                V: indParams.V * Math.exp(eV),
-                KA: indParams.KA
+                V: indParams.V * Math.exp(eV)
             };
             const c = predictAtTime(t, allDoses, p);
             return bioassay === 2 ? cmiaAdjust(c) : c;
@@ -697,10 +792,13 @@
             const etaCL = z1 * sdCL;
             const etaV = (rho * z1 + rhoPerp * z2) * sdV;
 
+            // Spread indParams — see the note in mapBayesian's ofv. Without it
+            // the CI band was drawn for a constant-weight patient while the
+            // individual curve it wraps used the time-varying one.
             const p = {
+                ...indParams,
                 CL: indParams.CL * Math.exp(etaCL),
-                V: indParams.V * Math.exp(etaV),
-                KA: indParams.KA
+                V: indParams.V * Math.exp(etaV)
             };
             curves.push(generateCurve(timePoints, allDoses, p, bioassay));
         }
@@ -804,6 +902,34 @@
 
     function fillHistoricalGaps(historyLog, txDate) {
         const filled = [];
+        const sortedHistory = [...historyLog].sort((a, b) => a.time - b.time);
+
+        // Time-varying covariates (body weight, haematocrit) are recorded on
+        // whatever event the clinician happened to enter them on, and apply from
+        // that moment until the next recorded value — the same carry-forward rule
+        // the dose regimen uses. Returns the values in force at `t`.
+        //
+        // NOTE on the weight model: predictAtTime scales each dose by the weight
+        // in force when that dose was GIVEN, and keeps it for that dose's whole
+        // disposition. A dose given at 60 kg is therefore still eliminated at
+        // 60 kg clearance ten days later at 45 kg. For slowly drifting weight
+        // that is a fair approximation; for rapidly resolving post-operative
+        // oedema — the main reason this feature exists — it is the weakest link.
+        // A fully correct treatment needs time-varying ke integrated along the
+        // elimination phase, not superposition of fixed-parameter doses.
+        function getCovariatesAtTime(t) {
+            let wt = null, hct = null;
+            for (const item of sortedHistory) {
+                if (item.time <= t) {
+                    if (item.weight != null) wt = item.weight;
+                    if (item.hematocrit != null) hct = item.hematocrit;
+                } else {
+                    break;
+                }
+            }
+            return { weight: wt, hematocrit: hct };
+        }
+
         // Anchor on dose >= 0, NOT dose > 0. A recorded 0 mg is a deliberate
         // "dose held" entry. Filtering it out dropped it from the anchor list,
         // and the 12-hourly gap-filler then spanned straight across it and
@@ -813,7 +939,12 @@
         if (logged.length === 0) return [];
 
         for (let i = 0; i < logged.length; i++) {
-            filled.push(logged[i]);
+            const cov = getCovariatesAtTime(logged[i].time);
+            filled.push({
+                ...logged[i],
+                weight: logged[i].weight ?? cov.weight,
+                hematocrit: logged[i].hematocrit ?? cov.hematocrit
+            });
             if (i === logged.length - 1) break;
 
             let nextTime = logged[i].recordDate.add(12, 'hour');
@@ -822,7 +953,17 @@
                 // Carry the regimen in force at this slot. Reads `logged`, not
                 // `filled`: only entered doses define the regimen.
                 const doseToGive = regimenDoseAt(logged, nextTime, logged[i].dose);
-                filled.push({ id: 'inter-' + i + '-' + nextTime.valueOf(), recordDate: nextTime, dose: doseToGive, level: null, time: nextTime.diff(txDate, 'hour', true) });
+                const slotTime = nextTime.diff(txDate, 'hour', true);
+                const slotCov = getCovariatesAtTime(slotTime);
+                filled.push({
+                    id: 'inter-' + i + '-' + nextTime.valueOf(),
+                    recordDate: nextTime,
+                    dose: doseToGive,
+                    level: null,
+                    weight: slotCov.weight,
+                    hematocrit: slotCov.hematocrit,
+                    time: slotTime
+                });
                 nextTime = nextTime.add(12, 'hour');
             }
         }
@@ -832,6 +973,10 @@
     function extrapolateDoses(filledHistory, untilDate, txDate) {
         if (filledHistory.length === 0) return [];
         const last = filledHistory[filledHistory.length - 1];
+        // Future slots inherit the most recent known covariates — there is no
+        // later measurement to carry forward from.
+        const lastWt = last ? last.weight : null;
+        const lastHct = last ? last.hematocrit : null;
         // Same regimen rule as fillHistoricalGaps, driven off the entered doses
         // only — filledHistory already carries imputed slots by this point.
         const entered = filledHistory.filter(d => !isImputedDose(d));
@@ -840,7 +985,15 @@
         let nextTime = last.recordDate.add(12, 'hour');
         while (nextTime.isBefore(untilDate)) {
             const doseToGive = regimenDoseAt(source, nextTime, last.dose);
-            extra.push({ id: 'ext-' + extra.length, recordDate: nextTime, dose: doseToGive, level: null, time: nextTime.diff(txDate, 'hour', true) });
+            extra.push({
+                id: 'ext-' + extra.length,
+                recordDate: nextTime,
+                dose: doseToGive,
+                level: null,
+                weight: lastWt,
+                hematocrit: lastHct,
+                time: nextTime.diff(txDate, 'hour', true)
+            });
             nextTime = nextTime.add(12, 'hour');
         }
         return extra;
@@ -866,6 +1019,9 @@
         const bridge = [];
         if (!logged || logged.length === 0) return bridge;
         const fallback = logged[logged.length - 1].dose;
+        const last = logged[logged.length - 1];
+        const lastWt = last ? last.weight : null;
+        const lastHct = last ? last.hematocrit : null;
         // Callers pass the forecast's dose array, which mixes entered and
         // imputed slots; only the entered ones may define the regimen.
         const entered = logged.filter(d => !isImputedDose(d));
@@ -876,6 +1032,8 @@
                 recordDate: t,
                 dose: regimenDoseAt(source, t, fallback),
                 level: null,
+                weight: lastWt,
+                hematocrit: lastHct,
                 time: t.diff(txDate, 'hour', true)
             });
         }
