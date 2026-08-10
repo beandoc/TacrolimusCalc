@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import date, datetime
 
@@ -6,6 +6,8 @@ class ClinicalEventBase(BaseModel):
     datetime: datetime
     dose: Optional[float] = None
     level: Optional[float] = None
+    weight: Optional[float] = None
+    hematocrit: Optional[float] = None
     creatinine: Optional[float] = None
     wbc: Optional[float] = None
     crp: Optional[float] = None
@@ -66,6 +68,19 @@ class PatientBase(BaseModel):
 class PatientCreate(PatientBase):
     pass
 
+class PatientSummary(PatientBase):
+    """Patient WITHOUT the event/outcome collections.
+
+    The list endpoint fills a name picker and the Load Patient directory, which
+    need mrn / transplant_date / weight and nothing else. Returning the full
+    `Patient` there serialised every dose and level in the database on each call
+    (plus one lazy-load query per patient) — so opening the picker downloaded the
+    entire clinical record set.
+    """
+
+    class Config:
+        from_attributes = True
+
 class Patient(PatientBase):
     events: List[ClinicalEvent] = []
     outcomes: List[ClinicalOutcome] = []
@@ -74,7 +89,16 @@ class Patient(PatientBase):
         from_attributes = True
 
 class CenterConfigUpdate(BaseModel):
-    cl_scalar: float
+    # Bounded deliberately. This single number multiplies TVCL for EVERY patient
+    # on EVERY device that loads the app, so an out-of-range value is not a
+    # cosmetic bug: cl_scalar = 0 gives CL = 0 (no elimination, unbounded
+    # predicted concentrations), and a negative value gives negative clearance.
+    #
+    # The plausible range for a centre-level correction to the Størset prior is
+    # narrow — the shipped default is 1.18, and a centre needing more than ±60%
+    # has a data problem (assay calibration, dose-log quality) that recalibrating
+    # the prior would only paper over.
+    cl_scalar: float = Field(gt=0.5, lt=3.0, description="Centre-wide multiplier on TVCL")
 
 class CenterConfig(CenterConfigUpdate):
     updated_at: Optional[datetime] = None
