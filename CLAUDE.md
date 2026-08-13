@@ -126,10 +126,14 @@ Guarded permanently by the section *"Walk-forward selection is leak-free"* in
 held-out level and its own prediction must not move (with a live-probe
 counter-assertion so it cannot pass trivially).
 
-**Remaining known look-ahead, mild:** `fillHistoricalGaps` interpolates the dose
-regimen across gaps using the whole log, so a dose entered *after* a target can
-shape the inferred regimen *before* it. Measure it with
-`node tools/backtest.js --doses both`.
+**Theoretical look-ahead, measured and found to be zero on this cohort:**
+`fillHistoricalGaps` interpolates the dose regimen across gaps using the whole
+log, so a dose entered *after* a target could in principle shape the inferred
+regimen *before* it. `node tools/backtest.js --doses truncated` cuts the dose
+history at each target before fitting; on the current cohort it reproduces the
+`full` numbers exactly (24.6% selector MAPE either way) — this cohort's dose
+logs have no gaps that straddle a held-out target. Re-run this check if the
+cohort changes; it is not guaranteed to stay zero.
 
 ---
 
