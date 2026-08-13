@@ -1,6 +1,13 @@
 # Local SQLite database
 tacrolimus.db
 
+# Scratch exports containing patient data (PHI) — never commit
+patient_*.json
+extracted_*.json
+extracted_log.txt
+line_*_content.json
+subagent_content.txt
+
 # Python
 __pycache__/
 *.pyc

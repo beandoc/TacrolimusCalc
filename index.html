@@ -1333,7 +1333,6 @@
         let clinicalData = [];
         let myChart = null;
         let lastForecastParams = { individual: null, population: null, allDoses: [], patientData: null };
-        let useRecentFitOnly = false;
 
         // ============================================================
         // INITIALIZATION
@@ -1914,7 +1913,6 @@
         }
 
         async function loadPatientData() {
-            useRecentFitOnly = false;
             const nameInput = document.getElementById('patient-name');
             const name = nameInput ? nameInput.value.trim().toLowerCase() : '';
             if (!name) {
@@ -2033,7 +2031,6 @@
 
         function clearAllData(clearName = true) {
             if (!confirm('Clear all data?')) return;
-            useRecentFitOnly = false;
             if (clearName) document.getElementById('patient-name').value = '';
             document.getElementById('weight').value = 60;
             document.getElementById('hematocrit').value = 35;
@@ -3101,18 +3098,6 @@
             return { patientData, historyLog, predictionDate: predDate };
         }
 
-        function getRecentLevels(levels) {
-            const sorted = [...levels].sort((a, b) => a.time - b.time);
-            const count = Math.max(3, Math.ceil(sorted.length / 2));
-            return sorted.slice(-count);
-        }
-
-        function window_toggleRecentFitOnly(flag) {
-            useRecentFitOnly = flag;
-            runAllAnalyses();
-        }
-        window.toggleRecentFitOnly = window_toggleRecentFitOnly;
-
         function runForecast(patientData, historyLog, predictionDate) {
             return new Promise(resolve => setTimeout(() => {
                 try {
@@ -3126,10 +3111,14 @@
                     const allDoses = [...filledHistory, ...extraDoses];
 
                     const popParams = getPopulationParameters(patientData);
-                    const levelsToFit = useRecentFitOnly ? getRecentLevels(measuredLevels) : measuredLevels;
-                    const indParams = mapBayesian(popParams, levelsToFit, allDoses, patientData.bioassay);
+                    // Which recency regime to trust is decided from THIS
+                    // patient's own walk-forward record, not a global rule —
+                    // see selectRecencyRegime. Costs a handful of extra MAP
+                    // fits, which is why runForecast is already async.
+                    const regimeChoice = selectRecencyRegime(popParams, measuredLevels, allDoses, patientData.bioassay);
+                    const indParams = mapBayesian(popParams, measuredLevels, allDoses, patientData.bioassay, regimeChoice.regime);
 
-                    lastForecastParams = { individual: indParams, population: popParams, allDoses, patientData };
+                    lastForecastParams = { individual: indParams, population: popParams, allDoses, patientData, regimeChoice };
 
                     const lastHour = Math.max(
                         untilDate.diff(patientData.transplantDate, 'hour', true),
@@ -3170,7 +3159,7 @@
                         measuredLevels, patientData.bioassay, 500);
                     const mcCiAtPred = ciAtPred[0];  // { p5, p95 }
 
-                    updateSummary(predicted, predictionDate, indParams, measuredLevels, allDoses, mcCiAtPred, patientData.transplantDate, popParams, patientData.bioassay);
+                    updateSummary(predicted, predictionDate, indParams, measuredLevels, allDoses, mcCiAtPred, patientData.transplantDate, popParams, patientData.bioassay, regimeChoice);
                     updateModelParams(popParams, indParams);
                     updateAccuracyPanel(indParams, measuredLevels.length, measuredLevels, allDoses);
 
@@ -3413,7 +3402,7 @@
             </div>`;
         }
 
-        function updateSummary(predicted, predDate, indParams, measuredLevels, allDoses, mcCiAtPred, txDate, popParams, bioassay) {
+        function updateSummary(predicted, predDate, indParams, measuredLevels, allDoses, mcCiAtPred, txDate, popParams, bioassay, regimeChoice) {
             const div = document.getElementById('results-summary');
             const hasError = indParams.rmse !== null;
 
@@ -3508,71 +3497,62 @@
                 }
             }
 
-            // ── Erratic C/D ratio: full-history fit may be stale ─────────────
-            // shiftWarning above catches a MONOTONIC C/D drift (OLS slope). It
-            // does not fire on an OSCILLATING C/D — swinging up and down rather
-            // than trending — because the slope over such data is near zero.
-            // That is exactly the case where a single time-invariant MAP fit
-            // struggles hardest: mapBayesian has no recency weighting, so every
-            // observation counts equally regardless of age, and the fit becomes
-            // a compromise that can end up dominated by whichever readings are
-            // largest, not most recent.
+            // mapBayesian now weights each level by age (PK_MODEL.RECENCY_*),
+            // so drift that used to need a manual "recent-only fit" toggle is
+            // handled automatically inside the fit itself.
+
+            // ── This model's demonstrated accuracy ON THIS PATIENT ────────────
+            // Clinicians calibrate trust in a tool by watching it be right or
+            // wrong, not by reading its methodology. selectRecencyRegime has
+            // already walk-forward tested the chosen regime against this
+            // patient's own last few troughs (each prediction made WITHOUT
+            // seeing the level it predicts), so showing that record costs
+            // nothing extra and answers "should I believe this number?" with
+            // evidence instead of assertion.
             //
-            // Real case that motivated this: 8 troughs over ~6 weeks, C/D
-            // swinging 0.56-2.63 (IPV 48%, "High"). Full-history MAP: RMSE 6.89,
-            // forecast 17.0 ng/mL. Refit on just the 4 most recent troughs:
-            // RMSE 2.18 (self-consistent), forecast 9.8 ng/mL — the full-history
-            // number was being pulled up by readings 3-6 weeks stale while the
-            // recent trend was flat-to-declining.
-            //
-            // Gated tightly so it only appears when it is actually informative:
-            // >=6 observations (so a recent/older split leaves >=3 on each
-            // side), IPV already "High" (>40%, same threshold the IPV tile
-            // uses), AND the full-history fit is itself a demonstrated poor fit
-            // (same misfit test updateModelParams uses for "Severe Model
-            // Mismatch"). This is a comparison, never a replacement forecast —
-            // the recent-only refit has its own reliability caveats (fewer
-            // points, its own RMSE) and is presented that way.
-            let volatilityWarning = '';
-            if (popParams && measuredLevels && measuredLevels.length >= 5) {
-                const misfitNow = hasError && (r2Bad || indParams.rmse > 2.5);
-                if (useRecentFitOnly) {
-                    volatilityWarning = `
-                    <div style="margin-top:10px;padding:12px;background:#ecfdf5;border:1.5px solid #10b981;border-radius:8px;text-align:left;">
-                        <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:#065f46;margin-bottom:4px;">
-                            💡 ADAPTED TO RECENT TREND (Recent-Only Fit Active)
-                        </div>
-                        <div style="font-size:11.5px;color:#047857;line-height:1.5;margin-bottom:8px;">
-                            The forecast and dose recommendations are currently fit to only the most recent levels to discount historical changes in clearance.
-                        </div>
-                        <button class="btn" style="font-size:11px;padding:4px 8px;background:#10b981;border:none;color:white;border-radius:4px;cursor:pointer;font-weight:600;" onclick="toggleRecentFitOnly(false)">
-                            👈 Switch back to Full History Fit
-                        </button>
-                    </div>`;
-                } else if (misfitNow) {
-                    const sortedLevels = [...measuredLevels].sort((a, b) => a.time - b.time);
-                    const recentCount = Math.max(3, Math.ceil(sortedLevels.length / 2));
-                    const recentLevels = sortedLevels.slice(-recentCount);
-                    const recentFit = mapBayesian(popParams, recentLevels, allDoses, bioassay);
-                    if (recentFit.rmse !== null) {
-                        const predTimeHr = predDate.diff(txDate, 'hour', true);
-                        const recentPred = generateCurve([predTimeHr], allDoses, recentFit, bioassay)[0];
-                        volatilityWarning = `
-                        <div style="margin-top:10px;padding:12px;background:var(--col-warning-bg);border:1.5px solid var(--col-warning);border-radius:8px;text-align:left;">
-                            <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:#92400e;">⚠️ MODEL MISMATCH (RMSE ${indParams.rmse.toFixed(2)}) — CHRONIC CLEARANCE DRIFT</div>
-                            <div style="font-size:11.5px;color:#78350f;margin-top:4px;line-height:1.5;">
-                                A single time-invariant clearance cannot explain all ${measuredLevels.length} levels (RMSE is high at ${indParams.rmse.toFixed(2)}). This is common when clearance changes over the first few weeks post-transplant.
-                                <br><br>
-                                Refitting the model on only the ${recentCount} most recent levels gives a much cleaner fit (RMSE ${recentFit.rmse.toFixed(2)}) and predicts <strong>${recentPred.toFixed(1)} ng/mL</strong> for the next trough.
-                            </div>
-                            <div style="margin-top: 8px;">
-                                <button class="btn" style="font-size: 11px; padding: 6px 10px; background: #d97706; border: none; color: white; border-radius: 4px; cursor: pointer; font-weight: 600;" onclick="toggleRecentFitOnly(true)">
-                                    👉 Use Recent-Only Fit for Forecast
-                                </button>
-                            </div>
-                        </div>`;
-                    }
-                }
+            // Presented as observed error, not a confidence score: a track
+            // record of 3 predictions is thin, and dressing it up as a
+            // percentage-confidence would overstate what it supports.
+            let trackRecordHtml = '';
+            const trials = regimeChoice && regimeChoice.trials && regimeChoice.trials[regimeChoice.regime];
+            if (trials && trials.length > 0) {
+                const meanAbs = trials.reduce((s, t) => s + t.absPctError, 0) / trials.length;
+                const worst = Math.max(...trials.map(t => t.absPctError));
+                // Colour by the WORST miss, not the mean: a clinician's risk is
+                // the bad prediction, and a good average can hide one.
+                const tone = worst <= 20
+                    ? { bg: '#ecfdf5', border: '#10b981', head: '#065f46', body: '#047857' }
+                    : worst <= 40
+                        ? { bg: '#fffbeb', border: '#fbbf24', head: '#92400e', body: '#78350f' }
+                        : { bg: '#fff1f2', border: '#fda4af', head: '#be123c', body: '#881337' };
+                const rows = trials.map(t => {
+                    const when = txDate ? dayjs(txDate).add(t.time, 'hour').format('DD-MMM') : '—';
+                    const sign = t.pctError > 0 ? '+' : '';
+                    return `<tr>
+                        <td style="padding:2px 8px 2px 0;">${when}</td>
+                        <td style="padding:2px 8px 2px 0;text-align:right;">${t.predicted.toFixed(1)}</td>
+                        <td style="padding:2px 8px 2px 0;text-align:right;">${t.observed.toFixed(1)}</td>
+                        <td style="padding:2px 0;text-align:right;font-weight:600;">${sign}${t.pctError.toFixed(0)}%</td>
+                    </tr>`;
+                }).join('');
+                trackRecordHtml = `
+                <div style="margin-top:10px;padding:12px;background:${tone.bg};border:1.5px solid ${tone.border};border-radius:8px;text-align:left;">
+                    <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:${tone.head};margin-bottom:5px;">
+                        📊 THIS MODEL'S RECENT ACCURACY ON THIS PATIENT — avg miss ${meanAbs.toFixed(0)}%, worst ${worst.toFixed(0)}%
+                    </div>
+                    <table style="font-size:11px;color:${tone.body};line-height:1.5;border-collapse:collapse;">
+                        <tr style="font-weight:600;">
+                            <td style="padding:2px 8px 2px 0;">Trough</td>
+                            <td style="padding:2px 8px 2px 0;text-align:right;">Forecast</td>
+                            <td style="padding:2px 8px 2px 0;text-align:right;">Actual</td>
+                            <td style="padding:2px 0;text-align:right;">Miss</td>
+                        </tr>
+                        ${rows}
+                    </table>
+                    <div style="font-size:10.5px;color:${tone.body};margin-top:6px;line-height:1.45;">
+                        Each forecast above was made using only the levels drawn <em>before</em> it — the same position you are in now. Judge today's number against this record, not against the model's in-sample fit.
+                    </div>
+                </div>`;
             }
 
             let warningHtml = '';
@@ -3647,7 +3627,49 @@
                 </div>`;
             }
 
-            warningHtml = shiftWarning + volatilityWarning + imputationWarning + warningHtml;
+            // ── Can this number actually settle the clinical question? ────────
+            // The therapeutic bands here are 1-2 ng/mL wide; measured forecast
+            // error is ~26% (this patient's own record when we have one). Very
+            // often the honest answer is "this cannot tell you whether they
+            // will be in range" — say so plainly rather than letting a precise-
+            // looking decimal imply a precision the backtest doesn't support.
+            let resolutionHtml = '';
+            if (txDate && predicted > 0) {
+                const range = getTherapeuticRange(predDate, txDate);
+                const patientErr = (trials && trials.length > 0)
+                    ? trials.reduce((s, t) => s + t.absPctError, 0) / trials.length
+                    : null;
+                const res = forecastResolution(predicted, range, patientErr);
+                if (res) {
+                    const src = patientErr != null
+                        ? `this patient's own recent forecast error (±${res.err.toFixed(0)}%)`
+                        : `typical forecast error across a 10-patient held-out backtest (±${res.err.toFixed(0)}%)`;
+                    const band = `${range.low}–${range.high} ng/mL`;
+                    const cfg = {
+                        in: { icon: '✅', bg: '#ecfdf5', border: '#10b981', head: '#065f46', body: '#047857',
+                              title: 'FORECAST SUPPORTS "IN RANGE"',
+                              msg: `Even allowing for ${src}, the plausible range (<strong>${res.lo.toFixed(1)}–${res.hi.toFixed(1)}</strong>) stays inside the ${band} target. This number is strong enough to act on.` },
+                        above: { icon: '⬆️', bg: '#fff1f2', border: '#fda4af', head: '#be123c', body: '#881337',
+                              title: 'FORECAST SUPPORTS "ABOVE RANGE"',
+                              msg: `Even at the low end of ${src}, the plausible range (<strong>${res.lo.toFixed(1)}–${res.hi.toFixed(1)}</strong>) sits above the ${band} target. A reduction is indicated.` },
+                        below: { icon: '⬇️', bg: '#fff1f2', border: '#fda4af', head: '#be123c', body: '#881337',
+                              title: 'FORECAST SUPPORTS "BELOW RANGE"',
+                              msg: `Even at the high end of ${src}, the plausible range (<strong>${res.lo.toFixed(1)}–${res.hi.toFixed(1)}</strong>) sits below the ${band} target. An increase is indicated.` },
+                        unresolved: { icon: '🔬', bg: '#f8fafc', border: '#94a3b8', head: '#334155', body: '#475569',
+                              title: 'MEASURE BEFORE DECIDING — FORECAST CANNOT RESOLVE THIS',
+                              msg: `Allowing for ${src}, this patient could plausibly be anywhere from <strong>${res.lo.toFixed(1)} to ${res.hi.toFixed(1)} ng/mL</strong>, which straddles the ${band} target. The forecast cannot distinguish in-range from out-of-range here — a measured trough can. Use this number for trend and dose direction, not as the basis for a change.` }
+                    }[res.status];
+                    resolutionHtml = `
+                    <div style="margin-top:10px;padding:12px;background:${cfg.bg};border:1.5px solid ${cfg.border};border-radius:8px;text-align:left;">
+                        <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:${cfg.head};margin-bottom:3px;">${cfg.icon} ${cfg.title}</div>
+                        <div style="font-size:11.5px;color:${cfg.body};line-height:1.5;">${cfg.msg}</div>
+                    </div>`;
+                }
+            }
+
+            // Order: what the number means for a decision, then the evidence
+            // for believing it, then the caveats.
+            warningHtml = resolutionHtml + trackRecordHtml + shiftWarning + imputationWarning + warningHtml;
 
             div.innerHTML = `
             Predicted trough at <strong>${predDate.format('DD-MMM-YY HH:mm')}</strong>:

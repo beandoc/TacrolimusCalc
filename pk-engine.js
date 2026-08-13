@@ -67,6 +67,73 @@
         // Proportional residual error (σ = 18% CV)
         SIGMA: 0.18,
 
+        // ── Recency weighting (forgetting-factor MAP) ─────────────────────
+        // Each observation's contribution to the fit decays exponentially
+        // with its age relative to the MOST RECENT level in the fitted set,
+        // not wall-clock "today" — so a forecast run long after the last
+        // draw doesn't retroactively discount every observation equally.
+        // This is the batch equivalent of a sequential/Kalman filter with a
+        // forgetting factor: recomputing fresh each call (rather than
+        // chaining posteriors visit-to-visit) is deliberate, because patient
+        // history here is editable, and a chained filter would need a full
+        // replay on every correction anyway — see mapBayesian.
+        //
+        // ONE global half-life cannot serve two genuinely different regimes,
+        // confirmed on a real held-out-forecast test (troughs 4.5, 12.9,
+        // 11.1, 7.4, 6.2 over ~3 weeks post-transplant; actual next trough
+        // 6.8): a 45-day half-life left the forecast at 11.3 ng/mL (66%
+        // error, barely moved from the unweighted 11.6) — the maturation
+        // happened faster than that decay discounted it. A half-life short
+        // enough to fix that (~5-10d) would make any single new level
+        // dominate the fit for a stable, quarterly-monitored long-term
+        // patient too — a real regression, not a hypothetical one.
+        //
+        // Split into named REGIMES instead. Which one a patient gets is
+        // decided empirically per patient by selectRecencyRegime() — by
+        // backtesting both against that patient's OWN recent troughs —
+        // not by a global rule.
+        //
+        // A fixed post-transplant-day threshold was tried first and is kept
+        // only as the cold-start fallback (< MIN_LEVELS_FOR_REGIME_SELECT
+        // levels, nothing to backtest on yet). It was wrong often enough to
+        // abandon as the primary: on a 92-prediction held-out backtest over
+        // 10 real patients it improved the two genuinely-drifting patients a
+        // lot (arun_chougle 107%->64% MAPE, raj_bahadur 71%->42%) but made
+        // vidyashree materially WORSE (28%->37%) — her troughs oscillate
+        // noisily (1.5, 2.8, 4.4, 6.3, 8.9, 11.4, 8.4 ...) without trending,
+        // all inside the "early" window, so 'adaptive' chased noise as if it
+        // were a new steady state. Post-transplant day says nothing about
+        // whether THIS patient's clearance is actually moving; their own
+        // prediction history does.
+        //
+        // 'adaptive' half-life/floor swept against a real held-out test
+        // (3-week span, actual next trough 6.8 ng/mL):
+        //   10d/0.05 -> 10.4 (53% err)   7d/0.05 -> 9.6 (41% err)
+        //   5d/0.05  ->  8.5 (26% err)   7d/0    -> 9.1 (33% err)
+        //   5d/0     ->  7.8 (15% err)   3d/0    -> 7.1  (5% err)
+        // 3d/0 fits that one case almost exactly, which is itself reason to
+        // be wary — that precision is as likely overfit as correct. 5d/0 was
+        // chosen as a clear improvement without chasing one patient's best
+        // number.
+        RECENCY_REGIMES: {
+            // Clearance may genuinely be moving now: discount hard by age.
+            adaptive: { halfLifeDays: 5, floor: 0 },
+            // Assume stability; covariate tracking (inhibitors, weight)
+            // already handles the known reasons clearance would move. Long
+            // memory so one new level can't override an established fit.
+            stationary: { halfLifeDays: 180, floor: 0.4 }
+        },
+        // Cold-start fallback only — see selectRecencyRegime.
+        MATURATION_WINDOW_DAYS: 90,
+        // Below this many levels there is nothing to backtest a regime on
+        // (each trial needs >=3 prior levels to fit plus a held-out target).
+        MIN_LEVELS_FOR_REGIME_SELECT: 5,
+        // How many of the most recent levels to hold out when scoring a
+        // regime. Three was too jumpy on real backend data: it let a noisy
+        // short window flip drifting patients back to stationary. Five gives
+        // the selector more memory while still staying cheap enough for the UI.
+        REGIME_SELECT_TRIALS: 5,
+
         // Outlier alert threshold, in prior SD units. Deliberately DECOUPLED from
         // the MAP search bounds (ETA_*_BOUNDS): the search stays wide so genuine
         // outliers (severe hepatic impairment, strong CYP3A induction) converge
@@ -499,7 +566,107 @@
     const ETA_BOUNDARY_TOL = 0.02;   // treat as truncated within this of a hard bound
     const clamp = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
 
-    function mapBayesian(popParams, measuredLevels, allDoses, bioassay) {
+    // ============================================================
+    // RECENCY WEIGHTS — forgetting-factor equivalent, batch form.
+    // Age is relative to the MOST RECENT level in the set passed in, not
+    // wall-clock "today": see PK_MODEL.RECENCY_HALFLIFE_DAYS. Exported so
+    // the UI can show a clinician which levels are actually driving the
+    // current fit.
+    // ============================================================
+    // Rescales weights to sum to N (their count), preserving every RATIO
+    // between individual weights while keeping their total magnitude
+    // constant. Without this, downweighting old/disagreeing observations
+    // shrinks the total likelihood term relative to the FIXED prior
+    // penalty (eCL²/ωCL + eV²/ωV), which pulls even a clean, non-drifting
+    // fit toward the population prior just because some of its weight sum
+    // is below N — confirmed by a noise-free round-trip test recovering
+    // ηCL=0.67 instead of the true 0.8 before this was added. Normalizing
+    // keeps a recent point's weight relatively higher than an old point's
+    // (the actual goal) without deflating how much total evidence the
+    // patient's data carries against the prior.
+    function normalizeWeights(weights) {
+        if (!weights || weights.length === 0) return weights;
+        const total = weights.reduce((s, w) => s + w, 0);
+        if (!(total > 0)) return weights;
+        const scale = weights.length / total;
+        return weights.map(w => w * scale);
+    }
+
+    // Cold-start regime guess, used ONLY when there aren't yet enough levels
+    // for selectRecencyRegime to measure which regime actually works for
+    // this patient. Post-transplant day is a weak proxy — it says when
+    // clearance COULD be moving, never whether it is — so this is a
+    // starting assumption to be overridden by evidence, not a rule.
+    function defaultRegimeFor(measuredLevels) {
+        if (!measuredLevels || measuredLevels.length === 0) return 'stationary';
+        const mostRecentTime = Math.max(...measuredLevels.map(o => o.time));
+        return (mostRecentTime / 24) < PK_MODEL.MATURATION_WINDOW_DAYS ? 'adaptive' : 'stationary';
+    }
+
+    function recencyWeights(measuredLevels, regime) {
+        if (!measuredLevels || measuredLevels.length === 0) return [];
+        const name = regime || defaultRegimeFor(measuredLevels);
+        const cfg = PK_MODEL.RECENCY_REGIMES[name] || PK_MODEL.RECENCY_REGIMES.stationary;
+        const mostRecentTime = Math.max(...measuredLevels.map(o => o.time));
+        // The regime is fixed for the whole fit, so weights within a single
+        // fit stay a smooth function of age with no discontinuity.
+        return normalizeWeights(measuredLevels.map(obs => {
+            const ageDays = (mostRecentTime - obs.time) / 24;
+            const decay = Math.exp(-Math.LN2 * ageDays / cfg.halfLifeDays);
+            return cfg.floor + (1 - cfg.floor) * decay;
+        }));
+    }
+
+    // ============================================================
+    // ROBUST (RESIDUAL-BASED) WEIGHTS — Tukey biweight.
+    //
+    // recencyWeights alone (age only) turned out insufficient in practice:
+    // on a real held-out-forecast test (patient with troughs 4.5, 12.9,
+    // 11.1, 7.4, 6.2 over ~3 weeks, next trough actually 6.8), a 45-day
+    // half-life barely moved the fit (11.3 vs 11.6 ng/mL unweighted) — the
+    // drift happened faster than the age decay discounted it. Shortening
+    // the half-life enough to fix that case (~5-7d, floor 0) would make
+    // ANY single new level dominate the fit for every patient, including a
+    // stable one seen quarterly — the exact over-reaction the floor existed
+    // to prevent. A single global age constant cannot serve both.
+    //
+    // A level should be discounted because it DISAGREES with what the rest
+    // of the data implies about current clearance, not because it is
+    // chronologically old — a value from a stable long-term patient's last
+    // quarterly visit is still fully informative; a value from three weeks
+    // ago that no longer matches anything is not, regardless of its age.
+    // Tukey's biweight (Mosteller & Tukey; c=4.685 for ~95% efficiency under
+    // Gaussian residuals) downweights by residual size, smoothly to zero
+    // past the cutoff, and is applied ON TOP of the (now secondary) age
+    // weight so recency still breaks genuine ties.
+    //
+    // Floored at 0.05, not 0 — IRLS re-derives residuals from the CURRENT
+    // fit each pass, so a point at 0 weight can never re-enter regardless
+    // of what later iterations find; a small floor keeps it recoverable.
+    // ============================================================
+    const TUKEY_C = 4.685;
+    function tukeyWeight(residualRatio) {
+        const u = residualRatio / TUKEY_C;
+        if (Math.abs(u) >= 1) return 0.05;
+        return Math.pow(1 - u * u, 2);
+    }
+
+    function combinedWeights(measuredLevels, allDoses, params, bioassay, ageWeights) {
+        return normalizeWeights(measuredLevels.map((obs, i) => {
+            const pred = predictAtTime(obs.time, allDoses, params);
+            const predAdj = bioassay === 2 ? cmiaAdjust(pred) : pred;
+            if (!(predAdj > 0.1)) return ageWeights[i] * 0.05;
+            const r = (obs.level - predAdj) / (predAdj * PK_MODEL.SIGMA);
+            return ageWeights[i] * tukeyWeight(r);
+        }));
+    }
+
+    // `regime` names which RECENCY_REGIMES entry to weight with. It is a
+    // plain argument, never auto-selected here: selectRecencyRegime() calls
+    // this function repeatedly to score each regime, so a fit that chose its
+    // own regime would recurse. Callers that want the empirically-chosen
+    // regime call selectRecencyRegime first and pass the winner through.
+    function mapBayesian(popParams, measuredLevels, allDoses, bioassay, regime) {
         const { OMEGA_CL, OMEGA_V, SIGMA } = PK_MODEL;
 
         if (measuredLevels.length === 0) {
@@ -510,60 +677,86 @@
             };
         }
 
-        // ── MAP objective function ────────────────────────────────────────
-        // OFV = ηCL²/ωCL + ηV²/ωV  +  Σ[(Cobs − Cpred)² / (Cpred·σ)²]
-        const ofv = (eCL, eV) => {
-            // SPREAD popParams — do not enumerate {CL, V, KA}. predictAtTime
-            // rescales each dose by (d.weight / params.weight) for time-varying
-            // body weight, and that gate is silently skipped when `weight` is
-            // absent. Enumerating the three fields dropped it here, so the fit
-            // saw a constant-weight patient while the plotted population curve
-            // saw a varying one: MAP then absorbed the missing correction as
-            // slow clearance (ηCL = −0.151, CL 14% low, on data this very model
-            // generated). Same reason applies at every other rebuild below.
-            const p = {
-                ...popParams,
-                CL: popParams.CL * Math.exp(eCL),
-                V: popParams.V * Math.exp(eV)
+        const regimeUsed = regime || defaultRegimeFor(measuredLevels);
+        const ageWeights = recencyWeights(measuredLevels, regimeUsed);
+
+        // ── One MAP optimization pass at a fixed set of weights ────────────
+        // OFV = ηCL²/ωCL + ηV²/ωV  +  Σ[wᵢ · (Cobs − Cpred)² / (Cpred·σ)²]
+        // Factored out so IRLS (below) can re-run it against updated weights
+        // without duplicating the grid+Nelder-Mead search.
+        const fitAt = (weights) => {
+            const ofv = (eCL, eV) => {
+                // SPREAD popParams — do not enumerate {CL, V, KA}. predictAtTime
+                // rescales each dose by (d.weight / params.weight) for time-varying
+                // body weight, and that gate is silently skipped when `weight` is
+                // absent. Enumerating the three fields dropped it here, so the fit
+                // saw a constant-weight patient while the plotted population curve
+                // saw a varying one: MAP then absorbed the missing correction as
+                // slow clearance (ηCL = −0.151, CL 14% low, on data this very model
+                // generated). Same reason applies at every other rebuild below.
+                const p = {
+                    ...popParams,
+                    CL: popParams.CL * Math.exp(eCL),
+                    V: popParams.V * Math.exp(eV)
+                };
+                const prior = (eCL * eCL) / OMEGA_CL + (eV * eV) / OMEGA_V;
+                const lik = measuredLevels.reduce((s, obs, i) => {
+                    const pred = predictAtTime(obs.time, allDoses, p);
+                    const predAdj = bioassay === 2 ? cmiaAdjust(pred) : pred;
+                    if (predAdj <= 0.1) return s + 1000 * weights[i];
+                    const w = predAdj * SIGMA;   // WLS: predicted-value denominator
+                    return s + weights[i] * Math.pow((obs.level - predAdj) / w, 2);
+                }, 0);
+                return prior + lik;
             };
-            const prior = (eCL * eCL) / OMEGA_CL + (eV * eV) / OMEGA_V;
-            const lik = measuredLevels.reduce((s, obs) => {
-                const pred = predictAtTime(obs.time, allDoses, p);
-                const predAdj = bioassay === 2 ? cmiaAdjust(pred) : pred;
-                if (predAdj <= 0.1) return s + 1000;
-                const w = predAdj * SIGMA;   // WLS: predicted-value denominator
-                return s + Math.pow((obs.level - predAdj) / w, 2);
-            }, 0);
-            return prior + lik;
+
+            // ── Phase 1: Coarse global grid — basin identification ───────────
+            // Step 0.25 across full eta space to locate the basin of attraction.
+            // Kept coarse intentionally; Nelder-Mead refines from here.
+            // Driven by an integer step count: accumulating `e += 0.25` in a float
+            // loop drifts, so the final grid point could fall just past the bound
+            // and be skipped, making the search grid asymmetric.
+            const GRID_STEP = 0.25;
+            const nCL = Math.round((ETA_CL_BOUNDS[1] - ETA_CL_BOUNDS[0]) / GRID_STEP);
+            const nV = Math.round((ETA_V_BOUNDS[1] - ETA_V_BOUNDS[0]) / GRID_STEP);
+            let gridCL = 0, gridV = 0, minOFV = Infinity;
+            for (let i = 0; i <= nCL; i++) {
+                const eCL = ETA_CL_BOUNDS[0] + i * GRID_STEP;
+                for (let j = 0; j <= nV; j++) {
+                    const eV = ETA_V_BOUNDS[0] + j * GRID_STEP;
+                    const v = ofv(eCL, eV);
+                    if (v < minOFV) { minOFV = v; gridCL = eCL; gridV = eV; }
+                }
+            }
+
+            // ── Phase 2: Nelder-Mead simplex refinement ─────────────────────
+            // Starts at the grid winner; converges to sub-1e-8 precision,
+            // eliminating the ~7% CL error from a 0.15-step grid.
+            // nelderMead2D is UNCONSTRAINED, so clamp back into the search box —
+            // otherwise indParams could carry an eta the grid would never allow.
+            const nm = nelderMead2D(ofv, gridCL, gridV);
+            return { bestCL: clamp(nm.x, ETA_CL_BOUNDS), bestV: clamp(nm.y, ETA_V_BOUNDS) };
         };
 
-        // ── Phase 1: Coarse global grid — basin identification ─────────────
-        // Step 0.25 across full eta space to locate the basin of attraction.
-        // Kept coarse intentionally; Nelder-Mead refines from here.
-        // Driven by an integer step count: accumulating `e += 0.25` in a float
-        // loop drifts, so the final grid point could fall just past the bound
-        // and be skipped, making the search grid asymmetric.
-        const GRID_STEP = 0.25;
-        const nCL = Math.round((ETA_CL_BOUNDS[1] - ETA_CL_BOUNDS[0]) / GRID_STEP);
-        const nV = Math.round((ETA_V_BOUNDS[1] - ETA_V_BOUNDS[0]) / GRID_STEP);
-        let bestCL = 0, bestV = 0, minOFV = Infinity;
-        for (let i = 0; i <= nCL; i++) {
-            const eCL = ETA_CL_BOUNDS[0] + i * GRID_STEP;
-            for (let j = 0; j <= nV; j++) {
-                const eV = ETA_V_BOUNDS[0] + j * GRID_STEP;
-                const v = ofv(eCL, eV);
-                if (v < minOFV) { minOFV = v; bestCL = eCL; bestV = eV; }
-            }
+        // ── IRLS: alternate fitting and robust reweighting ──────────────────
+        // 4 passes: converges in practice within 2-3 for a problem this small
+        // (few observations, 2 free parameters); the 4th confirms stability
+        // rather than assuming it. Each pass re-derives Tukey weights from
+        // the residuals of the PREVIOUS pass's fit, so a level's influence
+        // reflects how well it agrees with where the data has converged, not
+        // a single initial (possibly still-compromised) fit.
+        const IRLS_ITERS = 4;
+        let weights = ageWeights;
+        let bestCL = 0, bestV = 0;
+        for (let iter = 0; iter < IRLS_ITERS; iter++) {
+            ({ bestCL, bestV } = fitAt(weights));
+            const p = {
+                ...popParams,
+                CL: popParams.CL * Math.exp(bestCL),
+                V: popParams.V * Math.exp(bestV)
+            };
+            weights = combinedWeights(measuredLevels, allDoses, p, bioassay, ageWeights);
         }
-
-        // ── Phase 2: Nelder-Mead simplex refinement ───────────────────────
-        // Starts at the grid winner; converges to sub-1e-8 precision,
-        // eliminating the ~7% CL error from a 0.15-step grid.
-        // nelderMead2D is UNCONSTRAINED, so clamp back into the search box —
-        // otherwise indParams could carry an eta the grid would never allow.
-        const nm = nelderMead2D(ofv, bestCL, bestV);
-        bestCL = clamp(nm.x, ETA_CL_BOUNDS);
-        bestV = clamp(nm.y, ETA_V_BOUNDS);
 
         // ── Phase 3a: Outlier alert (clinical) ───────────────────────────
         // Fires when the converged fit is beyond OUTLIER_SD prior SDs.
@@ -607,10 +800,142 @@
             etaV: bestV,
             outlierHit,
             boundaryHit,
-            boundaryMsg: boundaryMsg.trim()
+            boundaryMsg: boundaryMsg.trim(),
+            // Carried so every downstream consumer (laplacePosterior's CI,
+            // the UI) reweights with the SAME regime this fit used, rather
+            // than re-deriving and possibly disagreeing with it.
+            regime: regimeUsed
         };
         const metrics = calculateAccuracyMetrics(measuredLevels, allDoses, indParams, bioassay);
         return { ...indParams, ...metrics };
+    }
+
+    // ============================================================
+    // PER-PATIENT REGIME SELECTION
+    //
+    // Picks the recency regime by measuring which one has actually
+    // predicted THIS patient's recent troughs better, instead of assuming
+    // one from post-transplant day.
+    //
+    // Why: a global day-based rule was measurably wrong for some patients.
+    // On a 92-prediction held-out backtest over 10 real patients, forcing
+    // 'adaptive' inside the maturation window helped genuine drifters a lot
+    // (arun_chougle 107%->64% MAPE, raj_bahadur 71%->42%) but hurt
+    // vidyashree (28%->37%), whose troughs oscillate without trending. Post-
+    // transplant day cannot distinguish those two patients; their own
+    // prediction track record can.
+    //
+    // Method — walk-forward validation on the patient's own history: for
+    // each of the last REGIME_SELECT_TRIALS levels, fit on only the levels
+    // BEFORE it under each regime, predict it, and score by mean absolute
+    // percentage error. Strictly out-of-sample: the target level never
+    // enters the fit that predicts it.
+    //
+    // The selector used to make stationary win ties and required adaptive to
+    // clear a 10% margin. That was too conservative on real centre data:
+    // forcing adaptive beat the selector overall, because the selector fell
+    // back to stationary on drifting patients exactly when adaptation mattered.
+    // Now adaptive wins ties/small differences; stationary still wins when it
+    // actually scores lower.
+    // ============================================================
+    const REGIME_SWITCH_MARGIN = 0;
+
+    function selectRecencyRegime(popParams, measuredLevels, allDoses, bioassay) {
+        const sorted = [...(measuredLevels || [])].sort((a, b) => a.time - b.time);
+        const n = sorted.length;
+        const fallback = {
+            regime: defaultRegimeFor(sorted),
+            basis: 'post-transplant day (too few levels to measure)',
+            scores: null, trials: null, nTrials: 0
+        };
+        if (n < PK_MODEL.MIN_LEVELS_FOR_REGIME_SELECT) return fallback;
+
+        // Each trial needs >=3 prior levels to fit against.
+        const firstTarget = Math.max(3, n - PK_MODEL.REGIME_SELECT_TRIALS);
+        const names = Object.keys(PK_MODEL.RECENCY_REGIMES);
+        const scores = {};
+        // Per-trial detail is kept, not just the mean: it IS the patient's
+        // prediction track record ("last 3 forecasts for this patient were
+        // off by 12%, 8%, 21%"), which the UI shows so a clinician can
+        // calibrate trust from observed performance rather than from a
+        // methodology note. Computing it here means one walk-forward pass
+        // serves both regime selection and the displayed record.
+        const trials = {};
+        let nTrials = 0;
+
+        for (const name of names) {
+            const rows = [];
+            for (let i = firstTarget; i < n; i++) {
+                const target = sorted[i];
+                if (!(target.level > 0)) continue;
+                const fit = mapBayesian(popParams, sorted.slice(0, i), allDoses, bioassay, name);
+                const pred = generateCurve([target.time], allDoses, fit, bioassay)[0];
+                if (!(pred > 0) || !isFinite(pred)) continue;
+                rows.push({
+                    time: target.time,
+                    observed: target.level,
+                    predicted: pred,
+                    pctError: (pred - target.level) / target.level * 100,
+                    absPctError: Math.abs(pred - target.level) / target.level * 100
+                });
+            }
+            trials[name] = rows;
+            scores[name] = rows.length
+                ? rows.reduce((s, r) => s + r.absPctError, 0) / rows.length / 100
+                : null;
+            nTrials = Math.max(nTrials, rows.length);
+        }
+
+        const stationary = scores.stationary;
+        const adaptive = scores.adaptive;
+        if (stationary == null || adaptive == null) return fallback;
+
+        const adaptiveWins = adaptive <= stationary * (1 - REGIME_SWITCH_MARGIN);
+        return {
+            regime: adaptiveWins ? 'adaptive' : 'stationary',
+            basis: 'walk-forward validation on this patient',
+            scores, trials, nTrials
+        };
+    }
+
+    // ============================================================
+    // CAN THIS FORECAST SETTLE THE CLINICAL QUESTION?
+    //
+    // A trough number is only actionable if it can distinguish "in the
+    // target band" from "outside it". This app's own bands are narrow —
+    // 10-11, 7-9, 5-7, 4-6 ng/mL (getTherapeuticRange), i.e. 1-2 ng/mL
+    // wide — while a 92-prediction held-out backtest over 10 real patients
+    // put typical forecast error at ~26% MAPE. At a predicted 8 ng/mL that
+    // is +/-2 ng/mL: wider than the entire 7-9 band. So for many patients
+    // the honest answer is "this forecast cannot tell you whether they will
+    // be in range — measure".
+    //
+    // Deliberately driven by the patient's OWN demonstrated error
+    // (selectRecencyRegime's walk-forward record) when available, falling
+    // back to the population backtest figure otherwise. Both are measured,
+    // neither is asserted.
+    //
+    // This intentionally does NOT emit a "recheck in N days" interval:
+    // monitoring frequency is center protocol and varies, and inventing
+    // day numbers inside a clinical tool would dress a guess as guidance.
+    // It answers only what the model can support — whether the number is
+    // strong enough to act on, or whether a level is needed first.
+    // ============================================================
+    const POPULATION_BACKTEST_MAPE = 26;   // %, 92 held-out predictions / 10 patients
+
+    function forecastResolution(predicted, range, expectedPctError) {
+        if (!(predicted > 0) || !range || !(range.low > 0) || !(range.high > 0)) return null;
+        const err = (typeof expectedPctError === 'number' && isFinite(expectedPctError) && expectedPctError > 0)
+            ? expectedPctError
+            : POPULATION_BACKTEST_MAPE;
+        const lo = predicted * (1 - err / 100);
+        const hi = predicted * (1 + err / 100);
+        let status;
+        if (lo >= range.low && hi <= range.high) status = 'in';
+        else if (lo > range.high) status = 'above';
+        else if (hi < range.low) status = 'below';
+        else status = 'unresolved';
+        return { status, lo, hi, err, resolves: status !== 'unresolved' };
     }
 
     // ============================================================
@@ -728,19 +1053,29 @@
             return bioassay === 2 ? cmiaAdjust(c) : c;
         };
 
-        // Accumulate JᵀJ by central differences on the log scale.
+        // Accumulate JᵀJ by central differences on the log scale, weighted
+        // by the same combined (recency × robust) weights the fit itself
+        // converged on (mapBayesian) — otherwise a discounted level would
+        // still count in full toward narrowing the CI, understating
+        // uncertainty on a patient whose effective sample size is smaller
+        // than raw N. Recomputed from indParams (the converged fit) rather
+        // than threaded through as a return value, since it's a pure
+        // function of (measuredLevels, allDoses, indParams, bioassay) —
+        // the same inputs this function already takes.
+        const weights = combinedWeights(measuredLevels, allDoses, indParams, bioassay,
+            recencyWeights(measuredLevels, indParams && indParams.regime));
         const h = 1e-5;
         let Sxx = 0, Sxy = 0, Syy = 0;
-        for (const obs of measuredLevels) {
+        measuredLevels.forEach((obs, i) => {
             const c0 = predAt(obs.time, 0, 0);
-            if (!(c0 > 0.1)) continue;   // uninformative / degenerate point
+            if (!(c0 > 0.1)) return;   // uninformative / degenerate point
             const gx = (predAt(obs.time, h, 0) - predAt(obs.time, -h, 0)) / (2 * h) / c0;
             const gy = (predAt(obs.time, 0, h) - predAt(obs.time, 0, -h)) / (2 * h) / c0;
-            if (!isFinite(gx) || !isFinite(gy)) continue;
-            Sxx += gx * gx;
-            Sxy += gx * gy;
-            Syy += gy * gy;
-        }
+            if (!isFinite(gx) || !isFinite(gy)) return;
+            Sxx += weights[i] * gx * gx;
+            Sxy += weights[i] * gx * gy;
+            Syy += weights[i] * gy * gy;
+        });
 
         // Σ_post = (Ω⁻¹ + JᵀJ/σ²)⁻¹  — closed-form 2×2 inverse
         const a = 1 / OMEGA_CL + Sxx / sigma2;
@@ -1187,11 +1522,13 @@
         cmiaAdjust, generateCurve, suggestStartingDose,
         // estimation
         nelderMead2D, mapBayesian, calculateAccuracyMetrics,
-        laplacePosterior, monteCarloCI,
+        laplacePosterior, monteCarloCI, recencyWeights, combinedWeights,
+        selectRecencyRegime, defaultRegimeFor,
         // dose series
         fillHistoricalGaps, extrapolateDoses, buildBridgeDoses,
         regimenDoseAt, buildEffectiveDoses, dailyDoseBefore, REGIMEN_WINDOW_HR,
         // analytics / QC
-        rosendaalFraction, findPostDoseSamples, calculateIPV, classifyMetabolizer
+        rosendaalFraction, findPostDoseSamples, calculateIPV, classifyMetabolizer,
+        forecastResolution, POPULATION_BACKTEST_MAPE
     };
 }));
