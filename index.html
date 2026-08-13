@@ -1823,10 +1823,15 @@
                 });
                 if (res.status === 409) {
                     const errData = await res.json().catch(() => ({}));
-                    showAlert(
-                        `Save blocked: ${typeof errData.detail === 'string' ? errData.detail : 'the server holds more records than this browser.'} Your changes are saved locally.`,
-                        'error');
-                    throw new Error('Refused: fewer events than the server holds');
+                    const detailMsg = typeof errData.detail === 'string'
+                        ? errData.detail
+                        : 'The server holds more records than this browser.';
+                    if (confirm(`Save blocked: ${detailMsg}\n\nDo you want to OVERWRITE the server record with your current version?\n\n• Click OK to force save (overwrite server).\n• Click Cancel to keep local copy and reload full history from server.`)) {
+                        return await savePatientData(true);
+                    } else {
+                        await loadPatientData();
+                        throw new Error('Refused: fewer events than the server holds (reloaded from server)');
+                    }
                 }
                 if (!res.ok) {
                     const errData = await res.json().catch(() => ({}));
@@ -1873,7 +1878,10 @@
                 if (res.ok) {
                     const p = await res.json();
                     const eventsRes = await apiFetch(`${API_BASE}/patients/${name}/events`);
-                    const events = eventsRes.ok ? await eventsRes.json() : [];
+                    if (!eventsRes.ok) {
+                        throw new Error(`Failed to load events from server (HTTP ${eventsRes.status})`);
+                    }
+                    const events = await eventsRes.json();
 
                     loadedData = {
                         profile: p,
