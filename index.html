@@ -1333,6 +1333,7 @@
         let clinicalData = [];
         let myChart = null;
         let lastForecastParams = { individual: null, population: null, allDoses: [], patientData: null };
+        let useRecentFitOnly = false;
 
         // ============================================================
         // INITIALIZATION
@@ -1913,6 +1914,7 @@
         }
 
         async function loadPatientData() {
+            useRecentFitOnly = false;
             const nameInput = document.getElementById('patient-name');
             const name = nameInput ? nameInput.value.trim().toLowerCase() : '';
             if (!name) {
@@ -2031,6 +2033,7 @@
 
         function clearAllData(clearName = true) {
             if (!confirm('Clear all data?')) return;
+            useRecentFitOnly = false;
             if (clearName) document.getElementById('patient-name').value = '';
             document.getElementById('weight').value = 60;
             document.getElementById('hematocrit').value = 35;
@@ -3098,6 +3101,18 @@
             return { patientData, historyLog, predictionDate: predDate };
         }
 
+        function getRecentLevels(levels) {
+            const sorted = [...levels].sort((a, b) => a.time - b.time);
+            const count = Math.max(3, Math.ceil(sorted.length / 2));
+            return sorted.slice(-count);
+        }
+
+        function window_toggleRecentFitOnly(flag) {
+            useRecentFitOnly = flag;
+            runAllAnalyses();
+        }
+        window.toggleRecentFitOnly = window_toggleRecentFitOnly;
+
         function runForecast(patientData, historyLog, predictionDate) {
             return new Promise(resolve => setTimeout(() => {
                 try {
@@ -3111,7 +3126,8 @@
                     const allDoses = [...filledHistory, ...extraDoses];
 
                     const popParams = getPopulationParameters(patientData);
-                    const indParams = mapBayesian(popParams, measuredLevels, allDoses, patientData.bioassay);
+                    const levelsToFit = useRecentFitOnly ? getRecentLevels(measuredLevels) : measuredLevels;
+                    const indParams = mapBayesian(popParams, levelsToFit, allDoses, patientData.bioassay);
 
                     lastForecastParams = { individual: indParams, population: popParams, allDoses, patientData };
 
@@ -3518,10 +3534,22 @@
             // the recent-only refit has its own reliability caveats (fewer
             // points, its own RMSE) and is presented that way.
             let volatilityWarning = '';
-            if (popParams && measuredLevels && measuredLevels.length >= 6) {
-                const { ipv } = calculateIPV(measuredLevels, allDoses);
+            if (popParams && measuredLevels && measuredLevels.length >= 5) {
                 const misfitNow = hasError && (r2Bad || indParams.rmse > 2.5);
-                if (ipv !== null && ipv > 40 && misfitNow) {
+                if (useRecentFitOnly) {
+                    volatilityWarning = `
+                    <div style="margin-top:10px;padding:12px;background:#ecfdf5;border:1.5px solid #10b981;border-radius:8px;text-align:left;">
+                        <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:#065f46;margin-bottom:4px;">
+                            💡 ADAPTED TO RECENT TREND (Recent-Only Fit Active)
+                        </div>
+                        <div style="font-size:11.5px;color:#047857;line-height:1.5;margin-bottom:8px;">
+                            The forecast and dose recommendations are currently fit to only the most recent levels to discount historical changes in clearance.
+                        </div>
+                        <button class="btn" style="font-size:11px;padding:4px 8px;background:#10b981;border:none;color:white;border-radius:4px;cursor:pointer;font-weight:600;" onclick="toggleRecentFitOnly(false)">
+                            👈 Switch back to Full History Fit
+                        </button>
+                    </div>`;
+                } else if (misfitNow) {
                     const sortedLevels = [...measuredLevels].sort((a, b) => a.time - b.time);
                     const recentCount = Math.max(3, Math.ceil(sortedLevels.length / 2));
                     const recentLevels = sortedLevels.slice(-recentCount);
@@ -3529,17 +3557,20 @@
                     if (recentFit.rmse !== null) {
                         const predTimeHr = predDate.diff(txDate, 'hour', true);
                         const recentPred = generateCurve([predTimeHr], allDoses, recentFit, bioassay)[0];
-                        const bigDiff = Math.abs(recentPred - predicted) > Math.max(2, 0.25 * predicted);
-                        if (bigDiff) {
-                            volatilityWarning = `
-                            <div style="margin-top:10px;padding:12px;background:var(--col-warning-bg);border:1.5px solid var(--col-warning);border-radius:8px;text-align:left;">
-                                <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:#92400e;">⚠️ ERRATIC C/D RATIO (IPV ${ipv.toFixed(0)}%) — FULL-HISTORY FIT MAY BE STALE</div>
-                                <div style="font-size:11.5px;color:#78350f;margin-top:4px;line-height:1.5;">
-                                    This forecast (<strong>${predicted.toFixed(1)} ng/mL</strong>) is fit to all ${measuredLevels.length} levels equally, however old. C/D ratio is swinging (IPV ${ipv.toFixed(0)}%, "High" per Sapir-Pichhadze 2014) and the fit itself is poor (RMSE ${indParams.rmse.toFixed(2)}) — a single fixed clearance cannot explain data that isn't behaving like one.
-                                    Refit on just the ${recentCount} most recent levels gives <strong>${recentPred.toFixed(1)} ng/mL</strong> instead (RMSE ${recentFit.rmse.toFixed(2)}). Treat this as a secondary, more-current estimate, not a replacement — it rests on fewer points. Consider whether the older levels still reflect this patient (early post-transplant change, adherence, an assay switch) before trusting either number over the next actual trough.
-                                </div>
-                            </div>`;
-                        }
+                        volatilityWarning = `
+                        <div style="margin-top:10px;padding:12px;background:var(--col-warning-bg);border:1.5px solid var(--col-warning);border-radius:8px;text-align:left;">
+                            <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:#92400e;">⚠️ MODEL MISMATCH (RMSE ${indParams.rmse.toFixed(2)}) — CHRONIC CLEARANCE DRIFT</div>
+                            <div style="font-size:11.5px;color:#78350f;margin-top:4px;line-height:1.5;">
+                                A single time-invariant clearance cannot explain all ${measuredLevels.length} levels (RMSE is high at ${indParams.rmse.toFixed(2)}). This is common when clearance changes over the first few weeks post-transplant.
+                                <br><br>
+                                Refitting the model on only the ${recentCount} most recent levels gives a much cleaner fit (RMSE ${recentFit.rmse.toFixed(2)}) and predicts <strong>${recentPred.toFixed(1)} ng/mL</strong> for the next trough.
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <button class="btn" style="font-size: 11px; padding: 6px 10px; background: #d97706; border: none; color: white; border-radius: 4px; cursor: pointer; font-weight: 600;" onclick="toggleRecentFitOnly(true)">
+                                    👉 Use Recent-Only Fit for Forecast
+                                </button>
+                            </div>
+                        </div>`;
                     }
                 }
             }
