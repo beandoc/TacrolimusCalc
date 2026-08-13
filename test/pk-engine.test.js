@@ -446,6 +446,31 @@ section('Time-varying covariates (Weight & Hematocrit)');
         predBaseline > predConstant60, `time-varying pred=${predBaseline.toFixed(2)} vs constant pred=${predConstant60.toFixed(2)}`);
 }
 
+section('Time-varying inhibitor (Azoles / Diltiazem)');
+{
+    // Verify fillHistoricalGaps carries forward inhibitor
+    const historyLog = [
+        { id: 0, recordDate: dayjs('2026-07-11 07:00'), dose: 3, level: null, weight: 60, hematocrit: 35, inhibitor: 'none', time: 0 },
+        { id: 1, recordDate: dayjs('2026-07-11 19:00'), dose: 3, level: null, time: 12 },
+        { id: 2, recordDate: dayjs('2026-07-13 07:00'), dose: 3, level: 8.5, weight: 60, hematocrit: 35, inhibitor: 'moderate', time: 48 },
+        { id: 3, recordDate: dayjs('2026-07-14 07:00'), dose: 3, level: null, time: 72 }
+    ];
+    const filled = E.fillHistoricalGaps(historyLog, dayjs('2026-07-11'));
+    ok('fillHistoricalGaps carries forward initial inhibitor=none', filled.find(d => d.time === 12).inhibitor === 'none');
+    ok('fillHistoricalGaps updates to inhibitor=moderate after time=48', filled.find(d => d.time === 72).inhibitor === 'moderate');
+
+    // Verify predictAtTime with time-varying inhibitor
+    const popBase = E.getPopulationParameters({ weight: 60, genotype: 'unknown', mpa: '1', bilirubin: 1.0, inhibitor: 'none', transplantDate: dayjs('2026-07-11') });
+    const predInhibitor = E.predictAtTime(71, filled, popBase);
+
+    // Constant none inhibitor filled doses
+    const filledConstantNone = filled.map(d => ({ ...d, inhibitor: 'none' }));
+    const predConstantNone = E.predictAtTime(71, filledConstantNone, popBase);
+
+    ok('co-administration of moderate inhibitor reduces clearance, resulting in higher predicted trough concentration',
+        predInhibitor > predConstantNone, `time-varying pred=${predInhibitor.toFixed(2)} vs constant pred=${predConstantNone.toFixed(2)}`);
+}
+
 section('Levels the fit cannot use are excluded, not scored');
 {
     // A level drawn before any logged dose predicts ~0. The OFV already ignores

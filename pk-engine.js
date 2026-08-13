@@ -221,7 +221,8 @@
             // KA is population-fixed (4.53 hr⁻¹). Absorption variability (~30% CV)
             // is not individualised by MAP — negligible for trough-only TDM.
             KA: m.TVKA,
-            weight: parseFloat(weight) || m.WT_REF
+            weight: parseFloat(weight) || m.WT_REF,
+            baselineInhibitor: inhibitor || 'none'
         };
     }
 
@@ -266,12 +267,22 @@
         return allDoses.reduce((sum, d) => {
             if (d.time < t && d.dose > 0) {
                 let doseParams = params;
-                if (d.weight != null && params.weight != null && d.weight !== params.weight) {
-                    const wtRatio = d.weight / params.weight;
+                const wtRatio = (d.weight != null && params.weight != null) ? (d.weight / params.weight) : 1.0;
+                const baseInh = params.baselineInhibitor || 'none';
+                const dInh = (d.inhibitor !== undefined && d.inhibitor !== null && d.inhibitor !== '') ? d.inhibitor : baseInh;
+
+                if (wtRatio !== 1.0 || dInh !== baseInh) {
+                    const wtCLScale = Math.pow(wtRatio, PK_MODEL.WT_CL);
+                    const wtVScale = Math.pow(wtRatio, PK_MODEL.WT_V);
+
+                    const baseInhF = PK_MODEL.INHIBITOR[baseInh] ?? 1.0;
+                    const doseInhF = PK_MODEL.INHIBITOR[dInh] ?? 1.0;
+                    const inhScale = doseInhF / baseInhF;
+
                     doseParams = {
                         ...params,
-                        CL: params.CL * Math.pow(wtRatio, PK_MODEL.WT_CL),
-                        V: params.V * Math.pow(wtRatio, PK_MODEL.WT_V)
+                        CL: params.CL * wtCLScale * inhScale,
+                        V: params.V * wtVScale
                     };
                 }
                 return sum + predictSingleDose(t - d.time, d.dose, doseParams, d.time);
@@ -918,16 +929,17 @@
         // A fully correct treatment needs time-varying ke integrated along the
         // elimination phase, not superposition of fixed-parameter doses.
         function getCovariatesAtTime(t) {
-            let wt = null, hct = null;
+            let wt = null, hct = null, inh = null;
             for (const item of sortedHistory) {
                 if (item.time <= t) {
                     if (item.weight != null) wt = item.weight;
                     if (item.hematocrit != null) hct = item.hematocrit;
+                    if (item.inhibitor != null && item.inhibitor !== '') inh = item.inhibitor;
                 } else {
                     break;
                 }
             }
-            return { weight: wt, hematocrit: hct };
+            return { weight: wt, hematocrit: hct, inhibitor: inh };
         }
 
         // Anchor on dose >= 0, NOT dose > 0. A recorded 0 mg is a deliberate
@@ -943,7 +955,8 @@
             filled.push({
                 ...logged[i],
                 weight: logged[i].weight ?? cov.weight,
-                hematocrit: logged[i].hematocrit ?? cov.hematocrit
+                hematocrit: logged[i].hematocrit ?? cov.hematocrit,
+                inhibitor: logged[i].inhibitor ?? cov.inhibitor
             });
             if (i === logged.length - 1) break;
 
@@ -962,6 +975,7 @@
                     level: null,
                     weight: slotCov.weight,
                     hematocrit: slotCov.hematocrit,
+                    inhibitor: slotCov.inhibitor,
                     time: slotTime
                 });
                 nextTime = nextTime.add(12, 'hour');
@@ -977,6 +991,7 @@
         // later measurement to carry forward from.
         const lastWt = last ? last.weight : null;
         const lastHct = last ? last.hematocrit : null;
+        const lastInh = last ? last.inhibitor : null;
         // Same regimen rule as fillHistoricalGaps, driven off the entered doses
         // only — filledHistory already carries imputed slots by this point.
         const entered = filledHistory.filter(d => !isImputedDose(d));
@@ -992,6 +1007,7 @@
                 level: null,
                 weight: lastWt,
                 hematocrit: lastHct,
+                inhibitor: lastInh,
                 time: nextTime.diff(txDate, 'hour', true)
             });
             nextTime = nextTime.add(12, 'hour');
@@ -1022,6 +1038,7 @@
         const last = logged[logged.length - 1];
         const lastWt = last ? last.weight : null;
         const lastHct = last ? last.hematocrit : null;
+        const lastInh = last ? last.inhibitor : null;
         // Callers pass the forecast's dose array, which mixes entered and
         // imputed slots; only the entered ones may define the regimen.
         const entered = logged.filter(d => !isImputedDose(d));
@@ -1034,6 +1051,7 @@
                 level: null,
                 weight: lastWt,
                 hematocrit: lastHct,
+                inhibitor: lastInh,
                 time: t.diff(txDate, 'hour', true)
             });
         }

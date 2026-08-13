@@ -741,12 +741,13 @@
                             <tr>
                                 <th>Date & Time</th>
                                 <th>Dose (mg)</th>
+                                <th>Vitals/Covariates</th>
                                 <th style="text-align:right">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="doseLogTable">
                             <tr>
-                                <td colspan="3" style="text-align:center;padding:32px;color:var(--col-muted);">No doses
+                                <td colspan="4" style="text-align:center;padding:32px;color:var(--col-muted);">No doses
                                     logged</td>
                             </tr>
                         </tbody>
@@ -1052,6 +1053,15 @@
                             <label style="display:block;font-size:11px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:4px;">Hematocrit (%) <span style="font-weight:400;">· recorded only</span></label>
                             <input type="number" step="0.5" id="newHct" class="input-field" placeholder="Optional">
                         </div>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <label style="display:block;font-size:11px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:4px;">CYP3A4 Inhibitor <span style="color:var(--col-primary);font-weight:700;">· affects forecast</span></label>
+                        <select id="newInhibitor" class="input-field">
+                            <option value="">(Inherit baseline)</option>
+                            <option value="none">None / Regular metabolizer</option>
+                            <option value="moderate">Moderate (e.g. Diltiazem, Erythromycin)</option>
+                            <option value="strong">Strong (e.g. Voriconazole, Itraconazole, Ketoconazole)</option>
+                        </select>
                     </div>
                     <div style="font-size:10.5px;color:var(--col-muted);margin-top:7px;line-height:1.45;">
                         Weight rescales CL/F and V/F allometrically from this date onward.
@@ -1856,7 +1866,8 @@
                     dose: c.dose !== undefined ? c.dose : null,
                     level: c.level !== undefined ? c.level : null,
                     weight: c.weight !== undefined ? c.weight : null,
-                    hematocrit: c.hematocrit !== undefined ? c.hematocrit : null
+                    hematocrit: c.hematocrit !== undefined ? c.hematocrit : null,
+                    inhibitor: c.inhibitor !== undefined ? c.inhibitor : null
                 }));
 
                 // `allowShrink` is set only by an explicit deletion. The events
@@ -1939,7 +1950,8 @@
                             dose: e.dose,
                             level: e.level,
                             weight: e.weight != null ? e.weight : null,
-                            hematocrit: e.hematocrit != null ? e.hematocrit : null
+                            hematocrit: e.hematocrit != null ? e.hematocrit : null,
+                            inhibitor: e.inhibitor || null
                         }))
                     };
                     loadedFrom = 'Database';
@@ -2358,6 +2370,7 @@
                                 level: e.level,
                                 weight: e.weight != null ? e.weight : null,
                                 hematocrit: e.hematocrit != null ? e.hematocrit : null,
+                                inhibitor: e.inhibitor != null ? e.inhibitor : null,
                                 time: rd.diff(txDate, 'hour', true)
                             };
                         });
@@ -2627,6 +2640,7 @@
                 document.getElementById('newLevel').value = r.level ?? '';
                 document.getElementById('newWeight').value = r.weight ?? '';
                 document.getElementById('newHct').value = r.hematocrit ?? '';
+                document.getElementById('newInhibitor').value = r.inhibitor ?? '';
             } else {
                 const last = clinicalData.length > 0 ? dayjs(clinicalData[clinicalData.length - 1].datetime) : dayjs();
                 // Doses go on the 07:00/19:00 slot; levels are C0 samples, drawn
@@ -2641,6 +2655,7 @@
                 document.getElementById('newLevel').value = '';
                 document.getElementById('newWeight').value = '';
                 document.getElementById('newHct').value = '';
+                document.getElementById('newInhibitor').value = '';
             }
             const fp = document.getElementById('newDateTime')._flatpickr;
             if (fp) { fp.destroy(); }
@@ -2665,6 +2680,7 @@
             const hctVal = document.getElementById('newHct').value;
             const weight = (weightVal !== '' && !isNaN(parseFloat(weightVal))) ? parseFloat(weightVal) : null;
             const hematocrit = (hctVal !== '' && !isNaN(parseFloat(hctVal))) ? parseFloat(hctVal) : null;
+            const inhibitor = document.getElementById('newInhibitor').value || null;
             const indexStr = document.getElementById('editIndex').value;
             const type = document.getElementById('recordType').value;
 
@@ -2693,6 +2709,7 @@
                     // getCovariatesAtTime then carries the previous value forward.
                     clinicalData[idx].weight = weight;
                     clinicalData[idx].hematocrit = hematocrit;
+                    clinicalData[idx].inhibitor = inhibitor;
                 }
             } else {
                 const existing = clinicalData.find(r => r.datetime === datetime);
@@ -2703,13 +2720,15 @@
                     // see the note in the edit branch above.
                     existing.weight = weight;
                     existing.hematocrit = hematocrit;
+                    existing.inhibitor = inhibitor;
                 } else {
                     clinicalData.push({
                         datetime,
                         dose: type === 'dose' ? ((dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null) : null,
                         level: type === 'level' ? ((level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null) : null,
                         weight: weight,
-                        hematocrit: hematocrit
+                        hematocrit: hematocrit,
+                        inhibitor: inhibitor
                     });
                 }
             }
@@ -2780,17 +2799,30 @@
         function renderDoseLog() {
             const tbody = document.getElementById('doseLogTable');
             const rows = clinicalData
-                .map((r, i) => r.dose !== null
-                    ? `<tr>
+                .map((r, i) => {
+                    if (r.dose === null) return '';
+                    const vitalsParts = [];
+                    if (r.weight != null) vitalsParts.push(`${r.weight} kg`);
+                    if (r.hematocrit != null) vitalsParts.push(`${r.hematocrit}% Hct`);
+                    if (r.inhibitor != null && r.inhibitor !== '') {
+                        const label = r.inhibitor === 'none' ? 'No inh.' : r.inhibitor === 'moderate' ? 'Mod inh.' : 'Str inh.';
+                        vitalsParts.push(label);
+                    }
+                    const vitalsCell = vitalsParts.length > 0
+                        ? `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;font-weight:600;">${vitalsParts.join(' · ')}</span>`
+                        : `<span style="color:var(--col-muted);font-size:11px;">—</span>`;
+                    return `<tr>
                     <td>${dayjs(r.datetime).format('DD-MMM-YY HH:mm')}</td>
                     <td style="font-family:'DM Mono',monospace;font-weight:500;">${r.dose.toFixed(1)}</td>
+                    <td>${vitalsCell}</td>
                     <td style="text-align:right">
                         <button onclick="showAddRecordModal('dose',${i})" style="background:none;border:none;cursor:pointer;color:var(--col-primary);font-size:12.5px;font-family:'Sora',sans-serif;font-weight:600;margin-right:8px;">Edit</button>
                         <button onclick="deleteRecord(${i},'dose')" style="background:none;border:none;cursor:pointer;color:var(--col-danger);font-size:12.5px;font-family:'Sora',sans-serif;font-weight:600;">Delete</button>
                     </td>
-                </tr>` : '')
+                </tr>`;
+                })
                 .join('');
-            tbody.innerHTML = rows || '<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--col-muted);">No doses logged</td></tr>';
+            tbody.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--col-muted);">No doses logged</td></tr>';
             updateForecastDateAuto();
         }
 
@@ -2816,6 +2848,7 @@
             const epoch = txDate || (allDates.length ? allDates.reduce((a, b) => (b.isBefore(a) ? b : a)) : null);
             const effectiveDoses = epoch ? buildEffectiveDoses(clinicalData.map((r, i) => ({
                 id: i, recordDate: dayjs(r.datetime), dose: r.dose, level: r.level,
+                weight: r.weight, hematocrit: r.hematocrit, inhibitor: r.inhibitor,
                 time: dayjs(r.datetime).diff(epoch, 'hour', true)
             })), epoch) : [];
 
@@ -2829,6 +2862,10 @@
                     const vitalsParts = [];
                     if (r.weight != null) vitalsParts.push(`${r.weight} kg`);
                     if (r.hematocrit != null) vitalsParts.push(`${r.hematocrit}% Hct`);
+                    if (r.inhibitor != null && r.inhibitor !== '') {
+                        const label = r.inhibitor === 'none' ? 'No inh.' : r.inhibitor === 'moderate' ? 'Mod inh.' : 'Str inh.';
+                        vitalsParts.push(label);
+                    }
                     const vitalsCell = vitalsParts.length > 0
                         ? `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;font-weight:600;">${vitalsParts.join(' · ')}</span>`
                         : `<span style="color:var(--col-muted);font-size:11px;">—</span>`;
@@ -3053,6 +3090,7 @@
                     level: r.level,
                     weight: r.weight != null ? r.weight : null,
                     hematocrit: r.hematocrit != null ? r.hematocrit : null,
+                    inhibitor: r.inhibitor != null ? r.inhibitor : null,
                     time: rd.diff(txDate, 'hour', true)
                 };
             });

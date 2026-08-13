@@ -76,6 +76,7 @@ class ClinicalEvent(Base):
     creatinine = Column(Float, nullable=True)
     wbc = Column(Float, nullable=True)
     crp = Column(Float, nullable=True)
+    inhibitor = Column(String, nullable=True)
 
     patient = relationship("Patient", back_populates="events")
 

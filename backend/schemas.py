@@ -11,6 +11,7 @@ class ClinicalEventBase(BaseModel):
     creatinine: Optional[float] = None
     wbc: Optional[float] = None
     crp: Optional[float] = None
+    inhibitor: Optional[str] = None
 
 class ClinicalEventCreate(ClinicalEventBase):
     pass
