@@ -1270,7 +1270,7 @@
         // laplacePosterior, monteCarloCI, fillHistoricalGaps,
         // extrapolateDoses, buildBridgeDoses, regimenDoseAt,
         // buildEffectiveDoses, dailyDoseBefore, rosendaalFraction,
-        // findPostDoseSamples  — all loaded as globals by that script.
+        // findPostDoseSamples, calculateIPV  — all loaded as globals by that script.
         // Unit tests: test/pk-engine.test.js
 
         // ============================================================
@@ -2776,16 +2776,13 @@
             // entered. Reading only entered rows reported "insufficient dose
             // data" for a patient who never missed a dose.
             const doses = buildEffectiveDoses(historyLog, txDate);
-            const cdPairs = levels.map(lev => {
-                const daily = dailyDoseBefore(doses, lev.time);
-                return daily > 0 ? lev.level / daily : null;
-            }).filter(Boolean);
+            // calculateIPV is the pure engine version of this same calculation —
+            // shared with updateSummary's volatility check so the forecast panel
+            // and this tile can never report two different IPV numbers.
+            const { ipv, mean, n: nPairs } = calculateIPV(levels, doses);
 
-            if (cdPairs.length < 2) { div.innerHTML = '<p style="color:var(--col-muted);font-size:13px;">Insufficient dose data for C/D pairs</p>'; return; }
+            if (nPairs < 2) { div.innerHTML = '<p style="color:var(--col-muted);font-size:13px;">Insufficient dose data for C/D pairs</p>'; return; }
 
-            const mean = cdPairs.reduce((s, v) => s + v, 0) / cdPairs.length;
-            const sd = Math.sqrt(cdPairs.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / (cdPairs.length - 1));
-            const ipv = (sd / mean) * 100;  // CV% — more statistically robust than MAD
             const status = mean > 1.5 ? 'Slow Metabolizer' : mean < 0.9 ? 'Fast Metabolizer' : 'Normal Metabolizer';
             const ipvRisk = ipv > 40 ? ['High', 'var(--col-danger)'] : ipv > 25 ? ['Moderate', 'var(--col-warning)'] : ['Low', 'var(--col-success)'];
 
@@ -2803,8 +2800,8 @@
                 </div>
             </div>
             <div style="margin-top:10px;padding:8px;background:#f7f9fc;border-radius:6px;font-size:12px;color:var(--col-muted);">
-                Based on ${cdPairs.length} C/D pairs · denominator is the reconstructed regimen (last entered dose carried forward until revised) · IPV &gt;40% associated with ↑rejection risk (Sapir-Pichhadze 2014)
-                ${cdPairs.length < 5 ? `<span style="display:block;margin-top:5px;padding:5px 8px;background:var(--col-warning-bg);border-left:3px solid var(--col-warning);border-radius:4px;color:#78350f;font-size:11px;">⚠ N=${cdPairs.length} &lt;5 — IPV and C/D ratio are <strong>statistically unstable</strong> at this sample size (95% CI for CV% spans nearly 0–100%). Collect ≥5 trough levels before using IPV to guide clinical decisions.</span>` : ''}</div>`;
+                Based on ${nPairs} C/D pairs · denominator is the reconstructed regimen (last entered dose carried forward until revised) · IPV &gt;40% associated with ↑rejection risk (Sapir-Pichhadze 2014)
+                ${nPairs < 5 ? `<span style="display:block;margin-top:5px;padding:5px 8px;background:var(--col-warning-bg);border-left:3px solid var(--col-warning);border-radius:4px;color:#78350f;font-size:11px;">⚠ N=${nPairs} &lt;5 — IPV and C/D ratio are <strong>statistically unstable</strong> at this sample size (95% CI for CV% spans nearly 0–100%). Collect ≥5 trough levels before using IPV to guide clinical decisions.</span>` : ''}</div>`;
         }
 
         // ============================================================
@@ -2998,7 +2995,7 @@
                         measuredLevels, patientData.bioassay, 500);
                     const mcCiAtPred = ciAtPred[0];  // { p5, p95 }
 
-                    updateSummary(predicted, predictionDate, indParams, measuredLevels, allDoses, mcCiAtPred, patientData.transplantDate);
+                    updateSummary(predicted, predictionDate, indParams, measuredLevels, allDoses, mcCiAtPred, patientData.transplantDate, popParams, patientData.bioassay);
                     updateModelParams(popParams, indParams);
                     updateAccuracyPanel(indParams, measuredLevels.length, measuredLevels, allDoses);
 
@@ -3232,7 +3229,7 @@
             </div>`;
         }
 
-        function updateSummary(predicted, predDate, indParams, measuredLevels, allDoses, mcCiAtPred, txDate) {
+        function updateSummary(predicted, predDate, indParams, measuredLevels, allDoses, mcCiAtPred, txDate, popParams, bioassay) {
             const div = document.getElementById('results-summary');
             const hasError = indParams.rmse !== null;
 
@@ -3327,6 +3324,58 @@
                 }
             }
 
+            // ── Erratic C/D ratio: full-history fit may be stale ─────────────
+            // shiftWarning above catches a MONOTONIC C/D drift (OLS slope). It
+            // does not fire on an OSCILLATING C/D — swinging up and down rather
+            // than trending — because the slope over such data is near zero.
+            // That is exactly the case where a single time-invariant MAP fit
+            // struggles hardest: mapBayesian has no recency weighting, so every
+            // observation counts equally regardless of age, and the fit becomes
+            // a compromise that can end up dominated by whichever readings are
+            // largest, not most recent.
+            //
+            // Real case that motivated this: 8 troughs over ~6 weeks, C/D
+            // swinging 0.56-2.63 (IPV 48%, "High"). Full-history MAP: RMSE 6.89,
+            // forecast 17.0 ng/mL. Refit on just the 4 most recent troughs:
+            // RMSE 2.18 (self-consistent), forecast 9.8 ng/mL — the full-history
+            // number was being pulled up by readings 3-6 weeks stale while the
+            // recent trend was flat-to-declining.
+            //
+            // Gated tightly so it only appears when it is actually informative:
+            // >=6 observations (so a recent/older split leaves >=3 on each
+            // side), IPV already "High" (>40%, same threshold the IPV tile
+            // uses), AND the full-history fit is itself a demonstrated poor fit
+            // (same misfit test updateModelParams uses for "Severe Model
+            // Mismatch"). This is a comparison, never a replacement forecast —
+            // the recent-only refit has its own reliability caveats (fewer
+            // points, its own RMSE) and is presented that way.
+            let volatilityWarning = '';
+            if (popParams && measuredLevels && measuredLevels.length >= 6) {
+                const { ipv } = calculateIPV(measuredLevels, allDoses);
+                const misfitNow = hasError && (r2Bad || indParams.rmse > 2.5);
+                if (ipv !== null && ipv > 40 && misfitNow) {
+                    const sortedLevels = [...measuredLevels].sort((a, b) => a.time - b.time);
+                    const recentCount = Math.max(3, Math.ceil(sortedLevels.length / 2));
+                    const recentLevels = sortedLevels.slice(-recentCount);
+                    const recentFit = mapBayesian(popParams, recentLevels, allDoses, bioassay);
+                    if (recentFit.rmse !== null) {
+                        const predTimeHr = predDate.diff(txDate, 'hour', true);
+                        const recentPred = generateCurve([predTimeHr], allDoses, recentFit, bioassay)[0];
+                        const bigDiff = Math.abs(recentPred - predicted) > Math.max(2, 0.25 * predicted);
+                        if (bigDiff) {
+                            volatilityWarning = `
+                            <div style="margin-top:10px;padding:12px;background:var(--col-warning-bg);border:1.5px solid var(--col-warning);border-radius:8px;text-align:left;">
+                                <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:12px;color:#92400e;">⚠️ ERRATIC C/D RATIO (IPV ${ipv.toFixed(0)}%) — FULL-HISTORY FIT MAY BE STALE</div>
+                                <div style="font-size:11.5px;color:#78350f;margin-top:4px;line-height:1.5;">
+                                    This forecast (<strong>${predicted.toFixed(1)} ng/mL</strong>) is fit to all ${measuredLevels.length} levels equally, however old. C/D ratio is swinging (IPV ${ipv.toFixed(0)}%, "High" per Sapir-Pichhadze 2014) and the fit itself is poor (RMSE ${indParams.rmse.toFixed(2)}) — a single fixed clearance cannot explain data that isn't behaving like one.
+                                    Refit on just the ${recentCount} most recent levels gives <strong>${recentPred.toFixed(1)} ng/mL</strong> instead (RMSE ${recentFit.rmse.toFixed(2)}). Treat this as a secondary, more-current estimate, not a replacement — it rests on fewer points. Consider whether the older levels still reflect this patient (early post-transplant change, adherence, an assay switch) before trusting either number over the next actual trough.
+                                </div>
+                            </div>`;
+                        }
+                    }
+                }
+            }
+
             let warningHtml = '';
 
             // ── Nephrotoxicity Safety Guard ──────────────────────────────────
@@ -3399,7 +3448,7 @@
                 </div>`;
             }
 
-            warningHtml = shiftWarning + imputationWarning + warningHtml;
+            warningHtml = shiftWarning + volatilityWarning + imputationWarning + warningHtml;
 
             div.innerHTML = `
             Predicted trough at <strong>${predDate.format('DD-MMM-YY HH:mm')}</strong>:

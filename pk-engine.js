@@ -1098,6 +1098,34 @@
         }).filter(Boolean);
     }
 
+    // ============================================================
+    // C/D RATIO VARIABILITY (IPV) — coefficient of variation of the
+    // concentration/dose ratio across measured levels, using the
+    // reconstructed (imputed) daily dose. Sapir-Pichhadze 2014: IPV >40% CV
+    // is associated with increased rejection risk; the UI's IPV panel has
+    // used this threshold since it was written.
+    //
+    // Pulled out as a pure function so the forecast panel can reuse the exact
+    // same number the IPV panel shows, rather than a second inline
+    // computation drifting from it. mapBayesian has no recency weighting —
+    // every observation counts equally regardless of age — so a high IPV
+    // (the C/D ratio genuinely swinging, not just trending) is precisely the
+    // condition under which a single time-invariant MAP fit struggles, and
+    // is worth flagging on the forecast itself, not only in the IPV tile.
+    // ============================================================
+    function calculateIPV(measuredLevels, allDoses) {
+        const pairs = (measuredLevels || [])
+            .map(lev => {
+                const daily = dailyDoseBefore(allDoses, lev.time);
+                return daily > 0 ? { time: lev.time, cd: lev.level / daily } : null;
+            })
+            .filter(Boolean);
+        if (pairs.length < 2) return { ipv: null, mean: null, n: pairs.length, pairs };
+        const mean = pairs.reduce((s, p) => s + p.cd, 0) / pairs.length;
+        const sd = Math.sqrt(pairs.reduce((s, p) => s + Math.pow(p.cd - mean, 2), 0) / (pairs.length - 1));
+        const ipv = mean > 0 ? (sd / mean) * 100 : null;
+        return { ipv, mean, n: pairs.length, pairs };
+    }
 
     return {
         // constants
@@ -1115,6 +1143,6 @@
         fillHistoricalGaps, extrapolateDoses, buildBridgeDoses,
         regimenDoseAt, buildEffectiveDoses, dailyDoseBefore, REGIMEN_WINDOW_HR,
         // analytics / QC
-        rosendaalFraction, findPostDoseSamples
+        rosendaalFraction, findPostDoseSamples, calculateIPV
     };
 }));

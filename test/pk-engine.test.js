@@ -527,4 +527,108 @@ section('Time-varying weight survives every params rebuild');
         `p5=${band.p5.toFixed(2)} curve=${curve1.toFixed(3)} p95=${band.p95.toFixed(2)}`);
 }
 
+section('calculateIPV (C/D ratio variability)');
+{
+    // Constant C/D ratio → zero variability, regardless of the absolute level.
+    const flatDoses = [{ id: 0, time: -12, dose: 4 }, { id: 1, time: 0, dose: 4 }];
+    const flatLevels = [{ time: 12, level: 8 }, { time: 24, level: 8 }, { time: 36, level: 8 }];
+    const flat = E.calculateIPV(flatLevels, [...flatDoses, { id: 2, time: 12, dose: 4 }, { id: 3, time: 24, dose: 4 }]);
+    ok('constant C/D ratio gives IPV ~0%', near(flat.ipv, 0, 1e-6), `ipv=${flat.ipv}`);
+
+    // Fewer than 2 usable pairs → null, not NaN or a divide-by-zero.
+    ok('n=0 levels returns null ipv, not NaN', E.calculateIPV([], []).ipv === null);
+    ok('n=1 usable pair returns null ipv (need >=2 for a variance)',
+        E.calculateIPV([{ time: 12, level: 8 }], flatDoses).ipv === null);
+
+    // A level with no dose in the prior 24h contributes no C/D pair — matches
+    // dailyDoseBefore's own `daily > 0` gate, not counted as a "0/0" pair.
+    const withGap = E.calculateIPV(
+        [{ time: -1000, level: 5 }, { time: 12, level: 8 }, { time: 24, level: 8 }],
+        flatDoses.concat([{ id: 2, time: 12, dose: 4 }])
+    );
+    ok('an observation with no preceding dose is excluded, not counted as n', withGap.n === 2, `n=${withGap.n}`);
+
+    // Regression case: arun_chougle (the real patient whose full-history MAP
+    // fit motivated the volatility banner below). C/D ratios reconstructed
+    // from the actual dose log via dailyDoseBefore: 2.63, 1.08, 1.94, 2.30,
+    // 1.11, 1.03, 1.24, 0.56 — independently verified against the app's own
+    // reported C/D column for this patient. Known IPV ≈ 48%, "High" per this
+    // app's >40% threshold (Sapir-Pichhadze 2014).
+    const cdRatios = [2.63, 1.08, 1.94, 2.30, 1.11, 1.03, 1.24, 0.56];
+    const chougleLevels = cdRatios.map((cd, i) => ({ time: i * 100, level: cd * 8 }));
+    const chougleDoses = cdRatios.map((_, i) => ({ id: i, time: i * 100 - 1, dose: 8 }));
+    const chougle = E.calculateIPV(chougleLevels, chougleDoses);
+    ok('arun_chougle case: IPV lands in the "High" band (>40%)', chougle.ipv > 40, `ipv=${chougle.ipv.toFixed(1)}%`);
+    ok('arun_chougle case: IPV matches hand-computed CV% within rounding', near(chougle.ipv, 48.4, 1.0), `ipv=${chougle.ipv.toFixed(1)}%`);
+}
+
+section('Erratic C/D volatility: recent-only fit as a comparison');
+{
+    // Reproduces the arun_chougle case end-to-end through the real doses and
+    // levels (not synthetic C/D ratios): 6 weeks of dosing changes, 8 troughs
+    // oscillating instead of trending, full-history MAP producing a forecast
+    // disconnected from the most recent, most clinically relevant trough.
+    const epoch = dayjs('2026-06-23 00:00');
+    const doseRows = [
+        ['2026-06-23 19:00', 5.0], ['2026-06-24 07:00', 5.0], ['2026-06-24 19:00', 5.0],
+        ['2026-06-26 07:00', 4.5], ['2026-06-26 19:00', 4.5],
+        ['2026-07-06 07:00', 4.0], ['2026-07-06 19:00', 4.0],
+        ['2026-07-10 07:00', 3.5], ['2026-07-10 19:00', 3.5],
+        ['2026-07-14 07:00', 3.5], ['2026-07-14 19:00', 4.0],
+        ['2026-07-20 07:00', 4.5], ['2026-07-20 19:00', 4.0],
+        ['2026-07-27 07:00', 4.0], ['2026-07-27 19:00', 4.0],
+        ['2026-08-04 07:00', 4.5], ['2026-08-04 19:00', 4.5],
+    ];
+    const levelRows = [
+        ['2026-06-25 06:45', 26.3], ['2026-07-01 06:45', 9.7], ['2026-07-05 06:45', 17.5],
+        ['2026-07-09 06:45', 18.4], ['2026-07-13 06:45', 7.8], ['2026-07-19 06:45', 7.7],
+        ['2026-07-26 06:45', 10.5],
+        ['2026-08-03 06:45', 4.5, 66, 40.1], // weight/Hct override entered on this lab row
+    ];
+    const rows = [
+        ...doseRows.map(([dt, dose]) => ({ datetime: dt, dose, level: null, weight: null, hematocrit: null })),
+        ...levelRows.map(([dt, level, weight, hct]) => ({ datetime: dt, dose: null, level, weight: weight ?? null, hematocrit: hct ?? null })),
+    ].sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
+    const historyLog = rows.map((r, i) => {
+        const rd = dayjs(r.datetime);
+        return { id: i, recordDate: rd, dose: r.dose, level: r.level, weight: r.weight, hematocrit: r.hematocrit, time: rd.diff(epoch, 'hour', true) };
+    });
+
+    const patientData = { weight: 68, genotype: '33', mpa: '1', bioassay: 1, bilirubin: 1.0, inhibitor: 'none' };
+    const popParams = E.getPopulationParameters(patientData);
+    const measuredLevels = historyLog.filter(e => e.level !== null);
+    const filledHistory = E.fillHistoricalGaps(historyLog, epoch);
+    const predDate = dayjs('2026-08-13 06:45');
+    const allDoses = [...filledHistory, ...E.extrapolateDoses(filledHistory, predDate.add(14, 'day'), epoch)];
+
+    const indParams = E.mapBayesian(popParams, measuredLevels, allDoses, 1);
+    ok('full-history fit reproduces the reported panel numbers',
+        near(indParams.CL, 16.77, 0.02) && near(indParams.V, 335, 1) && near(indParams.rmse, 6.89, 0.02),
+        `CL=${indParams.CL.toFixed(2)} V=${indParams.V.toFixed(0)} RMSE=${indParams.rmse.toFixed(2)}`);
+
+    const predTime = predDate.diff(epoch, 'hour', true);
+    const fullPred = E.generateCurve([predTime], allDoses, indParams, 1)[0];
+    ok('full-history forecast reproduces the reported 17.0 ng/mL', near(fullPred, 17.03, 0.02), fullPred.toFixed(2));
+
+    const { ipv } = E.calculateIPV(measuredLevels, allDoses);
+    ok('IPV on the real data is "High" (>40%), matching the app-reported 48.4%', ipv > 40, `ipv=${ipv.toFixed(1)}%`);
+
+    const misfitNow = (typeof indParams.r2 === 'number' && indParams.r2 < 0.5) || indParams.rmse > 2.5;
+    ok('full-history fit meets the "Severe Model Mismatch" misfit test', misfitNow);
+
+    const sortedLevels = [...measuredLevels].sort((a, b) => a.time - b.time);
+    const recentCount = Math.max(3, Math.ceil(sortedLevels.length / 2));
+    const recentLevels = sortedLevels.slice(-recentCount);
+    ok('recent-half split takes the 4 most recent troughs', recentCount === 4);
+    const recentFit = E.mapBayesian(popParams, recentLevels, allDoses, 1);
+    const recentPred = E.generateCurve([predTime], allDoses, recentFit, 1)[0];
+    ok('recent-only fit is markedly better than the full-history fit',
+        recentFit.rmse < indParams.rmse, `recent RMSE=${recentFit.rmse.toFixed(2)} vs full RMSE=${indParams.rmse.toFixed(2)}`);
+    ok('recent-only forecast is far closer to the last observed trough (4.5) than the full-history one',
+        Math.abs(recentPred - 4.5) < Math.abs(fullPred - 4.5),
+        `recent=${recentPred.toFixed(2)} full=${fullPred.toFixed(2)} last observed=4.5`);
+    ok('the volatility banner\'s trigger condition (IPV>40 AND misfit AND big gap) fires for this exact case',
+        ipv > 40 && misfitNow && Math.abs(recentPred - fullPred) > Math.max(2, 0.25 * fullPred));
+}
+
 done('pk-engine');
