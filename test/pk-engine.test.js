@@ -562,6 +562,61 @@ section('calculateIPV (C/D ratio variability)');
     ok('arun_chougle case: IPV matches hand-computed CV% within rounding', near(chougle.ipv, 48.4, 1.0), `ipv=${chougle.ipv.toFixed(1)}%`);
 }
 
+section('classifyMetabolizer (Thölking 2014 C/D thresholds)');
+{
+    // Published cutoffs: fast <1.05, intermediate 1.05-2.0, slow >2.0.
+    ok('C/D 0.96 is FAST, not "Normal"', E.classifyMetabolizer(0.96) === 'Fast Metabolizer');
+    ok('C/D 1.04 is still fast (just under the cutoff)', E.classifyMetabolizer(1.04) === 'Fast Metabolizer');
+    ok('C/D 1.05 is intermediate (boundary is inclusive above)', E.classifyMetabolizer(1.05) === 'Intermediate Metabolizer');
+    ok('C/D 2.0 is intermediate (upper boundary inclusive)', E.classifyMetabolizer(2.0) === 'Intermediate Metabolizer');
+    ok('C/D 2.01 is slow', E.classifyMetabolizer(2.01) === 'Slow Metabolizer');
+    // Never label off a value that cannot be a ratio.
+    ok('null C/D returns null, not a label', E.classifyMetabolizer(null) === null);
+    ok('zero C/D returns null, not "Fast"', E.classifyMetabolizer(0) === null);
+    ok('NaN C/D returns null', E.classifyMetabolizer(NaN) === null);
+
+    // Regression case: CASE-B (de-identified). 15 troughs, C/D reconstructed from the real
+    // dose-change log (each logged date carried forward until revised) and
+    // verified against the app's own C/D column to 2dp. Clinical ground truth:
+    // could not hold a therapeutic level even at 9 mg/day and was switched off
+    // tacrolimus — a fast metabolizer by outcome.
+    //
+    // The arithmetic mean is 0.96 and the median 0.97, both below 1.05, so the
+    // OLD 0.9 threshold reported "Normal Metabolizer" for this patient. That is
+    // the bug this section locks down.
+    const caseBCd = [1.02, 0.21, 0.40, 0.55, 0.79, 0.98, 1.27, 1.05, 0.89, 0.97, 0.69, 1.57, 1.09, 0.62, 2.37];
+    const caseBLevels = caseBCd.map((cd, i) => ({ time: i * 100, level: cd * 8 }));
+    const caseBDoses = caseBCd.map((_, i) => ({ id: i, time: i * 100 - 1, dose: 8 }));
+    const caseB = E.calculateIPV(caseBLevels, caseBDoses);
+    ok('CASE-B: median C/D is reported alongside the mean',
+        typeof caseB.median === 'number', `median=${caseB.median}`);
+    ok('CASE-B: median C/D 0.97 classifies as Fast Metabolizer',
+        E.classifyMetabolizer(caseB.median) === 'Fast Metabolizer',
+        `median=${caseB.median.toFixed(2)} -> ${E.classifyMetabolizer(caseB.median)}`);
+    ok('CASE-B: the OLD 0.9 cutoff would have mislabelled this patient as Normal',
+        caseB.mean > 0.9 && caseB.median > 0.9,
+        `mean=${caseB.mean.toFixed(2)} median=${caseB.median.toFixed(2)}`);
+    ok('CASE-B: IPV is "High" (>40%)', caseB.ipv > 40, `ipv=${caseB.ipv.toFixed(1)}%`);
+
+    // The median must resist outliers that would drag an arithmetic mean over a
+    // threshold — the whole reason the label switched statistic.
+    const skew = E.calculateIPV(
+        [0.8, 0.8, 0.8, 0.8, 9.0].map((cd, i) => ({ time: i * 100, level: cd * 8 })),
+        [0.8, 0.8, 0.8, 0.8, 9.0].map((_, i) => ({ id: i, time: i * 100 - 1, dose: 8 }))
+    );
+    ok('one extreme outlier drags the mean over 1.05 but not the median',
+        skew.mean > 1.05 && skew.median === 0.8, `mean=${skew.mean.toFixed(2)} median=${skew.median}`);
+    ok('median-based label stays Fast despite the outlier',
+        E.classifyMetabolizer(skew.median) === 'Fast Metabolizer');
+
+    // Even n: median must average the two middle values.
+    const evenN = E.calculateIPV(
+        [1.0, 2.0, 3.0, 4.0].map((cd, i) => ({ time: i * 100, level: cd * 8 })),
+        [1.0, 2.0, 3.0, 4.0].map((_, i) => ({ id: i, time: i * 100 - 1, dose: 8 }))
+    );
+    ok('even n averages the two middle C/D values', near(evenN.median, 2.5, 1e-9), `median=${evenN.median}`);
+}
+
 section('Erratic C/D volatility: recent-only fit as a comparison');
 {
     // Reproduces the arun_chougle case end-to-end through the real doses and

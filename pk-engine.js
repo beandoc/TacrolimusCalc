@@ -1120,11 +1120,42 @@
                 return daily > 0 ? { time: lev.time, cd: lev.level / daily } : null;
             })
             .filter(Boolean);
-        if (pairs.length < 2) return { ipv: null, mean: null, n: pairs.length, pairs };
+        if (pairs.length < 2) return { ipv: null, mean: null, median: null, n: pairs.length, pairs };
         const mean = pairs.reduce((s, p) => s + p.cd, 0) / pairs.length;
         const sd = Math.sqrt(pairs.reduce((s, p) => s + Math.pow(p.cd - mean, 2), 0) / (pairs.length - 1));
         const ipv = mean > 0 ? (sd / mean) * 100 : null;
-        return { ipv, mean, n: pairs.length, pairs };
+        // ── Two different central-tendency measures, deliberately ────────────
+        // `mean` is arithmetic because IPV is defined as SD/mean × 100 — CV%
+        // has no meaning on any other centre, so the CV keeps it.
+        //
+        // `median` exists for the metabolizer LABEL, which is a different job.
+        // C/D is ratio data and its distribution is right-skewed; on a patient
+        // whose C/D spanned 0.21–2.37 (11-fold) the arithmetic mean was dragged
+        // to 0.96 by two high outliers, landing just above the fast-metabolizer
+        // cutoff and printing "Normal Metabolizer" for a patient who could not
+        // hold a therapeutic level on 9 mg/day and was switched off tacrolimus.
+        // The median is unmoved by those two points and classifies correctly.
+        const sortedCd = pairs.map(p => p.cd).sort((a, b) => a - b);
+        const mid = Math.floor(sortedCd.length / 2);
+        const median = sortedCd.length % 2 === 0
+            ? (sortedCd[mid - 1] + sortedCd[mid]) / 2
+            : sortedCd[mid];
+        return { ipv, mean, median, n: pairs.length, pairs };
+    }
+
+    // ── Metabolizer classification from the C/D ratio ────────────────────────
+    // Thresholds are Thölking 2014 (PLoS One 9:e111128), as replicated in
+    // Thölking 2016 and Schütte-Nütgen 2019: fast <1.05, intermediate 1.05–2.0,
+    // slow >2.0 ng/mL per mg/24h. This app previously used 0.9 / 1.5, which are
+    // not the published values and shifted the fast/intermediate boundary far
+    // enough that a genuine fast metabolizer at C/D 0.96 was reported "Normal".
+    //
+    // Takes the median C/D (see calculateIPV), not the arithmetic mean.
+    function classifyMetabolizer(cdRatio) {
+        if (typeof cdRatio !== 'number' || !isFinite(cdRatio) || cdRatio <= 0) return null;
+        if (cdRatio < 1.05) return 'Fast Metabolizer';
+        if (cdRatio <= 2.0) return 'Intermediate Metabolizer';
+        return 'Slow Metabolizer';
     }
 
     return {
@@ -1143,6 +1174,6 @@
         fillHistoricalGaps, extrapolateDoses, buildBridgeDoses,
         regimenDoseAt, buildEffectiveDoses, dailyDoseBefore, REGIMEN_WINDOW_HR,
         // analytics / QC
-        rosendaalFraction, findPostDoseSamples, calculateIPV
+        rosendaalFraction, findPostDoseSamples, calculateIPV, classifyMetabolizer
     };
 }));

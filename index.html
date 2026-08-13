@@ -667,6 +667,26 @@
                     reduce hepatic CL/F (Moderate ×0.65, Strong ×0.25). Bilirubin uses a continuous power-law: CL ∝
                     (1/Bil)^0.30 — no step discontinuity. HCT is handled by the standalone HCT Correction Tool; it is
                     not a structural CL covariate in this whole-blood model.</p>
+
+                <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--col-border);">
+                    <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;">
+                        <input id="tac-discontinued" type="checkbox" style="margin-top:2px;width:15px;height:15px;flex:none;cursor:pointer;"
+                            onchange="onDiscontinuedToggle()">
+                        <span>
+                            <span style="font-size:12.5px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-text);">Tacrolimus discontinued — switched to another agent</span>
+                            <span style="display:block;font-size:11px;color:var(--col-muted);margin-top:2px;line-height:1.5;">
+                                Keeps the full level history for review but removes this patient from the Center Calibration cohort.
+                                Patients are switched off tacrolimus <em>because</em> their PK was unmanageable — usually clearance too
+                                high to hold a trough — so leaving them in would calibrate the centre-wide prior on the subset selected
+                                for abnormal clearance.
+                            </span>
+                        </span>
+                    </label>
+                    <div id="discontinued-reason-wrap" style="display:none;margin-top:9px;padding-left:24px;">
+                        <input id="discontinued-reason" type="text" class="input-field" maxlength="120"
+                            placeholder="Reason / new agent (e.g. switched to cyclosporine — unattainable trough at 9 mg/day)">
+                    </div>
+                </div>
             </div>
 
             <div
@@ -790,6 +810,24 @@
 
         <!-- ===== RESULTS SECTION ===== -->
         <div id="output-section" style="display:none;">
+
+            <!-- Shown whenever the patient is flagged off tacrolimus. The whole
+                 output below forecasts a drug they are no longer taking, so the
+                 numbers are historical review only, never a dosing basis. -->
+            <div id="discontinued-banner" class="card"
+                style="display:none;padding:14px;margin-bottom:20px;">
+                <div
+                    style="padding:13px;background:#f1f5f9;border:1.5px solid #94a3b8;border-radius:8px;">
+                    <div
+                        style="font-family:'Sora',sans-serif;font-weight:700;font-size:13px;color:#334155;margin-bottom:4px;">
+                        ⏹ TACROLIMUS DISCONTINUED — FORECAST IS HISTORICAL REVIEW ONLY</div>
+                    <div style="font-size:11.5px;color:#475569;line-height:1.55;">
+                        This patient is flagged as switched to another agent. Everything below extrapolates a
+                        tacrolimus regimen they are no longer on — use it to review what happened, not to choose a
+                        dose. This patient is also excluded from the Center Calibration cohort.
+                    </div>
+                </div>
+            </div>
 
             <!-- Model Intelligence Panel -->
             <div class="card" style="padding:24px;margin-bottom:20px;" id="intelligence-card">
@@ -1163,6 +1201,11 @@
                 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;"
                     id="calib-summary-grid"></div>
 
+                <!-- Patients dropped from the cohort as discontinued -->
+                <div id="calib-discontinued-note"
+                    style="display:none;margin-bottom:20px;padding:10px 12px;background:#f8fafc;border-left:3px solid #94a3b8;border-radius:4px;font-size:11.5px;color:#475569;line-height:1.55;">
+                </div>
+
                 <!-- Population vs Individual accuracy -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
                     <div
@@ -1270,7 +1313,8 @@
         // laplacePosterior, monteCarloCI, fillHistoricalGaps,
         // extrapolateDoses, buildBridgeDoses, regimenDoseAt,
         // buildEffectiveDoses, dailyDoseBefore, rosendaalFraction,
-        // findPostDoseSamples, calculateIPV  — all loaded as globals by that script.
+        // findPostDoseSamples, calculateIPV, classifyMetabolizer  — all loaded
+        // as globals by that script.
         // Unit tests: test/pk-engine.test.js
 
         // ============================================================
@@ -1767,7 +1811,11 @@
                 transplant_type: document.getElementById('transplant-type').value || 'Live Related',
                 albumin: numField('albumin', 3.5),
                 bilirubin: numField('bilirubin', 1.0),
-                inhibitor: document.getElementById('inhibitor').value || 'none'
+                inhibitor: document.getElementById('inhibitor').value || 'none',
+                tac_discontinued: document.getElementById('tac-discontinued').checked ? 1 : 0,
+                discontinued_reason: document.getElementById('tac-discontinued').checked
+                    ? (document.getElementById('discontinued-reason').value.trim() || null)
+                    : null
             };
 
             // 1. Always save locally first (ensures offline persistence)
@@ -1949,6 +1997,13 @@
             if (p.albumin !== undefined) document.getElementById('albumin').value = p.albumin;
             if (p.bilirubin !== undefined) document.getElementById('bilirubin').value = p.bilirubin;
             if (p.inhibitor !== undefined) document.getElementById('inhibitor').value = p.inhibitor;
+            // Always assigned, never guarded on !== undefined: a record saved
+            // before this field existed has no key, and leaving the previous
+            // patient's checkbox state standing would silently mark the newly
+            // loaded patient as discontinued. NULL/missing means active.
+            document.getElementById('tac-discontinued').checked = Number(p.tac_discontinued) === 1;
+            document.getElementById('discontinued-reason').value = p.discontinued_reason || '';
+            onDiscontinuedToggle();
 
             clinicalData = loadedData.events || [];
             clinicalData.sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
@@ -1974,10 +2029,23 @@
             document.getElementById('albumin').value = 3.5;
             document.getElementById('bilirubin').value = 1.0;
             document.getElementById('inhibitor').value = 'none';
+            document.getElementById('tac-discontinued').checked = false;
+            document.getElementById('discontinued-reason').value = '';
+            onDiscontinuedToggle();
             clinicalData = [];
             forecastDatePinned = false;
             renderDoseLog(); renderLevelLog(); hideOutput();
             showAlert('Cleared', 'success');
+        }
+
+        // Reveals the free-text reason only when the flag is set, and keeps the
+        // banner in sync. Called on load/clear too, not just on user input, so
+        // the disclosure state can never disagree with the checkbox.
+        function onDiscontinuedToggle() {
+            const on = document.getElementById('tac-discontinued').checked;
+            document.getElementById('discontinued-reason-wrap').style.display = on ? 'block' : 'none';
+            const banner = document.getElementById('discontinued-banner');
+            if (banner) banner.style.display = on ? 'block' : 'none';
         }
 
         function hideOutput() { document.getElementById('output-section').style.display = 'none'; }
@@ -2234,6 +2302,7 @@
                 }
 
                 const patientResults = [];
+                const excludedDiscontinued = [];
 
                 for (const p of patientList) {
                     try {
@@ -2244,6 +2313,25 @@
                         if (!patRes.ok || !eventsRes.ok) continue;
                         const patData = await patRes.json();
                         const events = await eventsRes.json();
+
+                        // ── Discontinued patients never inform the centre prior ──
+                        // Patients are switched off tacrolimus *because* their PK
+                        // was unmanageable — nearly always clearance too high to
+                        // hold a trough. Fitting the centre-wide CL scalar on a
+                        // cohort that keeps them is selection bias: it calibrates
+                        // on the patients selected for abnormal clearance and
+                        // ratchets every future patient's starting dose upward.
+                        // The failures accumulate in the database while the
+                        // successes are never revisited, so left unchecked this
+                        // drifts in one direction forever.
+                        // NULL (pre-existing rows) means not discontinued.
+                        if (Number(patData.tac_discontinued) === 1) {
+                            excludedDiscontinued.push({
+                                mrn: p.mrn,
+                                reason: patData.discontinued_reason || null
+                            });
+                            continue;
+                        }
 
                         const txDate = dayjs(patData.transplant_date);
                         if (!txDate.isValid()) continue;
@@ -2324,11 +2412,14 @@
                 }
 
                 if (patientResults.length < 2) {
-                    throw new Error(`Only ${patientResults.length} patient(s) had ≥3 measured levels. Need at least 2 patients to generate a meaningful report.`);
+                    const disc = excludedDiscontinued.length
+                        ? ` ${excludedDiscontinued.length} patient(s) were excluded as discontinued from tacrolimus and cannot be counted toward the cohort.`
+                        : '';
+                    throw new Error(`Only ${patientResults.length} patient(s) had ≥3 measured levels. Need at least 2 patients to generate a meaningful report.${disc}`);
                 }
 
                 _calibrationData = patientResults;
-                renderCalibrationResults(patientResults);
+                renderCalibrationResults(patientResults, excludedDiscontinued);
 
             } catch (err) {
                 document.getElementById('calib-loading').style.display = 'none';
@@ -2337,9 +2428,10 @@
             }
         }
 
-        function renderCalibrationResults(results) {
+        function renderCalibrationResults(results, excludedDiscontinued) {
             document.getElementById('calib-loading').style.display = 'none';
             document.getElementById('calib-results').style.display = 'block';
+            excludedDiscontinued = excludedDiscontinued || [];
 
             const nPts = results.reduce((s, r) => s + r.nObs, 0);
             const cohortPopMPE = results.reduce((s, r) => s + r.popMPE, 0) / results.length;
@@ -2388,6 +2480,25 @@
                     <div style="font-size:11px;color:var(--col-muted);margin-bottom:4px;">${label}</div>
                     <div style="font-size:18px;font-weight:700;font-family:'Sora',sans-serif;">${val}</div>
                 </div>`).join('');
+
+            // Discontinued-patient exclusion note. Shown even at zero so the
+            // cohort definition is never ambiguous — a clinician comparing two
+            // runs of this report needs to know whether the denominator moved
+            // because data changed or because someone was flagged.
+            const discNote = document.getElementById('calib-discontinued-note');
+            if (discNote) {
+                if (excludedDiscontinued.length === 0) {
+                    discNote.style.display = 'none';
+                } else {
+                    discNote.style.display = 'block';
+                    const names = excludedDiscontinued
+                        .map(d => escapeHtml(d.mrn) + (d.reason ? ` (${escapeHtml(d.reason)})` : ''))
+                        .join(', ');
+                    discNote.innerHTML = `<strong>${excludedDiscontinued.length} patient(s) excluded — discontinued from tacrolimus:</strong> ${names}.
+                    Patients are switched off tacrolimus because their PK was unmanageable, usually clearance too high to hold a trough.
+                    Including them would calibrate the centre-wide prior on the subset selected for abnormal clearance and push every future patient's starting dose upward.`;
+                }
+            }
 
             // Pop stats
             document.getElementById('calib-pop-stats').innerHTML = statRows([
@@ -2779,11 +2890,17 @@
             // calculateIPV is the pure engine version of this same calculation —
             // shared with updateSummary's volatility check so the forecast panel
             // and this tile can never report two different IPV numbers.
-            const { ipv, mean, n: nPairs } = calculateIPV(levels, doses);
+            const { ipv, mean, median, n: nPairs } = calculateIPV(levels, doses);
 
             if (nPairs < 2) { div.innerHTML = '<p style="color:var(--col-muted);font-size:13px;">Insufficient dose data for C/D pairs</p>'; return; }
 
-            const status = mean > 1.5 ? 'Slow Metabolizer' : mean < 0.9 ? 'Fast Metabolizer' : 'Normal Metabolizer';
+            // Classify on the median, and display the median — showing one
+            // statistic while labelling from another is how a "Normal
+            // Metabolizer" caption ends up under a fast metabolizer's number.
+            const status = classifyMetabolizer(median);
+            // Skew is the reason the two differ; surface it rather than hide it,
+            // because a large gap is itself the "this patient is erratic" signal.
+            const skewed = mean !== null && median > 0 && Math.abs(mean - median) / median > 0.15;
             const ipvRisk = ipv > 40 ? ['High', 'var(--col-danger)'] : ipv > 25 ? ['Moderate', 'var(--col-warning)'] : ['Low', 'var(--col-success)'];
 
             div.innerHTML = `
@@ -2794,13 +2911,17 @@
                     <div style="font-size:11px;color:${ipvRisk[1]};font-family:'Sora',sans-serif;font-weight:600;">${ipvRisk[0]} variability</div>
                 </div>
                 <div style="text-align:center">
-                    <div style="font-size:11px;color:var(--col-muted);font-family:'Sora',sans-serif;font-weight:600;margin-bottom:4px;">Mean C/D Ratio</div>
-                    <div style="font-family:'DM Mono',monospace;font-size:28px;font-weight:500;color:var(--col-primary);">${mean.toFixed(2)}</div>
-                    <div style="font-size:11px;color:var(--col-primary);font-family:'Sora',sans-serif;font-weight:600;">${status}</div>
+                    <div style="font-size:11px;color:var(--col-muted);font-family:'Sora',sans-serif;font-weight:600;margin-bottom:4px;">Median C/D Ratio</div>
+                    <div style="font-family:'DM Mono',monospace;font-size:28px;font-weight:500;color:var(--col-primary);">${median.toFixed(2)}</div>
+                    <div style="font-size:11px;color:var(--col-primary);font-family:'Sora',sans-serif;font-weight:600;">${status || '—'}</div>
                 </div>
             </div>
+            ${skewed ? `<div style="margin-top:10px;padding:8px;background:var(--col-warning-bg);border-left:3px solid var(--col-warning);border-radius:4px;font-size:11.5px;color:#78350f;">
+                ⚠ C/D distribution is skewed — median <strong>${median.toFixed(2)}</strong> vs arithmetic mean <strong>${mean.toFixed(2)}</strong>.
+                The metabolizer status above is classified on the median, which outlying levels cannot drag across a threshold. A gap this size means individual C/D values are spread widely; read the status as provisional and check the level history for a trend or a step change.
+            </div>` : ''}
             <div style="margin-top:10px;padding:8px;background:#f7f9fc;border-radius:6px;font-size:12px;color:var(--col-muted);">
-                Based on ${nPairs} C/D pairs · denominator is the reconstructed regimen (last entered dose carried forward until revised) · IPV &gt;40% associated with ↑rejection risk (Sapir-Pichhadze 2014)
+                Based on ${nPairs} C/D pairs · median C/D classified per Thölking 2014 (fast &lt;1.05, intermediate 1.05–2.0, slow &gt;2.0) · denominator is the reconstructed regimen (last entered dose carried forward until revised) · IPV &gt;40% associated with ↑rejection risk (Sapir-Pichhadze 2014)
                 ${nPairs < 5 ? `<span style="display:block;margin-top:5px;padding:5px 8px;background:var(--col-warning-bg);border-left:3px solid var(--col-warning);border-radius:4px;color:#78350f;font-size:11px;">⚠ N=${nPairs} &lt;5 — IPV and C/D ratio are <strong>statistically unstable</strong> at this sample size (95% CI for CV% spans nearly 0–100%). Collect ≥5 trough levels before using IPV to guide clinical decisions.</span>` : ''}</div>`;
         }
 
@@ -3054,12 +3175,21 @@
                 </div>
             </div>`;
 
-            // Intelligence level based on the levels actually used
+            // Intelligence level based on the levels actually used.
+            // "Individualized" describes how much data went in, not whether the fit is any
+            // good — a badge based on nUsed alone can read "Well Individualized" in green
+            // while the fit itself trips the "Severe Model Mismatch" / "DO NOT TRUST
+            // FORECAST" banners elsewhere on the page. Reuse the same misfit test those
+            // banners use (updateModelParams, updateSummary: r2 < 0.5 or rmse > 2.5) so the
+            // badge can't contradict them.
+            const misfit = nUsed > 0 && ((typeof indParams.r2 === 'number' && indParams.r2 < 0.5) ||
+                (typeof indParams.rmse === 'number' && indParams.rmse > 2.5));
             const intelPct = Math.min(100, 10 + nUsed * 18);  // 0 obs → 10%, 5 obs → 100%
-            const intelColor = intelPct < 35 ? 'var(--col-warning)' : intelPct < 65 ? '#d97706' : 'var(--col-success)';
-            // Tightened from N=4 to N=5: 3-4 is sufficient for chronic stable states, but early 
+            // Tightened from N=4 to N=5: 3-4 is sufficient for chronic stable states, but early
             // post-transplant time-varying PK requires more observations to overcome structural uncertainty.
-            const intelText = nUsed === 0 ? 'Population Estimate' : nUsed < 3 ? 'Weakly Individualized' : nUsed < 5 ? 'Moderately Individualized' : 'Well Individualized';
+            const intelTier = nUsed === 0 ? 'Population Estimate' : nUsed < 3 ? 'Weakly Individualized' : nUsed < 5 ? 'Moderately Individualized' : 'Well Individualized';
+            const intelText = misfit ? `${intelTier} — Poor Fit` : intelTier;
+            const intelColor = misfit ? 'var(--col-danger)' : intelPct < 35 ? 'var(--col-warning)' : intelPct < 65 ? '#d97706' : 'var(--col-success)';
             bar.style.width = intelPct + '%';
             bar.style.background = intelColor;
             label.textContent = intelText;

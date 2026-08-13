@@ -51,6 +51,11 @@ class PatientBase(BaseModel):
     albumin: float = 3.5
     bilirubin: float = 1.0
     inhibitor: str = "none"
+    # 0 = on tacrolimus, 1 = switched to another agent. Optional because rows
+    # created before this column exists deserialise as None; consumers must read
+    # it as falsy-means-active rather than assuming 0.
+    tac_discontinued: Optional[int] = 0
+    discontinued_reason: Optional[str] = None
     hla_mismatch: Optional[int] = None
     baseline_pra: Optional[float] = None
     
