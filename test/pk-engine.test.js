@@ -882,4 +882,24 @@ section('Walk-forward selection is leak-free (the accuracy numbers depend on it)
         near(E.predictAtTime(t, lkDoses, truth), E.predictAtTime(t, withFuture, truth), 1e-12));
 }
 
+section('Probabilistic Target Attainment (PTA) & Decision Matrix');
+{
+    const target = { low: 7.0, high: 9.0 };
+    // 1. Trough landing right at target midpoint (8.0 ng/mL)
+    const ptaMid = E.calculatePTA(8.0, target, 0.20);
+    ok('PTA probabilities sum to ~100%', near(ptaMid.pSub + ptaMid.pTarget + ptaMid.pToxic, 100, 0.5));
+    ok('mid-target trough maximizes in-range probability', ptaMid.pTarget > ptaMid.pSub && ptaMid.pTarget > ptaMid.pToxic);
+    ok('sub-therapeutic and toxic risks are roughly symmetric around midpoint', near(ptaMid.pSub, ptaMid.pToxic, 3.0));
+
+    // 2. High trough (12.0 ng/mL)
+    const ptaHigh = E.calculatePTA(12.0, target, 0.20);
+    ok('high trough yields high toxic risk', ptaHigh.pToxic > 70, `pToxic=${ptaHigh.pToxic}%`);
+    ok('high trough yields near-zero sub-therapeutic risk', ptaHigh.pSub < 5, `pSub=${ptaHigh.pSub}%`);
+
+    // 3. Low trough (4.5 ng/mL)
+    const ptaLow = E.calculatePTA(4.5, target, 0.20);
+    ok('low trough yields high sub-therapeutic risk', ptaLow.pSub > 70, `pSub=${ptaLow.pSub}%`);
+    ok('low trough yields near-zero toxic risk', ptaLow.pToxic < 5, `pToxic=${ptaLow.pToxic}%`);
+}
+
 done('pk-engine');

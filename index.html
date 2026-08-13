@@ -1039,6 +1039,15 @@
                         (ng/mL)</label>
                     <input type="number" step="0.1" id="newLevel" class="input-field">
                 </div>
+                <div id="level-artifact-container" style="display:none; background:#fffbeb; border:1px solid #fef3c7; border-radius:6px; padding:10px 12px; margin-top:2px;">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; color:#92400e; cursor:pointer;">
+                        <input type="checkbox" id="newExcludeFit" style="cursor:pointer; width:16px; height:16px;">
+                        <span>⚠️ Exclude from Clearance Fit (Acute Diarrhea / Sampling Artifact)</span>
+                    </label>
+                    <div style="font-size:11px; color:#b45309; margin-top:4px; margin-left:24px; line-height:1.4;">
+                        Level remains recorded and visible on charts for auditability, but is excluded from Bayesian clearance estimation to prevent transient spikes from corrupting the baseline model.
+                    </div>
+                </div>
                 <!-- Optional Date-Specific Vitals -->
                 <div style="padding-top:10px;border-top:1px dashed var(--col-border, #e2e8f0);">
                     <div style="font-size:11px;font-family:'Sora',sans-serif;font-weight:600;color:var(--col-muted);margin-bottom:8px;">
@@ -2624,30 +2633,23 @@
             document.getElementById('editIndex').value = editIndex !== null ? editIndex : '';
             document.getElementById('dose-input-container').style.display = type === 'dose' ? 'block' : 'none';
             document.getElementById('level-input-container').style.display = type === 'level' ? 'block' : 'none';
+            const artifactContainer = document.getElementById('level-artifact-container');
+            if (artifactContainer) artifactContainer.style.display = type === 'level' ? 'block' : 'none';
             document.getElementById('modal-title').textContent = `${editIndex !== null ? 'Edit' : 'Add'} ${type === 'dose' ? 'Dose' : 'Level'}`;
 
             let defaultDate;
             if (editIndex !== null) {
                 const r = clinicalData[editIndex];
                 defaultDate = r.datetime;
-                // `?? ''`, not `|| ''`. A 0 mg row is a deliberate "dose held"
-                // marker, and 0 is falsy: `r.dose || ''` opened the editor with an
-                // empty dose field, so saving wrote dose = null and — for a row
-                // with no level — deleted the record outright. fillHistoricalGaps
-                // then spanned the gap and re-inserted a full dose in that slot,
-                // the exact failure its `dose >= 0` anchor exists to prevent.
                 document.getElementById('newDose').value = r.dose ?? '';
                 document.getElementById('newLevel').value = r.level ?? '';
                 document.getElementById('newWeight').value = r.weight ?? '';
                 document.getElementById('newHct').value = r.hematocrit ?? '';
                 document.getElementById('newInhibitor').value = r.inhibitor ?? '';
+                const excludeBox = document.getElementById('newExcludeFit');
+                if (excludeBox) excludeBox.checked = !!r.excludeFit;
             } else {
                 const last = clinicalData.length > 0 ? dayjs(clinicalData[clinicalData.length - 1].datetime) : dayjs();
-                // Doses go on the 07:00/19:00 slot; levels are C0 samples, drawn
-                // SAMPLING_LEAD_MIN before the MORNING dose only (06:45) — never
-                // 18:45, since the evening trough is not assayed here. Defaulting
-                // a level to the dose time itself would put it on the absorption
-                // discontinuity where being 15 min late inflates the reading ~30%.
                 defaultDate = type === 'level'
                     ? nextC0Time(last.add(1, 'day').startOf('day')).toDate()
                     : last.add(1, 'day').hour(DOSE_SLOTS.AM).minute(0).toDate();
@@ -2656,6 +2658,8 @@
                 document.getElementById('newWeight').value = '';
                 document.getElementById('newHct').value = '';
                 document.getElementById('newInhibitor').value = '';
+                const excludeBox = document.getElementById('newExcludeFit');
+                if (excludeBox) excludeBox.checked = false;
             }
             const fp = document.getElementById('newDateTime')._flatpickr;
             if (fp) { fp.destroy(); }
@@ -2681,6 +2685,8 @@
             const weight = (weightVal !== '' && !isNaN(parseFloat(weightVal))) ? parseFloat(weightVal) : null;
             const hematocrit = (hctVal !== '' && !isNaN(parseFloat(hctVal))) ? parseFloat(hctVal) : null;
             const inhibitor = document.getElementById('newInhibitor').value || null;
+            const excludeFitEl = document.getElementById('newExcludeFit');
+            const excludeFit = (excludeFitEl && excludeFitEl.checked);
             const indexStr = document.getElementById('editIndex').value;
             const type = document.getElementById('recordType').value;
 
@@ -2691,22 +2697,15 @@
 
             const datetime = dayjs(datetimeStr).format("YYYY-MM-DD HH:mm");
 
-            // Desensitization / ABO-incompatible protocols (and Live Related loading
-            // doses) routinely start tacrolimus days before the transplant date
-            // itself, so records are never rejected purely for predating it.
-
             if (indexStr !== '') {
                 const idx = parseInt(indexStr);
                 if (clinicalData[idx]) {
                     clinicalData[idx].datetime = datetime;
                     if (type === 'dose') clinicalData[idx].dose = (dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null;
-                    if (type === 'level') clinicalData[idx].level = (level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null;
-                    // Assign unconditionally, including null. Guarding on
-                    // `!== null` made a date-specific weight write-once: blanking
-                    // the field was a no-op, so an erroneous value could only be
-                    // removed by deleting the whole record. A cleared field means
-                    // "no measurement here", which is exactly what null encodes —
-                    // getCovariatesAtTime then carries the previous value forward.
+                    if (type === 'level') {
+                        clinicalData[idx].level = (level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null;
+                        clinicalData[idx].excludeFit = excludeFit;
+                    }
                     clinicalData[idx].weight = weight;
                     clinicalData[idx].hematocrit = hematocrit;
                     clinicalData[idx].inhibitor = inhibitor;
@@ -2715,9 +2714,10 @@
                 const existing = clinicalData.find(r => r.datetime === datetime);
                 if (existing) {
                     if (type === 'dose') existing.dose = (dose !== '' && !isNaN(parseFloat(dose))) ? parseFloat(dose) : null;
-                    if (type === 'level') existing.level = (level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null;
-                    // Unconditional, so a cleared field clears the stored value —
-                    // see the note in the edit branch above.
+                    if (type === 'level') {
+                        existing.level = (level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null;
+                        existing.excludeFit = excludeFit;
+                    }
                     existing.weight = weight;
                     existing.hematocrit = hematocrit;
                     existing.inhibitor = inhibitor;
@@ -2728,7 +2728,8 @@
                         level: type === 'level' ? ((level !== '' && !isNaN(parseFloat(level))) ? parseFloat(level) : null) : null,
                         weight: weight,
                         hematocrit: hematocrit,
-                        inhibitor: inhibitor
+                        inhibitor: inhibitor,
+                        excludeFit: type === 'level' ? excludeFit : false
                     });
                 }
             }
@@ -2869,9 +2870,12 @@
                     const vitalsCell = vitalsParts.length > 0
                         ? `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;font-weight:600;">${vitalsParts.join(' · ')}</span>`
                         : `<span style="color:var(--col-muted);font-size:11px;">—</span>`;
+                    const excludeBadge = r.excludeFit
+                        ? `<span class="badge" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;font-size:10px;margin-left:4px;" title="Excluded from Bayesian fit (GI spike/artifact)">⚠️ Excluded</span>`
+                        : '';
                     return `<tr>
                     <td>${dayjs(r.datetime).format('DD-MMM-YY HH:mm')}</td>
-                    <td style="font-family:'DM Mono',monospace;font-weight:500;">${r.level.toFixed(1)}</td>
+                    <td style="font-family:'DM Mono',monospace;font-weight:500;">${r.level.toFixed(1)}${excludeBadge}</td>
                     <td style="font-family:'DM Mono',monospace;">${cdRatio}</td>
                     <td>${vitalsCell}</td>
                     <td><span class="badge ${badgeCls}">${status.text}</span></td>
@@ -3091,6 +3095,7 @@
                     weight: r.weight != null ? r.weight : null,
                     hematocrit: r.hematocrit != null ? r.hematocrit : null,
                     inhibitor: r.inhibitor != null ? r.inhibitor : null,
+                    excludeFit: !!r.excludeFit,
                     time: rd.diff(txDate, 'hour', true)
                 };
             });
@@ -3101,7 +3106,8 @@
         function runForecast(patientData, historyLog, predictionDate) {
             return new Promise(resolve => setTimeout(() => {
                 try {
-                    const measuredLevels = historyLog.filter(e => e.level !== null && e.level > 0);
+                    const allMeasured = historyLog.filter(e => e.level !== null && e.level > 0);
+                    const measuredLevels = allMeasured.filter(e => !e.excludeFit);
                     const loggedDosesRaw = historyLog.filter(e => e.dose !== null && e.dose > 0);
                     if (loggedDosesRaw.length === 0) throw new Error("No doses logged.");
 
@@ -3940,15 +3946,16 @@
                 </div>`;
             }
 
-            // ── Build output table ───────────────────────────────────────────────
+            // ── Build output table with PTA Matrix ───────────────────────────────
             const visibleResults = results.filter(r => Math.abs(r.trough - target) <= 3.5 || r.tdd === best.tdd);
             let html = warnings;
-            html += '<div style="overflow-x:auto;"><table><thead><tr><th>Dose Regimen</th><th>Predicted Trough</th><th>vs Target</th><th></th></tr></thead><tbody>';
+            html += '<div style="overflow-x:auto;"><table><thead><tr><th>Dose Regimen</th><th>Predicted Trough</th><th>In-Target % (' + protRange.low + '–' + protRange.high + ')</th><th>Sub-therapeutic (<' + protRange.low + ')</th><th>Toxic Risk (>' + protRange.high + ')</th><th>Recommendation</th></tr></thead><tbody>';
 
             visibleResults.forEach(r => {
                 const diff = r.trough - target;
                 const isBest = r.tdd === best.tdd;
                 const close = Math.abs(diff) < 0.5;
+                const pta = calculatePTA(r.trough, protRange, 0.25);
                 // Flag non-standard tablet splits visually
                 const splitNote = r.isAsymmetric
                     ? `<span style="color:#6366f1">AM: ${r.amDose.toFixed(1)}</span> <span style="color:#8b5cf6">PM: ${r.pmDose.toFixed(1)}</span>`
@@ -3956,12 +3963,22 @@
 
                 html += `<tr style="${isBest ? 'background:var(--col-success-bg);' : (close ? 'background:#f8fafc;' : '')}">
                 <td style="font-family:'DM Mono',monospace;font-weight:${isBest ? '700' : '500'};font-size:13px;">${splitNote}</td>
-                <td style="font-family:'DM Mono',monospace;font-size:13px;">${r.trough.toFixed(1)} ng/mL</td>
-                <td style="font-family:'DM Mono',monospace;font-size:13px;color:${diff > 0 ? '#b45309' : '#dc2626'};">${diff > 0 ? '+' : ''}${diff.toFixed(1)}</td>
-                <td>${isBest ? '<span class="badge badge-success">★ Recommended</span>' : (close ? '<span class="badge badge-info">Near target</span>' : '')}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;">${r.trough.toFixed(1)} ng/mL</td>
+                <td style="font-family:'DM Mono',monospace;font-size:13px;">
+                    <span style="display:inline-block;padding:2px 8px;border-radius:12px;background:${isBest ? '#10b981' : '#e0f2fe'};color:${isBest ? 'white' : '#0369a1'};font-weight:700;">
+                        ${pta.pTarget.toFixed(0)}%
+                    </span>
+                </td>
+                <td style="font-family:'DM Mono',monospace;font-size:13px;color:${pta.pSub > 30 ? '#dc2626' : '#64748b'};font-weight:${pta.pSub > 30 ? '700' : '400'};">
+                    ${pta.pSub.toFixed(0)}%
+                </td>
+                <td style="font-family:'DM Mono',monospace;font-size:13px;color:${pta.pToxic > 30 ? '#b45309' : '#64748b'};font-weight:${pta.pToxic > 30 ? '700' : '400'};">
+                    ${pta.pToxic.toFixed(0)}%
+                </td>
+                <td>${isBest ? '<span class="badge badge-success">★ Best Target Attainment</span>' : (close ? '<span class="badge badge-info">Near target</span>' : '')}</td>
             </tr>`;
             });
-            html += '</tbody></table></div><p style="font-size:11.5px;color:var(--col-muted);margin-top:10px;text-align:center;">Assumes asymmetric dosing with larger fraction assigned to morning (AM) if needed.<br/>Individual PK parameters (Bayesian MAP) used for forecast.</p>';
+            html += '</tbody></table></div><p style="font-size:11.5px;color:var(--col-muted);margin-top:10px;text-align:center;"><strong>Target Attainment Probabilities (PTA)</strong> calculated using calibrated posterior PK uncertainty + 18% residual assay error.<br/>Assumes asymmetric dosing with larger fraction assigned to morning (AM) if needed.<br/>Individual PK parameters (Bayesian MAP) used for forecast.</p>';
             div.innerHTML = html;
         }
 

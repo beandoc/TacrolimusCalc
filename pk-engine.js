@@ -1497,6 +1497,45 @@
     }
 
     // ── Metabolizer classification from the C/D ratio ────────────────────────
+    // ============================================================
+    // PROBABILISTIC TARGET ATTAINMENT (PTA) & DECISION RISK MATRIX
+    // ============================================================
+
+    // Fast approximation to the standard normal CDF (Abramowitz & Stegun formula 7.1.26)
+    function normalCDF(z) {
+        if (typeof z !== 'number' || isNaN(z)) return 0.5;
+        const t = 1 / (1 + 0.2316419 * Math.abs(z));
+        const d = 0.3989422804014337 * Math.exp(-z * z / 2);
+        const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+        return z > 0 ? 1 - p : p;
+    }
+
+    /**
+     * Computes Target Attainment Probability (PTA), sub-therapeutic risk (< low),
+     * and toxic risk (> high) for a predicted steady-state trough concentration.
+     * Uses log-normal predictive distribution: ln(C) ~ Normal(ln(Cpred), sigmaPred^2)
+     */
+    function calculatePTA(predictedTrough, targetRange, sigmaPred = 0.25) {
+        if (!predictedTrough || predictedTrough <= 0 || !targetRange || targetRange.low >= targetRange.high) {
+            return { pSub: 0, pTarget: 0, pToxic: 0 };
+        }
+        const s = Math.max(0.05, sigmaPred);
+        const mu = Math.log(predictedTrough);
+        const zLow = (Math.log(targetRange.low) - mu) / s;
+        const zHigh = (Math.log(targetRange.high) - mu) / s;
+
+        const pSub = normalCDF(zLow);
+        const pUpper = normalCDF(zHigh);
+        const pToxic = Math.max(0, 1 - pUpper);
+        const pTarget = Math.max(0, pUpper - pSub);
+
+        return {
+            pSub: Math.round(pSub * 1000) / 10,
+            pTarget: Math.round(pTarget * 1000) / 10,
+            pToxic: Math.round(pToxic * 1000) / 10
+        };
+    }
+
     // Thresholds are Thölking 2014 (PLoS One 9:e111128), as replicated in
     // Thölking 2016 and Schütte-Nütgen 2019: fast <1.05, intermediate 1.05–2.0,
     // slow >2.0 ng/mL per mg/24h. This app previously used 0.9 / 1.5, which are
@@ -1529,6 +1568,7 @@
         regimenDoseAt, buildEffectiveDoses, dailyDoseBefore, REGIMEN_WINDOW_HR,
         // analytics / QC
         rosendaalFraction, findPostDoseSamples, calculateIPV, classifyMetabolizer,
+        normalCDF, calculatePTA,
         forecastResolution, POPULATION_BACKTEST_MAPE
     };
 }));
