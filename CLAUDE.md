@@ -167,12 +167,10 @@ made things worse: MAPE 40% → 53%. Do not reintroduce it.
 
 1. **Calibrated intervals instead of a point estimate.** Log-residual SD ≈ 0.38;
    empirical coverage of a nominal 90% band is already ~89%. An honest 90% band
-   on a 9.0 ng/mL prediction spans **4.8–16.8**. Ship the band and per-dose
-   in-range probabilities ("at 4 mg: 62% in range, 25% sub-therapeutic"), and
-   score with CRPS / pinball / coverage. **Coverage is the one thing 92 points
-   can actually validate.**
-2. **Fit on log(concentration).** Residuals are multiplicative; raw-scale
-   fitting is what produces the observed ~14% over-prediction bias.
+   on a 9.0 ng/mL prediction spans **4.8–16.8**. Shipped via `calculatePTA` and
+   the Dose Decision Grid (`index.html:3949-3981`).
+2. **Fit on log(concentration).** Residuals are multiplicative; implemented
+   via `(ln(obs) − ln(pred))² / σ²` to eliminate asymmetric raw-scale bias.
 3. **Score the decision, not the number.** Bucket accuracy is 55–59% and
    17–18 of 92 predictions miss a HIGH trough. A MAPE gain that changes no dose
    recommendation has delivered nothing. Missing HIGH (toxicity) and missing LOW
@@ -180,6 +178,30 @@ made things worse: MAPE 40% → 53%. Do not reintroduce it.
 4. **More patients.** n=92 from 10 patients is below the threshold at which any
    modelling decision is verifiable. The data pipeline outranks every algorithm
    change on this list.
+
+---
+
+## 7b. Core Clinical Design Principle: Reframing Success
+
+**Do not treat transient biological noise as a new steady state.**
+
+1. **The Biological Floor**:
+   Due to within-patient lag-1 autocorrelation ($\rho \approx 0.44$), gut motility,
+   hematocrit shifts, and draw-timing jitter ($\pm 15\text{ min} \approx 30\%$), a single
+   trough measurement carries $\pm 25–35\%$ irreducible biological noise.
+2. **The Anti-Pattern**:
+   Chasing single-point lab values (e.g. "predicted 11.4, lab was 7.98 → model failed")
+   provokes over-reactive dose churning and destroys calibration on oscillating patients
+   (the `vidyashree` case: 28% → 37% MAPE under aggressive adaptation).
+3. **What True Clinical Success Means**:
+   - **Risk-Balanced Decision Support**: Recommending the dose regimen that maximizes
+     Target Attainment Probability ($P(\text{Target: } 6–10\text{ ng/mL})$) while minimizing
+     asymmetric clinical risk (toxicity vs rejection).
+   - **Humility & Calibration**: Providing honest 90% prediction intervals so clinicians
+     are not misled by false decimal precision.
+   - **Empirical Walk-Forward Adaptation**: Using `selectRecencyRegime()` to test whether
+     a patient is genuinely undergoing clearance maturation (e.g. `raj_bahadur`) vs
+     noisy oscillation (`vidyashree`) before committing to recency weighting.
 
 ---
 

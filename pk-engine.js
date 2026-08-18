@@ -655,8 +655,8 @@
         return normalizeWeights(measuredLevels.map((obs, i) => {
             const pred = predictAtTime(obs.time, allDoses, params);
             const predAdj = bioassay === 2 ? cmiaAdjust(pred) : pred;
-            if (!(predAdj > 0.1)) return ageWeights[i] * 0.05;
-            const r = (obs.level - predAdj) / (predAdj * PK_MODEL.SIGMA);
+            if (!(predAdj > 0.1) || !(obs.level > 0)) return ageWeights[i] * 0.05;
+            const r = (Math.log(obs.level) - Math.log(predAdj)) / PK_MODEL.SIGMA;
             return ageWeights[i] * tukeyWeight(r);
         }));
     }
@@ -681,7 +681,7 @@
         const ageWeights = recencyWeights(measuredLevels, regimeUsed);
 
         // ── One MAP optimization pass at a fixed set of weights ────────────
-        // OFV = ηCL²/ωCL + ηV²/ωV  +  Σ[wᵢ · (Cobs − Cpred)² / (Cpred·σ)²]
+        // OFV = ηCL²/ωCL + ηV²/ωV  +  Σ[wᵢ · (ln Cobs − ln Cpred)² / σ²]
         // Factored out so IRLS (below) can re-run it against updated weights
         // without duplicating the grid+Nelder-Mead search.
         const fitAt = (weights) => {
@@ -703,9 +703,9 @@
                 const lik = measuredLevels.reduce((s, obs, i) => {
                     const pred = predictAtTime(obs.time, allDoses, p);
                     const predAdj = bioassay === 2 ? cmiaAdjust(pred) : pred;
-                    if (predAdj <= 0.1) return s + 1000 * weights[i];
-                    const w = predAdj * SIGMA;   // WLS: predicted-value denominator
-                    return s + weights[i] * Math.pow((obs.level - predAdj) / w, 2);
+                    if (predAdj <= 0.1 || obs.level <= 0) return s + 1000 * weights[i];
+                    const logDiff = Math.log(obs.level) - Math.log(predAdj);
+                    return s + weights[i] * (logDiff * logDiff) / (SIGMA * SIGMA);
                 }, 0);
                 return prior + lik;
             };
@@ -1536,6 +1536,74 @@
         };
     }
 
+    /**
+     * Generates a clinical Decision Risk Grid evaluating candidate doses.
+     * Evaluates steady-state trough, 90% prediction interval, and target-range probabilities (PTA).
+     */
+    function generateDoseDecisionGrid(popParams, indParams, currentDose, targetRange, allDoses, predTime, bioassay = 1, sigmaResidual = 0.28) {
+        if (!indParams || !targetRange || !targetRange.low || !targetRange.high) return null;
+
+        const curDose = (currentDose && currentDose > 0)
+            ? currentDose
+            : (suggestStartingDose(popParams, targetRange, bioassay).dosePerAdmin * 2);
+
+        const baseAdmin = curDose / 2;
+        const testDoses = [
+            baseAdmin - 2.0, baseAdmin - 1.5, baseAdmin - 1.0, baseAdmin - 0.5,
+            baseAdmin,
+            baseAdmin + 0.5, baseAdmin + 1.0, baseAdmin + 1.5, baseAdmin + 2.0
+        ].filter(d => d >= 0.5 && d <= 15.0);
+
+        const uniqueAdminDoses = Array.from(new Set(testDoses.map(d => Math.round(d * 10) / 10))).sort((a, b) => a - b);
+        const rows = [];
+
+        for (const adminDose of uniqueAdminDoses) {
+            const dailyDose = adminDose * 2;
+
+            // Build hypothetical steady-state regimen
+            const simDoses = [
+                { time: predTime - 60, dose: adminDose, weight: indParams.weight },
+                { time: predTime - 48, dose: adminDose, weight: indParams.weight },
+                { time: predTime - 36, dose: adminDose, weight: indParams.weight },
+                { time: predTime - 24, dose: adminDose, weight: indParams.weight },
+                { time: predTime - 12, dose: adminDose, weight: indParams.weight }
+            ];
+
+            let predTrough = predictAtTime(predTime, simDoses, indParams);
+            if (bioassay === 2) predTrough = cmiaAdjust(predTrough);
+
+            // 90% prediction interval (z = 1.645)
+            const piLow = Math.round(predTrough * Math.exp(-1.645 * sigmaResidual) * 10) / 10;
+            const piHigh = Math.round(predTrough * Math.exp(1.645 * sigmaResidual) * 10) / 10;
+
+            const pta = calculatePTA(predTrough, targetRange, sigmaResidual);
+            const utility = pta.pTarget - (1.5 * pta.pToxic) - (1.0 * pta.pSub);
+            const isCurrent = Math.abs(dailyDose - curDose) < 0.1;
+
+            rows.push({
+                adminDose,
+                dailyDose,
+                predTrough: Math.round(predTrough * 10) / 10,
+                piLow,
+                piHigh,
+                pTarget: pta.pTarget,
+                pSub: pta.pSub,
+                pToxic: pta.pToxic,
+                utility,
+                isCurrent
+            });
+        }
+
+        const bestRow = [...rows].sort((a, b) => b.utility - a.utility)[0];
+
+        return {
+            rows,
+            recommendedDailyDose: bestRow ? bestRow.dailyDose : curDose,
+            recommendedAdminDose: bestRow ? bestRow.adminDose : baseAdmin,
+            targetRange
+        };
+    }
+
     // Thresholds are Thölking 2014 (PLoS One 9:e111128), as replicated in
     // Thölking 2016 and Schütte-Nütgen 2019: fast <1.05, intermediate 1.05–2.0,
     // slow >2.0 ng/mL per mg/24h. This app previously used 0.9 / 1.5, which are
@@ -1568,7 +1636,7 @@
         regimenDoseAt, buildEffectiveDoses, dailyDoseBefore, REGIMEN_WINDOW_HR,
         // analytics / QC
         rosendaalFraction, findPostDoseSamples, calculateIPV, classifyMetabolizer,
-        normalCDF, calculatePTA,
+        normalCDF, calculatePTA, generateDoseDecisionGrid,
         forecastResolution, POPULATION_BACKTEST_MAPE
     };
 }));

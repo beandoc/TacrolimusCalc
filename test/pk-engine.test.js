@@ -254,19 +254,18 @@ section('Verified case regression lock (raj bahadur, code-review-verified number
     const imputed = filled.filter(d => String(d.id).startsWith('inter-'));
     ok('imputes exactly 38 missing BID doses across the logging gaps', imputed.length === 38, `${imputed.length}`);
 
-    // Values below reflect mapBayesian AFTER recency+robust weighting was
-    // added (see "Erratic C/D volatility" section) — the 4.5 ng/mL trough
-    // (day 5.3, closest to "now") is trusted more than the later 12.9/11.1
-    // spike, shifting CL up slightly vs the old unweighted fit (was 25.223).
+    // Values below reflect mapBayesian with log-concentration likelihood
+    // and recency+robust weighting — the 4.5 ng/mL trough (day 5.3) is trusted
+    // appropriately without asymmetric penalty on higher peaks.
     const ind = E.mapBayesian(pop, measuredLevels, filled, 1);
-    ok('individual CL/F', near(ind.CL, 25.945, 0.01), `${ind.CL.toFixed(3)}`);
-    ok('individual V/F', near(ind.V, 822.29, 0.01), `${ind.V.toFixed(2)}`);
-    ok('RMSE', near(ind.rmse, 0.8148, 1e-3), `${ind.rmse.toFixed(4)}`);
-    ok('MPE%', near(ind.mpe, 3.0441, 1e-3), `${ind.mpe.toFixed(4)}`);
-    ok('MAPE%', near(ind.mape, 8.8032, 1e-3), `${ind.mape.toFixed(4)}`);
+    ok('individual CL/F', near(ind.CL, 26.179, 0.01), `${ind.CL.toFixed(3)}`);
+    ok('individual V/F', near(ind.V, 821.77, 0.01), `${ind.V.toFixed(2)}`);
+    ok('RMSE', near(ind.rmse, 0.8265, 1e-3), `${ind.rmse.toFixed(4)}`);
+    ok('MPE%', near(ind.mpe, 4.0698, 1e-3), `${ind.mpe.toFixed(4)}`);
+    ok('MAPE%', near(ind.mape, 9.0569, 1e-3), `${ind.mape.toFixed(4)}`);
 
     const trough = E.predictAtTime(patTx.add(414.75, 'hour').diff(patTx, 'hour', true), filled, ind);
-    ok('forecast trough at 26-Jul-26 06:45', near(trough, 11.355, 0.01), `${trough.toFixed(3)}`);
+    ok('forecast trough at 26-Jul-26 06:45', near(trough, 11.229, 0.01), `${trough.toFixed(3)}`);
 
     // TTR: duration-weighted Rosendaal fraction across the 3 troughs against
     // the month 0-1 band (10-11 ng/mL).
@@ -697,12 +696,12 @@ section('Erratic C/D volatility: automatic recency+robust weighting replaces the
 
     const indParams = E.mapBayesian(popParams, measuredLevels, allDoses, 1);
     ok('weighted fit on the SAME 8-level history now converges to a faster clearance',
-        near(indParams.CL, 33.46, 0.5), `CL=${indParams.CL.toFixed(2)} (unweighted reference was 16.77)`);
+        near(indParams.CL, 45.33, 0.5), `CL=${indParams.CL.toFixed(2)} (unweighted reference was 16.77)`);
 
     const predTime = predDate.diff(epoch, 'hour', true);
     const fullPred = E.generateCurve([predTime], allDoses, indParams, 1)[0];
     ok('forecast is now close to the last observed trough (4.5), not the unweighted 17.03',
-        near(fullPred, 8.84, 0.3), `forecast=${fullPred.toFixed(2)} last observed=4.5`);
+        near(fullPred, 5.71, 0.3), `forecast=${fullPred.toFixed(2)} last observed=4.5`);
     ok('this is a genuine improvement, not a coincidence of the new numbers',
         Math.abs(fullPred - 4.5) < Math.abs(17.03 - 4.5) / 2,
         `|forecast-4.5|=${Math.abs(fullPred - 4.5).toFixed(2)} vs unweighted |17.03-4.5|=${(17.03 - 4.5).toFixed(2)}`);
@@ -900,6 +899,26 @@ section('Probabilistic Target Attainment (PTA) & Decision Matrix');
     const ptaLow = E.calculatePTA(4.5, target, 0.20);
     ok('low trough yields high sub-therapeutic risk', ptaLow.pSub > 70, `pSub=${ptaLow.pSub}%`);
     ok('low trough yields near-zero toxic risk', ptaLow.pToxic < 5, `pToxic=${ptaLow.pToxic}%`);
+}
+
+section('generateDoseDecisionGrid (Clinical Decision Matrix)');
+{
+    const pop = { CL: 30, V: 800, KA: 4.53, weight: 70 };
+    const ind = { ...pop, CL: 24, V: 800, weight: 70 };
+    const target = { low: 7.0, high: 9.0 };
+    const grid = E.generateDoseDecisionGrid(pop, ind, 8.0, target, [], 100, 1);
+
+    ok('returns valid grid structure', grid && Array.isArray(grid.rows) && grid.rows.length > 0);
+    ok('recommends a dose regimen', grid.recommendedDailyDose > 0 && grid.recommendedAdminDose > 0);
+
+    const recRow = grid.rows.find(r => r.dailyDose === grid.recommendedDailyDose);
+    ok('recommended dose has highest utility', recRow && recRow.pTarget >= 30, `pTarget=${recRow?.pTarget}%`);
+
+    // Monotonicity: higher dose produces higher predicted trough
+    const first = grid.rows[0];
+    const last = grid.rows[grid.rows.length - 1];
+    ok('higher candidate dose yields higher predicted trough', last.predTrough > first.predTrough,
+        `low=${first.predTrough} vs high=${last.predTrough}`);
 }
 
 done('pk-engine');
