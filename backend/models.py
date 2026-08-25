@@ -24,7 +24,25 @@ class Patient(Base):
     albumin = Column(Float, default=3.5)
     bilirubin = Column(Float, default=1.0)
     inhibitor = Column(String, default="none")
-    
+
+    # Tacrolimus discontinued — patient switched to another agent (cyclosporine,
+    # belatacept, sirolimus...). Kept as a flag rather than deleting the record:
+    # the level history stays available for review, but the patient must drop
+    # out of the Center Calibration cohort.
+    #
+    # Why that matters: patients get switched off tacrolimus *because* their PK
+    # was unmanageable, overwhelmingly because clearance was too high to hold a
+    # therapeutic trough. Leaving them in the cohort that fits the centre-wide
+    # CL scalar is selection bias in the literal sense — it calibrates the prior
+    # on the subset selected for abnormal clearance, and pushes every future
+    # patient's starting dose toward a phenotype most of them don't have.
+    #
+    # NULL is possible on rows that predate this column (see
+    # _sync_missing_columns in main.py — ALTER TABLE ADD COLUMN backfills NULL,
+    # not the model default), so every read must treat NULL as 0/not-discontinued.
+    tac_discontinued = Column(Integer, default=0)   # 0=on tacrolimus, 1=switched off
+    discontinued_reason = Column(String, nullable=True)
+
     # ML Foundation: Immunological Risk Baseline
     hla_mismatch = Column(Integer, nullable=True) # 0-6
     baseline_pra = Column(Float, nullable=True)   # % PRA
@@ -58,6 +76,7 @@ class ClinicalEvent(Base):
     creatinine = Column(Float, nullable=True)
     wbc = Column(Float, nullable=True)
     crp = Column(Float, nullable=True)
+    inhibitor = Column(String, nullable=True)
 
     patient = relationship("Patient", back_populates="events")
 

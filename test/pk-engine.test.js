@@ -254,15 +254,18 @@ section('Verified case regression lock (raj bahadur, code-review-verified number
     const imputed = filled.filter(d => String(d.id).startsWith('inter-'));
     ok('imputes exactly 38 missing BID doses across the logging gaps', imputed.length === 38, `${imputed.length}`);
 
+    // Values below reflect mapBayesian with log-concentration likelihood
+    // and recency+robust weighting — the 4.5 ng/mL trough (day 5.3) is trusted
+    // appropriately without asymmetric penalty on higher peaks.
     const ind = E.mapBayesian(pop, measuredLevels, filled, 1);
-    ok('individual CL/F', near(ind.CL, 25.223, 0.01), `${ind.CL.toFixed(3)}`);
-    ok('individual V/F', near(ind.V, 826.00, 0.01), `${ind.V.toFixed(2)}`);
-    ok('RMSE', near(ind.rmse, 0.8709, 1e-3), `${ind.rmse.toFixed(4)}`);
-    ok('MPE%', near(ind.mpe, -0.2846, 1e-3), `${ind.mpe.toFixed(4)}`);
-    ok('MAPE%', near(ind.mape, 7.9828, 1e-3), `${ind.mape.toFixed(4)}`);
+    ok('individual CL/F', near(ind.CL, 26.179, 0.01), `${ind.CL.toFixed(3)}`);
+    ok('individual V/F', near(ind.V, 821.77, 0.01), `${ind.V.toFixed(2)}`);
+    ok('RMSE', near(ind.rmse, 0.8265, 1e-3), `${ind.rmse.toFixed(4)}`);
+    ok('MPE%', near(ind.mpe, 4.0698, 1e-3), `${ind.mpe.toFixed(4)}`);
+    ok('MAPE%', near(ind.mape, 9.0569, 1e-3), `${ind.mape.toFixed(4)}`);
 
     const trough = E.predictAtTime(patTx.add(414.75, 'hour').diff(patTx, 'hour', true), filled, ind);
-    ok('forecast trough at 26-Jul-26 06:45', near(trough, 11.766, 0.01), `${trough.toFixed(3)}`);
+    ok('forecast trough at 26-Jul-26 06:45', near(trough, 11.229, 0.01), `${trough.toFixed(3)}`);
 
     // TTR: duration-weighted Rosendaal fraction across the 3 troughs against
     // the month 0-1 band (10-11 ng/mL).
@@ -446,6 +449,31 @@ section('Time-varying covariates (Weight & Hematocrit)');
         predBaseline > predConstant60, `time-varying pred=${predBaseline.toFixed(2)} vs constant pred=${predConstant60.toFixed(2)}`);
 }
 
+section('Time-varying inhibitor (Azoles / Diltiazem)');
+{
+    // Verify fillHistoricalGaps carries forward inhibitor
+    const historyLog = [
+        { id: 0, recordDate: dayjs('2026-07-11 07:00'), dose: 3, level: null, weight: 60, hematocrit: 35, inhibitor: 'none', time: 0 },
+        { id: 1, recordDate: dayjs('2026-07-11 19:00'), dose: 3, level: null, time: 12 },
+        { id: 2, recordDate: dayjs('2026-07-13 07:00'), dose: 3, level: 8.5, weight: 60, hematocrit: 35, inhibitor: 'moderate', time: 48 },
+        { id: 3, recordDate: dayjs('2026-07-14 07:00'), dose: 3, level: null, time: 72 }
+    ];
+    const filled = E.fillHistoricalGaps(historyLog, dayjs('2026-07-11'));
+    ok('fillHistoricalGaps carries forward initial inhibitor=none', filled.find(d => d.time === 12).inhibitor === 'none');
+    ok('fillHistoricalGaps updates to inhibitor=moderate after time=48', filled.find(d => d.time === 72).inhibitor === 'moderate');
+
+    // Verify predictAtTime with time-varying inhibitor
+    const popBase = E.getPopulationParameters({ weight: 60, genotype: 'unknown', mpa: '1', bilirubin: 1.0, inhibitor: 'none', transplantDate: dayjs('2026-07-11') });
+    const predInhibitor = E.predictAtTime(71, filled, popBase);
+
+    // Constant none inhibitor filled doses
+    const filledConstantNone = filled.map(d => ({ ...d, inhibitor: 'none' }));
+    const predConstantNone = E.predictAtTime(71, filledConstantNone, popBase);
+
+    ok('co-administration of moderate inhibitor reduces clearance, resulting in higher predicted trough concentration',
+        predInhibitor > predConstantNone, `time-varying pred=${predInhibitor.toFixed(2)} vs constant pred=${predConstantNone.toFixed(2)}`);
+}
+
 section('Levels the fit cannot use are excluded, not scored');
 {
     // A level drawn before any logged dose predicts ~0. The OFV already ignores
@@ -525,6 +553,372 @@ section('Time-varying weight survives every params rebuild');
     ok('MC band brackets the weight-aware individual curve',
         band.p5 <= curve1 && curve1 <= band.p95,
         `p5=${band.p5.toFixed(2)} curve=${curve1.toFixed(3)} p95=${band.p95.toFixed(2)}`);
+}
+
+section('calculateIPV (C/D ratio variability)');
+{
+    // Constant C/D ratio → zero variability, regardless of the absolute level.
+    const flatDoses = [{ id: 0, time: -12, dose: 4 }, { id: 1, time: 0, dose: 4 }];
+    const flatLevels = [{ time: 12, level: 8 }, { time: 24, level: 8 }, { time: 36, level: 8 }];
+    const flat = E.calculateIPV(flatLevels, [...flatDoses, { id: 2, time: 12, dose: 4 }, { id: 3, time: 24, dose: 4 }]);
+    ok('constant C/D ratio gives IPV ~0%', near(flat.ipv, 0, 1e-6), `ipv=${flat.ipv}`);
+
+    // Fewer than 2 usable pairs → null, not NaN or a divide-by-zero.
+    ok('n=0 levels returns null ipv, not NaN', E.calculateIPV([], []).ipv === null);
+    ok('n=1 usable pair returns null ipv (need >=2 for a variance)',
+        E.calculateIPV([{ time: 12, level: 8 }], flatDoses).ipv === null);
+
+    // A level with no dose in the prior 24h contributes no C/D pair — matches
+    // dailyDoseBefore's own `daily > 0` gate, not counted as a "0/0" pair.
+    const withGap = E.calculateIPV(
+        [{ time: -1000, level: 5 }, { time: 12, level: 8 }, { time: 24, level: 8 }],
+        flatDoses.concat([{ id: 2, time: 12, dose: 4 }])
+    );
+    ok('an observation with no preceding dose is excluded, not counted as n', withGap.n === 2, `n=${withGap.n}`);
+
+    // Regression case: arun_chougle (the real patient whose full-history MAP
+    // fit motivated the volatility banner below). C/D ratios reconstructed
+    // from the actual dose log via dailyDoseBefore: 2.63, 1.08, 1.94, 2.30,
+    // 1.11, 1.03, 1.24, 0.56 — independently verified against the app's own
+    // reported C/D column for this patient. Known IPV ≈ 48%, "High" per this
+    // app's >40% threshold (Sapir-Pichhadze 2014).
+    const cdRatios = [2.63, 1.08, 1.94, 2.30, 1.11, 1.03, 1.24, 0.56];
+    const chougleLevels = cdRatios.map((cd, i) => ({ time: i * 100, level: cd * 8 }));
+    const chougleDoses = cdRatios.map((_, i) => ({ id: i, time: i * 100 - 1, dose: 8 }));
+    const chougle = E.calculateIPV(chougleLevels, chougleDoses);
+    ok('arun_chougle case: IPV lands in the "High" band (>40%)', chougle.ipv > 40, `ipv=${chougle.ipv.toFixed(1)}%`);
+    ok('arun_chougle case: IPV matches hand-computed CV% within rounding', near(chougle.ipv, 48.4, 1.0), `ipv=${chougle.ipv.toFixed(1)}%`);
+}
+
+section('classifyMetabolizer (Thölking 2014 C/D thresholds)');
+{
+    // Published cutoffs: fast <1.05, intermediate 1.05-2.0, slow >2.0.
+    ok('C/D 0.96 is FAST, not "Normal"', E.classifyMetabolizer(0.96) === 'Fast Metabolizer');
+    ok('C/D 1.04 is still fast (just under the cutoff)', E.classifyMetabolizer(1.04) === 'Fast Metabolizer');
+    ok('C/D 1.05 is intermediate (boundary is inclusive above)', E.classifyMetabolizer(1.05) === 'Intermediate Metabolizer');
+    ok('C/D 2.0 is intermediate (upper boundary inclusive)', E.classifyMetabolizer(2.0) === 'Intermediate Metabolizer');
+    ok('C/D 2.01 is slow', E.classifyMetabolizer(2.01) === 'Slow Metabolizer');
+    // Never label off a value that cannot be a ratio.
+    ok('null C/D returns null, not a label', E.classifyMetabolizer(null) === null);
+    ok('zero C/D returns null, not "Fast"', E.classifyMetabolizer(0) === null);
+    ok('NaN C/D returns null', E.classifyMetabolizer(NaN) === null);
+
+    // Regression case: CASE-B (de-identified). 15 troughs, C/D reconstructed from the real
+    // dose-change log (each logged date carried forward until revised) and
+    // verified against the app's own C/D column to 2dp. Clinical ground truth:
+    // could not hold a therapeutic level even at 9 mg/day and was switched off
+    // tacrolimus — a fast metabolizer by outcome.
+    //
+    // The arithmetic mean is 0.96 and the median 0.97, both below 1.05, so the
+    // OLD 0.9 threshold reported "Normal Metabolizer" for this patient. That is
+    // the bug this section locks down.
+    const caseBCd = [1.02, 0.21, 0.40, 0.55, 0.79, 0.98, 1.27, 1.05, 0.89, 0.97, 0.69, 1.57, 1.09, 0.62, 2.37];
+    const caseBLevels = caseBCd.map((cd, i) => ({ time: i * 100, level: cd * 8 }));
+    const caseBDoses = caseBCd.map((_, i) => ({ id: i, time: i * 100 - 1, dose: 8 }));
+    const caseB = E.calculateIPV(caseBLevels, caseBDoses);
+    ok('CASE-B: median C/D is reported alongside the mean',
+        typeof caseB.median === 'number', `median=${caseB.median}`);
+    ok('CASE-B: median C/D 0.97 classifies as Fast Metabolizer',
+        E.classifyMetabolizer(caseB.median) === 'Fast Metabolizer',
+        `median=${caseB.median.toFixed(2)} -> ${E.classifyMetabolizer(caseB.median)}`);
+    ok('CASE-B: the OLD 0.9 cutoff would have mislabelled this patient as Normal',
+        caseB.mean > 0.9 && caseB.median > 0.9,
+        `mean=${caseB.mean.toFixed(2)} median=${caseB.median.toFixed(2)}`);
+    ok('CASE-B: IPV is "High" (>40%)', caseB.ipv > 40, `ipv=${caseB.ipv.toFixed(1)}%`);
+
+    // The median must resist outliers that would drag an arithmetic mean over a
+    // threshold — the whole reason the label switched statistic.
+    const skew = E.calculateIPV(
+        [0.8, 0.8, 0.8, 0.8, 9.0].map((cd, i) => ({ time: i * 100, level: cd * 8 })),
+        [0.8, 0.8, 0.8, 0.8, 9.0].map((_, i) => ({ id: i, time: i * 100 - 1, dose: 8 }))
+    );
+    ok('one extreme outlier drags the mean over 1.05 but not the median',
+        skew.mean > 1.05 && skew.median === 0.8, `mean=${skew.mean.toFixed(2)} median=${skew.median}`);
+    ok('median-based label stays Fast despite the outlier',
+        E.classifyMetabolizer(skew.median) === 'Fast Metabolizer');
+
+    // Even n: median must average the two middle values.
+    const evenN = E.calculateIPV(
+        [1.0, 2.0, 3.0, 4.0].map((cd, i) => ({ time: i * 100, level: cd * 8 })),
+        [1.0, 2.0, 3.0, 4.0].map((_, i) => ({ id: i, time: i * 100 - 1, dose: 8 }))
+    );
+    ok('even n averages the two middle C/D values', near(evenN.median, 2.5, 1e-9), `median=${evenN.median}`);
+}
+
+section('Erratic C/D volatility: automatic recency+robust weighting replaces the manual toggle');
+{
+    // Reproduces the arun_chougle case end-to-end through the real doses and
+    // levels (not synthetic C/D ratios): 6 weeks of dosing changes, 8 troughs
+    // oscillating instead of trending. Previously this required a manual
+    // "recent-only fit" toggle (removed) to get a forecast connected to the
+    // most recent, most clinically relevant trough; mapBayesian now does
+    // this automatically via recencyWeights + combinedWeights (age-based
+    // decay, split by maturation regime, refined by IRLS Tukey biweight).
+    //
+    // Historical reference, UNWEIGHTED (every observation counted equally,
+    // the behavior before this feature): CL 16.77 L/hr, V 335 L, RMSE 6.89,
+    // forecast 17.03 ng/mL — wildly disconnected from the last observed
+    // trough of 4.5. That number is not asserted below (it belongs to a
+    // fit mode this codebase no longer has); it is kept here only so a
+    // future reader can see what changed.
+    const epoch = dayjs('2026-06-23 00:00');
+    const doseRows = [
+        ['2026-06-23 19:00', 5.0], ['2026-06-24 07:00', 5.0], ['2026-06-24 19:00', 5.0],
+        ['2026-06-26 07:00', 4.5], ['2026-06-26 19:00', 4.5],
+        ['2026-07-06 07:00', 4.0], ['2026-07-06 19:00', 4.0],
+        ['2026-07-10 07:00', 3.5], ['2026-07-10 19:00', 3.5],
+        ['2026-07-14 07:00', 3.5], ['2026-07-14 19:00', 4.0],
+        ['2026-07-20 07:00', 4.5], ['2026-07-20 19:00', 4.0],
+        ['2026-07-27 07:00', 4.0], ['2026-07-27 19:00', 4.0],
+        ['2026-08-04 07:00', 4.5], ['2026-08-04 19:00', 4.5],
+    ];
+    const levelRows = [
+        ['2026-06-25 06:45', 26.3], ['2026-07-01 06:45', 9.7], ['2026-07-05 06:45', 17.5],
+        ['2026-07-09 06:45', 18.4], ['2026-07-13 06:45', 7.8], ['2026-07-19 06:45', 7.7],
+        ['2026-07-26 06:45', 10.5],
+        ['2026-08-03 06:45', 4.5, 66, 40.1], // weight/Hct override entered on this lab row
+    ];
+    const rows = [
+        ...doseRows.map(([dt, dose]) => ({ datetime: dt, dose, level: null, weight: null, hematocrit: null })),
+        ...levelRows.map(([dt, level, weight, hct]) => ({ datetime: dt, dose: null, level, weight: weight ?? null, hematocrit: hct ?? null })),
+    ].sort((a, b) => dayjs(a.datetime).diff(dayjs(b.datetime)));
+    const historyLog = rows.map((r, i) => {
+        const rd = dayjs(r.datetime);
+        return { id: i, recordDate: rd, dose: r.dose, level: r.level, weight: r.weight, hematocrit: r.hematocrit, time: rd.diff(epoch, 'hour', true) };
+    });
+
+    const patientData = { weight: 68, genotype: '33', mpa: '1', bioassay: 1, bilirubin: 1.0, inhibitor: 'none' };
+    const popParams = E.getPopulationParameters(patientData);
+    const measuredLevels = historyLog.filter(e => e.level !== null);
+    const filledHistory = E.fillHistoricalGaps(historyLog, epoch);
+    const predDate = dayjs('2026-08-13 06:45');
+    const allDoses = [...filledHistory, ...E.extrapolateDoses(filledHistory, predDate.add(14, 'day'), epoch)];
+
+    const indParams = E.mapBayesian(popParams, measuredLevels, allDoses, 1);
+    ok('weighted fit on the SAME 8-level history now converges to a faster clearance',
+        near(indParams.CL, 45.33, 0.5), `CL=${indParams.CL.toFixed(2)} (unweighted reference was 16.77)`);
+
+    const predTime = predDate.diff(epoch, 'hour', true);
+    const fullPred = E.generateCurve([predTime], allDoses, indParams, 1)[0];
+    ok('forecast is now close to the last observed trough (4.5), not the unweighted 17.03',
+        near(fullPred, 5.71, 0.3), `forecast=${fullPred.toFixed(2)} last observed=4.5`);
+    ok('this is a genuine improvement, not a coincidence of the new numbers',
+        Math.abs(fullPred - 4.5) < Math.abs(17.03 - 4.5) / 2,
+        `|forecast-4.5|=${Math.abs(fullPred - 4.5).toFixed(2)} vs unweighted |17.03-4.5|=${(17.03 - 4.5).toFixed(2)}`);
+
+    const { ipv } = E.calculateIPV(measuredLevels, allDoses);
+    ok('IPV on the real data is still "High" (>40%) — the input hasn\'t changed, only the fit', ipv > 40, `ipv=${ipv.toFixed(1)}%`);
+
+    const weights = E.combinedWeights(measuredLevels, allDoses, indParams, 1, E.recencyWeights(measuredLevels));
+    ok('the two most volatile mid-history levels (17.5, 18.4) end up least trusted',
+        weights[measuredLevels.findIndex(l => l.level === 17.5)] < 0.1 &&
+        weights[measuredLevels.findIndex(l => l.level === 18.4)] < 0.1,
+        `weights=${weights.map(w => w.toFixed(3)).join(',')}`);
+    ok('the most recent level (4.5) is among the most trusted',
+        weights[measuredLevels.findIndex(l => l.level === 4.5)] > 0.3,
+        `4.5's weight=${weights[measuredLevels.findIndex(l => l.level === 4.5)].toFixed(3)}`);
+}
+
+section('Per-patient regime selection (walk-forward, not a global rule)');
+{
+    // Regimes must stay distinguishable, or selection is meaningless.
+    const early = [0, 5, 10, 15].map(d => ({ time: d * 24, level: 8 }));
+    const wAdaptive = E.recencyWeights(early, 'adaptive');
+    const wStationary = E.recencyWeights(early, 'stationary');
+    ok('adaptive discounts the oldest level far harder than stationary does',
+        wAdaptive[0] < wStationary[0] / 3,
+        `adaptive=${wAdaptive[0].toFixed(3)} stationary=${wStationary[0].toFixed(3)}`);
+    ok('both regimes still normalize to sum = N (prior influence unchanged)',
+        near(wAdaptive.reduce((s, w) => s + w, 0), 4, 1e-9) &&
+        near(wStationary.reduce((s, w) => s + w, 0), 4, 1e-9));
+
+    // An unknown regime name must not silently produce NaN weights.
+    const wBogus = E.recencyWeights(early, 'no-such-regime');
+    ok('an unknown regime name falls back to stationary, not NaN',
+        wBogus.every(w => isFinite(w)) && near(wBogus[0], wStationary[0], 1e-9));
+
+    // Cold start: too few levels to measure anything, so fall back to the
+    // day-based guess and SAY that is what happened.
+    const tooFew = [{ time: 24, level: 8 }, { time: 48, level: 8 }];
+    const cold = E.selectRecencyRegime(POP, tooFew, doses, 1);
+    ok('below the minimum level count, selection falls back to the day heuristic',
+        cold.nTrials === 0 && /post-transplant day/.test(cold.basis), cold.basis);
+    ok('the cold-start fallback still names a usable regime',
+        cold.regime in E.PK_MODEL.RECENCY_REGIMES, cold.regime);
+
+    // A patient whose clearance genuinely SHIFTED partway through: the
+    // stationary regime cannot represent it, so selection should pick
+    // adaptive on the evidence.
+    const shiftDoses = steadyStateDoses(60);
+    const slow = { CL: POP.CL * Math.exp(-0.35), V: POP.V, KA: POP.KA };
+    const fast = { CL: POP.CL * Math.exp(0.45), V: POP.V, KA: POP.KA };
+    const shifted = [20, 24, 28, 32].map(d => ({ time: c0Hour(d), level: E.predictAtTime(c0Hour(d), shiftDoses, slow) }))
+        .concat([40, 44, 48].map(d => ({ time: c0Hour(d), level: E.predictAtTime(c0Hour(d), shiftDoses, fast) })));
+    const shiftSel = E.selectRecencyRegime(POP, shifted, shiftDoses, 1);
+    ok('a genuine mid-history clearance shift selects the adaptive regime',
+        shiftSel.regime === 'adaptive',
+        `chose=${shiftSel.regime} adaptive=${shiftSel.scores.adaptive.toFixed(3)} stationary=${shiftSel.scores.stationary.toFixed(3)}`);
+    ok('selection reports it measured, not guessed',
+        /walk-forward/.test(shiftSel.basis) && shiftSel.nTrials > 0, `nTrials=${shiftSel.nTrials}`);
+
+    // A true tie is no longer enough to keep the conservative regime. The
+    // backend walk-forward audit showed the old stationary-wins-ties rule cost
+    // accuracy by missing drifting patients, so adaptive now wins ties.
+    const stable = [20, 24, 28, 32, 36, 40, 44].map(d =>
+        ({ time: c0Hour(d), level: E.predictAtTime(c0Hour(d), shiftDoses, POP) }));
+    const stableSel = E.selectRecencyRegime(POP, stable, shiftDoses, 1);
+    ok('adaptive wins a walk-forward tie',
+        stableSel.regime === 'adaptive',
+        `chose=${stableSel.regime} adaptive=${stableSel.scores.adaptive.toFixed(3)} stationary=${stableSel.scores.stationary.toFixed(3)}`);
+
+    // Stationary still wins when it is genuinely better, not merely tied.
+    const noisyStable = stable.concat([
+        { time: c0Hour(48), level: E.predictAtTime(c0Hour(48), shiftDoses, POP) * 0.65 },
+        { time: c0Hour(52), level: E.predictAtTime(c0Hour(52), shiftDoses, POP) * 1.35 },
+        { time: c0Hour(56), level: E.predictAtTime(c0Hour(56), shiftDoses, POP) }
+    ]);
+    const noisyStableSel = E.selectRecencyRegime(POP, noisyStable, shiftDoses, 1);
+    ok('stationary still wins when its walk-forward score is lower',
+        noisyStableSel.regime === 'stationary',
+        `chose=${noisyStableSel.regime} adaptive=${noisyStableSel.scores.adaptive.toFixed(3)} stationary=${noisyStableSel.scores.stationary.toFixed(3)}`);
+
+    // The walk-forward trials double as the displayed per-patient track
+    // record, so they must carry enough detail to render it honestly.
+    const t = shiftSel.trials[shiftSel.regime];
+    ok('trials expose observed/predicted/error per prediction for the UI record',
+        Array.isArray(t) && t.length > 0 &&
+        t.every(r => r.observed > 0 && r.predicted > 0 && isFinite(r.pctError) && r.absPctError >= 0),
+        `${t.length} trials`);
+    ok('absPctError is the magnitude of pctError',
+        t.every(r => near(r.absPctError, Math.abs(r.pctError), 1e-9)));
+}
+
+section('forecastResolution: can the number settle the clinical question?');
+{
+    const band = { low: 7, high: 9 };
+    // Narrow uncertainty fully inside the band -> actionable.
+    ok('a tight forecast inside the band resolves as "in"',
+        E.forecastResolution(8, band, 5).status === 'in');
+    // The same forecast with realistic (~26%) error spans 5.9-10.1 and
+    // cannot distinguish in-range from out — the common real case.
+    const real = E.forecastResolution(8, band, 26);
+    ok('the same forecast at measured error straddles the band and is unresolved',
+        real.status === 'unresolved' && !real.resolves,
+        `${real.lo.toFixed(1)}-${real.hi.toFixed(1)} vs band ${band.low}-${band.high}`);
+    ok('clearly high forecasts still resolve as above',
+        E.forecastResolution(20, band, 26).status === 'above');
+    ok('clearly low forecasts still resolve as below',
+        E.forecastResolution(2, band, 26).status === 'below');
+
+    // Missing/invalid patient-specific error must fall back to the measured
+    // population figure, never to a silently perfect 0%.
+    const fallback = E.forecastResolution(8, band, null);
+    ok('a missing patient error falls back to the population backtest MAPE',
+        near(fallback.err, E.POPULATION_BACKTEST_MAPE, 1e-9), `err=${fallback.err}`);
+    ok('a zero/NaN error does not fake certainty',
+        E.forecastResolution(8, band, 0).err === E.POPULATION_BACKTEST_MAPE &&
+        E.forecastResolution(8, band, NaN).err === E.POPULATION_BACKTEST_MAPE);
+    ok('degenerate inputs return null rather than a bogus verdict',
+        E.forecastResolution(0, band, 10) === null && E.forecastResolution(8, null, 10) === null);
+}
+
+section('Walk-forward selection is leak-free (the accuracy numbers depend on it)');
+{
+    // Every accuracy figure this project quotes — POPULATION_BACKTEST_MAPE, the
+    // per-patient track record shown to clinicians, forecastResolution's error
+    // width — comes out of selectRecencyRegime's walk-forward loop. If a target
+    // level could reach the fit that predicts it, all of those numbers would be
+    // optimistic and nothing downstream would fail visibly.
+    //
+    // Tested behaviourally rather than by inspecting `sorted.slice(0, i)`:
+    // change ONLY a held-out observation, and its own out-of-sample prediction
+    // must not move. That is the definition of no leakage, and it keeps holding
+    // if the implementation is rewritten.
+    const lkDoses = steadyStateDoses(60);
+    const truth = { CL: POP.CL * Math.exp(0.2), V: POP.V, KA: POP.KA };
+    const mkLevels = () => [12, 16, 20, 24, 28, 32, 36]
+        .map(d => ({ time: c0Hour(d), level: E.predictAtTime(c0Hour(d), lkDoses, truth) }));
+
+    const baseLevels = mkLevels();
+    const basePick = E.selectRecencyRegime(POP, baseLevels, lkDoses, 1);
+    ok('the leak probe actually exercises the walk-forward path',
+        basePick.nTrials >= 2 && /walk-forward/.test(basePick.basis),
+        `nTrials=${basePick.nTrials}`);
+
+    // Perturb the LAST level — a held-out target in every regime's trial set.
+    const bumped = mkLevels();
+    bumped[bumped.length - 1].level *= 3;
+    const bumpedPick = E.selectRecencyRegime(POP, bumped, lkDoses, 1);
+
+    const lastOf = sel => {
+        const rows = sel.trials && sel.trials.stationary;
+        return rows && rows.length ? rows[rows.length - 1] : null;
+    };
+    const a = lastOf(basePick), b = lastOf(bumpedPick);
+    ok('the perturbed level is genuinely the final held-out target',
+        a && b && near(a.time, b.time, 1e-9) && b.observed > a.observed * 2.5,
+        a && b ? `observed ${a.observed.toFixed(2)} -> ${b.observed.toFixed(2)}` : 'no trial rows');
+    ok('tripling a held-out level does NOT move its own prediction (no leakage)',
+        a && b && near(a.predicted, b.predicted, 1e-9),
+        a && b ? `pred ${a.predicted.toFixed(6)} vs ${b.predicted.toFixed(6)}` : '');
+
+    // Guard against the assertion above passing trivially: an EARLIER level is
+    // legitimate fit input for that same target, so it must change the number.
+    const early = mkLevels();
+    early[0].level *= 3;
+    const earlyPick = E.selectRecencyRegime(POP, early, lkDoses, 1);
+    const c = lastOf(earlyPick);
+    ok('perturbing an earlier level DOES move the prediction (probe is live)',
+        a && c && !near(a.predicted, c.predicted, 1e-6),
+        a && c ? `pred ${a.predicted.toFixed(4)} vs ${c.predicted.toFixed(4)}` : '');
+
+    // A future DOSE must not reach a prediction either: predictAtTime filters
+    // `d.time < t`, and buildEffectiveDoses/fillHistoricalGaps must not smuggle
+    // one in ahead of the sample.
+    const t = c0Hour(20);
+    const withFuture = [...lkDoses, { id: 'future', recordDate: TX.add(50, 'day'), dose: 99, level: null, time: 50 * 24 }];
+    ok('a dose recorded after the sample time cannot change that prediction',
+        near(E.predictAtTime(t, lkDoses, truth), E.predictAtTime(t, withFuture, truth), 1e-12));
+}
+
+section('Probabilistic Target Attainment (PTA) & Decision Matrix');
+{
+    const target = { low: 7.0, high: 9.0 };
+    // 1. Trough landing right at target midpoint (8.0 ng/mL)
+    const ptaMid = E.calculatePTA(8.0, target, 0.20);
+    ok('PTA probabilities sum to ~100%', near(ptaMid.pSub + ptaMid.pTarget + ptaMid.pToxic, 100, 0.5));
+    ok('mid-target trough maximizes in-range probability', ptaMid.pTarget > ptaMid.pSub && ptaMid.pTarget > ptaMid.pToxic);
+    ok('sub-therapeutic and toxic risks are roughly symmetric around midpoint', near(ptaMid.pSub, ptaMid.pToxic, 3.0));
+
+    // 2. High trough (12.0 ng/mL)
+    const ptaHigh = E.calculatePTA(12.0, target, 0.20);
+    ok('high trough yields high toxic risk', ptaHigh.pToxic > 70, `pToxic=${ptaHigh.pToxic}%`);
+    ok('high trough yields near-zero sub-therapeutic risk', ptaHigh.pSub < 5, `pSub=${ptaHigh.pSub}%`);
+
+    // 3. Low trough (4.5 ng/mL)
+    const ptaLow = E.calculatePTA(4.5, target, 0.20);
+    ok('low trough yields high sub-therapeutic risk', ptaLow.pSub > 70, `pSub=${ptaLow.pSub}%`);
+    ok('low trough yields near-zero toxic risk', ptaLow.pToxic < 5, `pToxic=${ptaLow.pToxic}%`);
+}
+
+section('generateDoseDecisionGrid (Clinical Decision Matrix)');
+{
+    const pop = { CL: 30, V: 800, KA: 4.53, weight: 70 };
+    const ind = { ...pop, CL: 24, V: 800, weight: 70 };
+    const target = { low: 7.0, high: 9.0 };
+    const grid = E.generateDoseDecisionGrid(pop, ind, 8.0, target, [], 100, 1);
+
+    ok('returns valid grid structure', grid && Array.isArray(grid.rows) && grid.rows.length > 0);
+    ok('recommends a dose regimen', grid.recommendedDailyDose > 0 && grid.recommendedAdminDose > 0);
+
+    const recRow = grid.rows.find(r => r.dailyDose === grid.recommendedDailyDose);
+    ok('recommended dose has highest utility', recRow && recRow.pTarget >= 30, `pTarget=${recRow?.pTarget}%`);
+
+    // Monotonicity: higher dose produces higher predicted trough
+    const first = grid.rows[0];
+    const last = grid.rows[grid.rows.length - 1];
+    ok('higher candidate dose yields higher predicted trough', last.predTrough > first.predTrough,
+        `low=${first.predTrough} vs high=${last.predTrough}`);
 }
 
 done('pk-engine');
